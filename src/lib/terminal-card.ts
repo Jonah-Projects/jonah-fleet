@@ -438,16 +438,18 @@ export function detectClaimedPR(chunk: string): string | null {
   const findingMatch = chunk.match(/(?:addressing\s+review\s+findings|fixing\s+review\s+findings)[^\n#]*?#(\d+)/i);
   if (findingMatch) return `PR #${findingMatch[1]}`;
 
-  // Pattern 1: Starting review (round N) on PR #123
-  const reviewMatch = chunk.match(/Starting\s+review[^\n#]*?#(\d+)/i);
+  // Pattern 1: Starting review (round N) on [PR ]#123 (avoiding run log issue # references)
+  const reviewMatch =
+    chunk.match(/Starting\s+review[^\n]*?(?:on\s+|PR\s+)#(\d+)/i) ||
+    chunk.match(/Starting\s+review(?![^\n]*?(?:run\s+log|tracking\s+log|log\s+issue))[^\n#]*?#(\d+)/i);
   if (reviewMatch) return `PR #${reviewMatch[1]}`;
 
   // Pattern 2: Selected Target PR: [PR #123] or PR #123
   const prMatch = chunk.match(/(?:selected|target|reviewing)\s+(?:target\s+)?PR:?\s*\[?PR\s*#?(\d+)/i);
   if (prMatch) return `PR #${prMatch[1]}`;
 
-  // Pattern 3: gh pr (view|diff|checkout|review|edit|ready) 123
-  const ghPrMatch = chunk.match(/gh\s+pr\s+(?:view|diff|checkout|review|edit|ready)\s+(\d+)/i);
+  // Pattern 3: gh pr (view|diff|checkout|review|edit|ready|comment) 123
+  const ghPrMatch = chunk.match(/gh\s+pr\s+(?:view|diff|checkout|review|edit|ready|comment)\s+(\d+)/i);
   if (ghPrMatch) return `PR #${ghPrMatch[1]}`;
 
   return null;

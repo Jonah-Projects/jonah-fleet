@@ -80,7 +80,11 @@ Check if `$PR_NUMBER` is set:
 
 ### Step 3: Round tracking & Starting Review marker
 
-- Post a "Starting review (round N)" comment on the target PR to claim the review window.
+- Post a "Starting review (round N)" comment on the target PR to claim the review window:
+  - If `$ROUTINE_ISSUE_NUMBER` is set in the environment or routine prompt, include a link to the tracking log issue:
+    `Starting review (round N) · [Run Log #$ROUTINE_ISSUE_NUMBER](${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/issues/${ROUTINE_ISSUE_NUMBER})`
+    (or `Starting review (round N) · Run log: #$ROUTINE_ISSUE_NUMBER`).
+  - If `$ROUTINE_ISSUE_NUMBER` is not set, post `Starting review (round N)`.
 - Check round count `N`. If `N >= 5` and blocking findings persist, prepare to escalate.
 
 ### Step 4: Multi-Angle Code Review Pass
@@ -133,6 +137,7 @@ If the PR is clean and approved for merge, but lacks a `Closes #N` tracking link
     gh issue close "$ISSUE_NUMBER" --comment "Closed via PR #<N> (merged into main)."
     ```
   - Submit held review comments.
+  - In any review summary, decision comment, or escalation comment posted to the PR, include the run log reference if `$ROUTINE_ISSUE_NUMBER` is set (e.g. `- **Run Log**: [#$ROUTINE_ISSUE_NUMBER](${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/issues/${ROUTINE_ISSUE_NUMBER})`).
   - File follow-up issues for material non-blocking findings.
   - If mechanical doc fixes are needed, commit directly to `main`.
 

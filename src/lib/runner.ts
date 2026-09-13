@@ -237,26 +237,29 @@ export function discoverSkillsPrompt(targetDir: string): string {
 export function buildRoutinePrompt(
   targetDir: string,
   routine: string,
-  options: { issue?: string | number; pr?: string | number } = {}
+  options: { issue?: string | number; pr?: string | number; routineIssueNumber?: number } = {}
 ): string {
   const skillsPrompt = discoverSkillsPrompt(targetDir);
   const promptFile = `.github/prompts/${routine}.md`;
+  const logPrompt = options.routineIssueNumber
+    ? ` Tracking run log issue: #${options.routineIssueNumber}.`
+    : '';
 
   if (routine === 'autowork') {
     if (options.issue) {
-      return `You are the Autowork routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is issue #${options.issue}. You are in Targeted mode: work issue #${options.issue} directly, ahead of Phase 1 convergence and priority scan.`;
+      return `You are the Autowork routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is issue #${options.issue}. You are in Targeted mode: work issue #${options.issue} directly, ahead of Phase 1 convergence and priority scan.${logPrompt}`;
     }
-    return `You are the Autowork routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs for review comments to fix, close merged issues, then pick the highest-priority unclaimed issue.`;
+    return `You are the Autowork routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs for review comments to fix, close merged issues, then pick the highest-priority unclaimed issue.${logPrompt}`;
   }
 
   if (routine === 'peer-review') {
     if (options.pr) {
-      return `You are the Peer Review routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is pull request #${options.pr}. You are in Targeted mode: review PR #${options.pr} directly.`;
+      return `You are the Peer Review routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is pull request #${options.pr}. You are in Targeted mode: review PR #${options.pr} directly.${logPrompt}`;
     }
-    return `You are the Peer Review routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs and select the highest-priority PR to review.`;
+    return `You are the Peer Review routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs and select the highest-priority PR to review.${logPrompt}`;
   }
 
-  return `You are the ${routine} routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}`;
+  return `You are the ${routine} routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}${logPrompt}`;
 }
 
 /**
@@ -378,9 +381,27 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     executionDir = worktreePath;
   }
 
+  let targetTitle: string | undefined = options.title;
+  const baseTarget = options.pr
+    ? `PR #${options.pr}`
+    : options.issue
+      ? `Issue #${options.issue}`
+      : undefined;
+
+  let targetLabel = baseTarget
+    ? formatTargetLabel(baseTarget, targetTitle)
+    : routine;
+  let dynamicTargetDetected = Boolean(options.pr || options.issue);
+
+  let routineIssueNumber: number | undefined;
+  if (!options.dryRun) {
+    routineIssueNumber = tryCreateLocalRunIssue(targetDir, routine, timestamp, targetLabel, hostname);
+  }
+
   const prompt = buildRoutinePrompt(executionDir, routine, {
     issue: options.issue,
     pr: options.pr,
+    routineIssueNumber,
   });
 
   if (options.dryRun) {
@@ -403,6 +424,10 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     PR_NUMBER: options.pr ? String(options.pr) : '',
   };
 
+  if (routineIssueNumber) {
+    childEnv.ROUTINE_ISSUE_NUMBER = String(routineIssueNumber);
+  }
+
   const args = buildAgyArgs(prompt, model, printTimeout);
 
   let output = '';
@@ -416,26 +441,6 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
   const logFilePath = path.join(logDir, 'daemon.log');
   const runsDir = path.join(logDir, 'runs');
   fs.mkdirSync(runsDir, { recursive: true });
-
-  let targetTitle: string | undefined = options.title;
-  const baseTarget = options.pr
-    ? `PR #${options.pr}`
-    : options.issue
-      ? `Issue #${options.issue}`
-      : undefined;
-
-  let targetLabel = baseTarget
-    ? formatTargetLabel(baseTarget, targetTitle)
-    : routine;
-  let dynamicTargetDetected = Boolean(options.pr || options.issue);
-
-  let routineIssueNumber: number | undefined;
-  if (!options.dryRun) {
-    routineIssueNumber = tryCreateLocalRunIssue(targetDir, routine, timestamp, targetLabel, hostname);
-    if (routineIssueNumber) {
-      childEnv.ROUTINE_ISSUE_NUMBER = String(routineIssueNumber);
-    }
-  }
 
   let activePhase = 'Starting session...';
   let lastActionDesc: string | null = null;

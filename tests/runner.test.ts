@@ -59,6 +59,12 @@ describe('Local Routine Runner', () => {
     expect(prompt).toContain('Scan mode: check open PRs and select the highest-priority PR');
   });
 
+  it('builds peer-review prompt with routineIssueNumber', () => {
+    const prompt = buildRoutinePrompt(tmpRepo, 'peer-review', { pr: 105, routineIssueNumber: 848 });
+    expect(prompt).toContain('Targeted mode: review PR #105 directly.');
+    expect(prompt).toContain('Tracking run log issue: #848.');
+  });
+
   it('builds agy invocation args with stream-json output format', () => {
     const args = buildAgyArgs('Test prompt', 'gemini-3.7-flash-high', '30m');
     expect(args).toContain('--output-format');

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **routines:** introduce autonomous Design Review routine for design system purity, UI clutter audit, and feature pruning.
 * **runner:** display clean, truncated PR and Issue titles in foreground daemon spinner alongside target numbers.
 * **workflows:** harden workflow templates against shell injection, credential persistence, and job timeout mismatches across autowork, review, and cron routines.
+* **peer-review:** link routine tracking log issue directly from "Starting review (round N)" PR comments and review summaries.
 
 ## [1.8.0](https://github.com/juliendurandeu/jonah-fleet/compare/jonah-fleet-v1.7.0...jonah-fleet-v1.8.0) (2026-09-09)
 

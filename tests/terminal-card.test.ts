@@ -219,6 +219,9 @@ The build is completing. Continuing shortly.
 
     it('detects PR from starting review comment or target PR text', () => {
       expect(detectClaimedPR('Starting review (round 1) on #3783')).toBe('PR #3783');
+      expect(detectClaimedPR('Starting review (round 1) on #3783 · [Run Log #848](https://github.com/org/repo/issues/848)')).toBe('PR #3783');
+      expect(detectClaimedPR('Starting review (round 1) on PR #847 · Run log: #848')).toBe('PR #847');
+      expect(detectClaimedPR('gh pr comment 847 --body "Starting review (round 1) · [Run Log #848]"')).toBe('PR #847');
       expect(detectClaimedPR('Selected Target PR: [PR #3783]')).toBe('PR #3783');
       expect(detectClaimedPR('Running gh pr view 3783 --json diff')).toBe('PR #3783');
       expect(detectClaimedPR('gh pr edit 42 --add-assignee user')).toBe('PR #42');
