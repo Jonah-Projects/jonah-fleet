@@ -241,25 +241,26 @@ export function buildRoutinePrompt(
 ): string {
   const skillsPrompt = discoverSkillsPrompt(targetDir);
   const promptFile = `.github/prompts/${routine}.md`;
+  const repoContext = `Working repository is located at ${targetDir}. All git, gh, and workspace commands must execute strictly within this repository.`;
   const logPrompt = options.routineIssueNumber
     ? ` Tracking run log issue: #${options.routineIssueNumber}.`
     : '';
 
   if (routine === 'autowork') {
     if (options.issue) {
-      return `You are the Autowork routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is issue #${options.issue}. You are in Targeted mode: work issue #${options.issue} directly, ahead of Phase 1 convergence and priority scan.${logPrompt}`;
+      return `You are the Autowork routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is issue #${options.issue}. You are in Targeted mode: work issue #${options.issue} directly, ahead of Phase 1 convergence and priority scan.${logPrompt}`;
     }
-    return `You are the Autowork routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs for review comments to fix, close merged issues, then pick the highest-priority unclaimed issue.${logPrompt}`;
+    return `You are the Autowork routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs for review comments to fix, close merged issues, then pick the highest-priority unclaimed issue.${logPrompt}`;
   }
 
   if (routine === 'peer-review') {
     if (options.pr) {
-      return `You are the Peer Review routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is pull request #${options.pr}. You are in Targeted mode: review PR #${options.pr} directly.${logPrompt}`;
+      return `You are the Peer Review routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is pull request #${options.pr}. You are in Targeted mode: review PR #${options.pr} directly.${logPrompt}`;
     }
-    return `You are the Peer Review routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs and select the highest-priority PR to review.${logPrompt}`;
+    return `You are the Peer Review routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs and select the highest-priority PR to review.${logPrompt}`;
   }
 
-  return `You are the ${routine} routine for this repository. Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}${logPrompt}`;
+  return `You are the ${routine} routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}${logPrompt}`;
 }
 
 /**
