@@ -124,6 +124,7 @@ If the PR is clean and approved for merge, but lacks a `Closes #N` tracking link
   - If `N < 5`: Post inline comments, submit review as `COMMENT`, and convert PR to draft (`gh pr ready <N> --undo`).
   - If `N >= 5`: Convert PR to draft, post summary comment escalating to repo maintainer, and apply `needs-human` label.
 - **If Clean (or only Non-blocking findings)**:
+  - If the PR branch has minor mechanical merge conflicts against `origin/main` (e.g. adjacent `CHANGELOG.md` entries from concurrent merges) while code and tests are sound, resolve the conflict mechanically via `/resolving-merge-conflicts` before squash-merging rather than bouncing the PR back to draft.
   - If PR lacks `Closes #N`, execute Autonomous Issue Synthesis (Step 5.5).
   - Extract the tracking issue number `$ISSUE_NUMBER` from the PR description or title (e.g. `Closes #<N>`, `Fixes #<N>`, `Resolves #<N>`).
   - Squash-merge the PR: `gh pr merge <N> --squash --delete-branch`.

@@ -86,7 +86,7 @@ a. **Read the target issue and check eligibility.** Eligible = open, unassigned 
    - **Design System & Viewport Pre-flight** (for frontend/UI diffs): self-audit diffs against design tokens (no arbitrary class overrides), WCAG AA 4.5:1 contrast ratios on dark/light surfaces, single primary CTA hierarchy per screen, and mobile viewport crowding (avoid stacked nudges/banners above the fold at ~390px).
    - **Documentation accuracy**: update relevant docs (`ARCHITECTURE.md`, `CODEMAP.md`, `API.md`, `CHANGELOG.md` if maintained by repo).
    - **Build & type-check verification**: run the repository's test, type-check, and lint commands from `AGENTS.md` (e.g. `npm test`, `npm run type-check`, `npm run lint`, `pytest`, `cargo test`). Confirm zero errors and zero test failures.
-   - **Clean-merge gate**: verify `git merge-tree origin/main HEAD` reports no conflicts.
+   - **Active Origin Sync & Clean-Merge Gate**: Run `git fetch origin main && git merge origin/main --no-edit` to absorb any newly merged pull requests and resolve any conflicts locally. Verify `git merge-tree origin/main HEAD` reports no conflicts before marking ready.
    - **Release claim on ready**: mark the PR ready (`gh pr ready <PR>`) and unassign yourself (`gh pr edit <PR> --remove-assignee <login>`) so Peer Review can evaluate without holding stale agent reservation locks.
      Only mark the PR ready after passing every check above.
      3b. **Ping-pong cap**: If this same PR has bounced between draft and ready 3 or more times over the same substantive finding, stop re-marking it ready. Post a comment summarizing the disagreement for human resolution and leave the PR in draft.

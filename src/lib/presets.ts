@@ -258,5 +258,5 @@ export const WORKFLOW_TO_ROUTINE_MAP: Record<string, keyof FleetManifest['routin
   'sync-fleet.yml': 'sync-fleet',
 };
 
-export const FLEET_VERSION = '1.6.0';
+export const FLEET_VERSION = '1.8.0';
 export const SCHEMA_URL = 'https://raw.githubusercontent.com/juliendurandeu/jonah-fleet/main/schema.json';
