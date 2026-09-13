@@ -26,7 +26,8 @@
         "issues-housekeeping": { "type": "boolean" },
         "dependency-update-security-check": { "type": "boolean" },
         "product-planning": { "type": "boolean" },
-        "analytics-review": { "type": "boolean" }
+        "analytics-review": { "type": "boolean" },
+        "design-review": { "type": "boolean" }
       },
       "additionalProperties": false,
       "description": "Granular routine toggles"
@@ -46,7 +47,8 @@
         "issues-housekeeping": { "type": "string", "description": "Target model for issues-housekeeping routine" },
         "dependency-update-security-check": { "type": "string", "description": "Target model for dependency-update-security-check routine" },
         "product-planning": { "type": "string", "description": "Target model for product-planning routine" },
-        "analytics-review": { "type": "string", "description": "Target model for analytics-review routine" }
+        "analytics-review": { "type": "string", "description": "Target model for analytics-review routine" },
+        "design-review": { "type": "string", "description": "Target model for design-review routine" }
       },
       "additionalProperties": { "type": "string" },
       "description": "Per-routine model overrides (e.g. gemini-3.7-flash-high, gemini-3.7-flash)"
@@ -68,7 +70,8 @@
             "issues-housekeeping": { "type": "number" },
             "dependency-update-security-check": { "type": "number" },
             "product-planning": { "type": "number" },
-            "analytics-review": { "type": "number" }
+            "analytics-review": { "type": "number" },
+            "design-review": { "type": "number" }
           },
           "additionalProperties": { "type": "number" },
           "description": "Maximum tool call iterations per routine"
@@ -83,7 +86,8 @@
             "issues-housekeeping": { "type": "number" },
             "dependency-update-security-check": { "type": "number" },
             "product-planning": { "type": "number" },
-            "analytics-review": { "type": "number" }
+            "analytics-review": { "type": "number" },
+            "design-review": { "type": "number" }
           },
           "additionalProperties": { "type": "number" },
           "description": "Workflow runner timeout in minutes per routine"
@@ -101,6 +105,7 @@
         "issues-housekeeping": { "type": "string", "description": "Custom cron schedule for issues housekeeping" },
         "dependency-update-security-check": { "type": "string", "description": "Custom cron schedule for dependency security checks" },
         "analytics-review": { "type": "string", "description": "Custom cron schedule for analytics review" },
+        "design-review": { "type": "string", "description": "Custom cron schedule for design review" },
         "sync-fleet": { "type": "string", "description": "Custom cron schedule for fleet sync" }
       },
       "additionalProperties": { "type": "string" },
