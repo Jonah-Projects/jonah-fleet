@@ -11,8 +11,8 @@ This routine runs behind a **human approval gate**: it **never files autowork-re
 This routine runs in two modes: **Propose** (scheduled cron sweep / unapproved fire) and **Promote** (operator-approved fire).
 
 In **Propose mode**, SUCCESS requires:
-- [ ] Read current roadmap, domain documentation, closed measurement trackers, and recent feedback/analytics findings
-- [ ] Performed Feature Pruning & Deprecation Audit: evaluated shipped features and measurement outcomes for low-ROI (<2% user adoption or >50% failure rate) features, drafting deprecation, removal, or simplification proposals
+- [ ] Read current roadmap, domain documentation, closed measurement trackers, recent feedback/analytics findings, and the latest open `🎨 Design Review` issue / `.github/prompts/logs/design-review/` directives
+- [ ] Performed Feature Pruning & Deprecation Audit: evaluated shipped features, measurement outcomes (<2% user adoption or >50% failure rate), and Design Review pruning/clutter directives, drafting deprecation, removal, or simplification proposals
 - [ ] Created or updated exactly one dated staging issue (`🗺️ Product Plan — {date}`) containing:
   - Up to 3 well-scoped proposals (Summary/Tasks/Why/Complexity), covering additions, pivots, or deprecations
   - Backlog re-ranking recommendations
@@ -51,10 +51,10 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 ### Steps 1–3: Propose Mode (Staging Proposals)
 
-1. Read `ROADMAP.md`, `AGENTS.md`, closed measurement trackers with `RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]`, and open issues.
+1. Read `ROADMAP.md`, `AGENTS.md`, closed measurement trackers with `RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]`, the latest open `🎨 Design Review` issue (and run log in `.github/prompts/logs/design-review/`), and open issues.
 2. **Feature Pruning & Deprecation Audit**:
-   - Audit shipped features and closed measurement tracker verdicts.
-   - For any feature with <2% user adoption, sub-threshold CTR, or >50% failure rate, draft explicit deprecation, removal, or pivot proposals to keep the codebase lean and eliminate maintenance waste.
+   - Audit shipped features, closed measurement tracker verdicts, and `🎨 Design Review` clutter/pruning findings.
+   - For any feature with <2% user adoption, sub-threshold CTR, >50% failure rate, or persistent UI clutter flagged by Design Review, draft explicit deprecation, removal, or pivot proposals to keep the codebase lean and eliminate maintenance waste.
 3. Draft up to 3 high-impact proposals (including additions, pivots, or deprecations) based on roadmap priorities, measurement outcomes, and user feedback.
 4. For proposals sized `size/M` or above, draft a formal specification using `/to-spec`.
 5. Stage all proposals in a dedicated staging issue: `🗺️ Product Plan — {YYYY-MM-DD}` assigned to the repo maintainer.

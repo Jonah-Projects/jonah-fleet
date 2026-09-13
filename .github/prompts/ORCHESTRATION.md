@@ -16,7 +16,7 @@ This project's automation is a GitHub-native implementation of the orchestration
 
 Dispatch is both **scheduled** and **event-driven**. All routines run as ephemeral agent sessions via **Antigravity CLI (`agy`)** powered by **Gemini 3.7 Flash (High reasoning)**. The routine suite is calibrated to operate within a **strict 70% weekly token ceiling across all routines combined**, supervised by `optimizer.md`:
 
-- **Scheduled cron sweeps**: Autowork runs periodically (`autowork-cron.yml`), complemented by prompt optimization (`prompt-optimizer-cron.yml`), issues housekeeping (`issues-housekeeping-cron.yml`), and dependency security checks (`dependency-check-cron.yml`).
+- **Scheduled cron sweeps**: Autowork runs periodically (`autowork-cron.yml`), complemented by prompt optimization (`prompt-optimizer-cron.yml`), issues housekeeping (`issues-housekeeping-cron.yml`), dependency security checks (`dependency-check-cron.yml`), analytics review (`analytics-review-cron.yml`), product planning (`product-planning-cron.yml`), and design review (`design-review-cron.yml`).
 - **Event-driven & manual triggers**: GitHub Actions workflows fire routines on events and interactive commands so work starts within seconds instead of waiting for scheduled ticks:
   - `trigger-review-routine.yml` fires Peer Review automatically when a PR is marked ready for review, updated, or review is requested (`ready_for_review`, `opened`, `reopened`, `synchronize`, `review_requested`). It can also be manually (re)triggered via `workflow_dispatch` (with optional `pr_number` for Targeted mode or blank for Scan mode) or by commenting `/review`, `/peer-review`, `/retrigger`, or `/re-review` on any open pull request.
   - `trigger-autowork-on-merge.yml` fires Autowork in **Targeted mode** when a PR merges to `main` and unblocks the next unit of chained work.
@@ -76,6 +76,7 @@ Single source of truth for Autowork Phase 1 pull request convergence. An assigne
 | Dependency Update & Security Check | `.github/prompts/dependency-update-security-check.md` | Checking dependencies for updates and known vulnerabilities, opening actionable PRs                                                                          |
 | Product Planning                   | `.github/prompts/product-planning.md`                 | Turning roadmap priorities into staged issues (`/to-tickets`) and formal PRDs (`/to-spec`)                                                                   |
 | Analytics Review                   | `.github/prompts/analytics-review.md`                 | Evaluating telemetry & measurement trackers against success metrics, emitting action directives (PIVOT/DEPRECATE/ITERATE), and bridging to product planning  |
+| Design Review                      | `.github/prompts/design-review.md`                    | Auditing player-facing surfaces for design system token deviations, visual clutter, feature pruning, and UX improvements                                      |
 
 ---
 
@@ -103,6 +104,10 @@ The routines invoke specialized engineering skills at key workflow checkpoints:
   - `/to-tickets`: Decomposes approved epics/proposals into dependency-linked issues.
 - **Prompt Optimizer (`optimizer.md`)**:
   - `/writing-for-agents`: Drafts crisp, token-efficient prompt and rule updates.
+- **Design Review (`design-review.md`)**:
+  - `/design-system`: Analyzes styling diffs and static components for token purity and pattern alignment.
+  - `/run`: Boots dev environment and automates mobile/desktop viewport captures.
+  - `/design-critique`: Analyzes captured screenshots for visual hierarchy, clutter, spacing, and contrast.
 
 ---
 

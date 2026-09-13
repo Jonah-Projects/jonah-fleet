@@ -85,6 +85,7 @@ export function createDefaultManifest(preset: PresetName = 'standard'): FleetMan
         'dependency-update-security-check': true,
         'product-planning': false,
         'analytics-review': false,
+        'design-review': false,
       },
       skills: PRESET_CONFIGS.standard.skills,
       models: { ...DEFAULT_MODELS_CONFIG },

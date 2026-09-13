@@ -9,6 +9,7 @@ export interface RoutineModels {
   'dependency-update-security-check'?: string;
   'product-planning'?: string;
   'analytics-review'?: string;
+  'design-review'?: string;
   [key: string]: string | undefined;
 }
 
@@ -23,6 +24,7 @@ export interface RoutineBudgets {
     'dependency-update-security-check'?: number;
     'product-planning'?: number;
     'analytics-review'?: number;
+    'design-review'?: number;
     [key: string]: number | undefined;
   };
   timeoutMinutes?: {
@@ -34,6 +36,7 @@ export interface RoutineBudgets {
     'dependency-update-security-check'?: number;
     'product-planning'?: number;
     'analytics-review'?: number;
+    'design-review'?: number;
     [key: string]: number | undefined;
   };
 }
@@ -50,6 +53,7 @@ export interface FleetManifest {
     'dependency-update-security-check': boolean;
     'product-planning': boolean;
     'analytics-review': boolean;
+    'design-review': boolean;
   };
   schedules?: {
     autowork?: string;
@@ -58,6 +62,7 @@ export interface FleetManifest {
     'issues-housekeeping'?: string;
     'dependency-update-security-check'?: string;
     'analytics-review'?: string;
+    'design-review'?: string;
     'sync-fleet'?: string;
     [key: string]: string | undefined;
   };
@@ -88,6 +93,7 @@ export const DEFAULT_ROUTINE_MODELS: Record<string, string> = {
   'dependency-update-security-check': 'gemini-3.7-flash',
   'product-planning': 'gemini-3.7-flash-high',
   'analytics-review': 'gemini-3.7-flash',
+  'design-review': 'gemini-3.7-flash-high',
 };
 
 export const DEFAULT_ROUTINE_TIMEOUTS: Record<string, number> = {
@@ -98,6 +104,7 @@ export const DEFAULT_ROUTINE_TIMEOUTS: Record<string, number> = {
   'dependency-update-security-check': 25,
   'product-planning': 45,
   'analytics-review': 30,
+  'design-review': 50,
 };
 
 export const DEFAULT_ROUTINE_MAX_ITERATIONS: Record<string, number> = {
@@ -108,6 +115,7 @@ export const DEFAULT_ROUTINE_MAX_ITERATIONS: Record<string, number> = {
   'dependency-update-security-check': 20,
   'product-planning': 40,
   'analytics-review': 25,
+  'design-review': 30,
 };
 
 export const DEFAULT_MODELS_CONFIG: RoutineModels = {
@@ -127,6 +135,7 @@ export const DEFAULT_BUDGETS_CONFIG: RoutineBudgets = {
     'dependency-update-security-check': 25,
     'product-planning': 45,
     'analytics-review': 30,
+    'design-review': 50,
   },
   maxIterations: {
     autowork: 65,
@@ -136,6 +145,7 @@ export const DEFAULT_BUDGETS_CONFIG: RoutineBudgets = {
     'dependency-update-security-check': 20,
     'product-planning': 40,
     'analytics-review': 25,
+    'design-review': 30,
   },
 };
 
@@ -162,6 +172,7 @@ export const PRESET_CONFIGS: Record<Exclude<PresetName, 'custom'>, { routines: F
       'dependency-update-security-check': false,
       'product-planning': false,
       'analytics-review': false,
+      'design-review': false,
     },
     skills: [
       'tdd',
@@ -180,6 +191,7 @@ export const PRESET_CONFIGS: Record<Exclude<PresetName, 'custom'>, { routines: F
       'dependency-update-security-check': true,
       'product-planning': false,
       'analytics-review': false,
+      'design-review': false,
     },
     skills: [
       'tdd',
@@ -202,6 +214,7 @@ export const PRESET_CONFIGS: Record<Exclude<PresetName, 'custom'>, { routines: F
       'dependency-update-security-check': true,
       'product-planning': true,
       'analytics-review': true,
+      'design-review': true,
     },
     skills: [
       'tdd',
@@ -232,6 +245,7 @@ export const ROUTINE_TO_WORKFLOW_MAP: Record<keyof FleetManifest['routines'], st
   'dependency-update-security-check': ['dependency-check-cron.yml'],
   'product-planning': [],
   'analytics-review': [],
+  'design-review': ['design-review-cron.yml'],
 };
 
 export const WORKFLOW_TO_ROUTINE_MAP: Record<string, keyof FleetManifest['routines'] | 'sync-fleet'> = {
@@ -240,6 +254,7 @@ export const WORKFLOW_TO_ROUTINE_MAP: Record<string, keyof FleetManifest['routin
   'prompt-optimizer-cron.yml': 'optimizer',
   'issues-housekeeping-cron.yml': 'issues-housekeeping',
   'dependency-check-cron.yml': 'dependency-update-security-check',
+  'design-review-cron.yml': 'design-review',
   'sync-fleet.yml': 'sync-fleet',
 };
 

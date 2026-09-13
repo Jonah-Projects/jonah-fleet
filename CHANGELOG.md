@@ -5,10 +5,11 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-10
+## [Unreleased] - 2026-09-13
 
 ### Features
 
+* **routines:** introduce autonomous Design Review routine for design system purity, UI clutter audit, and feature pruning.
 * **runner:** display clean, truncated PR and Issue titles in foreground daemon spinner alongside target numbers.
 
 ## [1.8.0](https://github.com/juliendurandeu/jonah-fleet/compare/jonah-fleet-v1.7.0...jonah-fleet-v1.8.0) (2026-09-09)
