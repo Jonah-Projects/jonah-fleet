@@ -3,6 +3,7 @@ import {
   fetchRepoLabels,
   classifyLabels,
   pruneLabels,
+  provisionLabels,
   resolveRepoName,
   DEFAULT_PROTECTED_LABEL_PATTERNS,
 } from '../lib/labels.js';
@@ -19,7 +20,7 @@ export interface LabelsCommandOptions {
 }
 
 export async function runLabels(
-  action: 'audit' | 'list' | 'prune' = 'audit',
+  action: 'audit' | 'list' | 'prune' | 'provision' = 'audit',
   options: LabelsCommandOptions = {}
 ): Promise<void> {
   const cwd = options.cwd || process.cwd();
@@ -32,6 +33,32 @@ export async function runLabels(
     ...DEFAULT_PROTECTED_LABEL_PATTERNS,
     ...userProtected,
   ];
+
+  if (action === 'provision' || (action as string) === 'sync') {
+    const result = await provisionLabels({ repo, cwd, executor });
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    console.log(pc.bold(pc.cyan(`\n🏷️  Fleet Label Provisioning for ${repo}\n`)));
+    if (result.created.length > 0) {
+      console.log(pc.green(`  ✓ Created ${result.created.length} missing label(s):`));
+      for (const label of result.created) {
+        console.log(`    - ${pc.green(label)}`);
+      }
+    }
+    if (result.alreadyExists.length > 0) {
+      console.log(pc.dim(`  ℹ ${result.alreadyExists.length} label(s) already exist.`));
+    }
+    if (result.errors.length > 0) {
+      console.log(pc.red(`\n  ❌ Failed to create ${result.errors.length} label(s):`));
+      for (const err of result.errors) {
+        console.log(`    - ${pc.red(err.label)}: ${err.error}`);
+      }
+    }
+    console.log();
+    return;
+  }
 
   if (action === 'prune') {
     const isDryRun = Boolean(options.dryRun);

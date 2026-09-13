@@ -46,6 +46,7 @@ export const DEFAULT_PROTECTED_LABEL_PATTERNS: string[] = [
   'status:*',
   'runner:*',
   'historical-migration',
+  'needs-attention',
 ];
 
 export function isLabelProtected(
@@ -293,6 +294,90 @@ export async function pruneLabels(options: PruneLabelsOptions = {}): Promise<Pru
           error: err.message || String(err),
         });
       }
+    }
+  }
+
+  return result;
+}
+
+export interface FleetLabelDefinition {
+  name: string;
+  color: string;
+  description: string;
+}
+
+export const FLEET_CORE_LABELS: FleetLabelDefinition[] = [
+  { name: 'routine-log', color: '5319e7', description: 'Autonomous routine execution log' },
+  { name: 'status:running', color: 'fbca04', description: 'Routine execution in progress' },
+  { name: 'status:success', color: '0e8a16', description: 'Routine execution succeeded' },
+  { name: 'status:failure', color: 'd93f0b', description: 'Routine execution failed' },
+  { name: 'needs-attention', color: 'e11d48', description: 'Requires maintainer triage' },
+  { name: 'runner:github-actions', color: '1f883d', description: 'Executed via GitHub Actions' },
+  { name: 'runner:local', color: 'bfd4f2', description: 'Executed via local machine daemon' },
+  { name: 'routine:autowork', color: '0052cc', description: 'Routine: autowork' },
+  { name: 'routine:peer-review', color: '0052cc', description: 'Routine: peer-review' },
+  { name: 'routine:optimizer', color: '0052cc', description: 'Routine: optimizer' },
+  { name: 'routine:issues-housekeeping', color: '0052cc', description: 'Routine: issues-housekeeping' },
+  { name: 'routine:dependency-check', color: '0052cc', description: 'Routine: dependency-check' },
+  { name: 'routine:analytics-review', color: '0052cc', description: 'Routine: analytics-review' },
+  { name: 'routine:product-planning', color: '0052cc', description: 'Routine: product-planning' },
+  { name: 'routine:design-review', color: '0052cc', description: 'Routine: design-review' },
+  { name: 'historical-migration', color: 'd4c5f9', description: 'Migrated from historical git logs' },
+];
+
+export interface ProvisionLabelsResult {
+  repo: string;
+  created: string[];
+  alreadyExists: string[];
+  errors: Array<{ label: string; error: string }>;
+}
+
+export async function provisionLabels(options: {
+  repo?: string;
+  cwd?: string;
+  executor?: GhExecutor;
+} = {}): Promise<ProvisionLabelsResult> {
+  const cwd = options.cwd || process.cwd();
+  const executor = options.executor || defaultGhExecutor;
+  const repo = await resolveRepoName(options.repo, cwd, executor);
+
+  const existingRaw = await fetchRepoLabels(repo, executor, cwd).catch(() => []);
+  const existingMap = new Set(existingRaw.map((l) => l.name));
+
+  const result: ProvisionLabelsResult = {
+    repo,
+    created: [],
+    alreadyExists: [],
+    errors: [],
+  };
+
+  for (const def of FLEET_CORE_LABELS) {
+    if (existingMap.has(def.name)) {
+      result.alreadyExists.push(def.name);
+      continue;
+    }
+
+    try {
+      const args = [
+        'label',
+        'create',
+        def.name,
+        '--color',
+        def.color,
+        '--description',
+        def.description,
+        '--force',
+      ];
+      if (repo && repo !== 'current') {
+        args.push('--repo', repo);
+      }
+      await executor(args);
+      result.created.push(def.name);
+    } catch (err: any) {
+      result.errors.push({
+        label: def.name,
+        error: err.message || String(err),
+      });
     }
   }
 

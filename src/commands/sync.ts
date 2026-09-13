@@ -3,6 +3,7 @@ import { loadManifest, saveManifest } from '../lib/manifest.js';
 import { installFleet } from '../lib/installer.js';
 import { checkDrift } from '../lib/diff.js';
 import { FLEET_VERSION } from '../lib/presets.js';
+import { provisionLabels } from '../lib/labels.js';
 
 export interface SyncOptions {
   check?: boolean;
@@ -51,5 +52,14 @@ export async function runSync(options: SyncOptions = {}): Promise<void> {
 
   const result = installFleet(cwd, manifest, { force: true });
   console.log(pc.green(`✓ Synchronized with Jonah Fleet v${FLEET_VERSION}`));
-  console.log(pc.green(`✓ Updated ${result.promptsInstalled.length} prompts, ${result.workflowsInstalled.length} workflows, and ${result.skillsInstalled.length} skills.\n`));
+  console.log(pc.green(`✓ Updated ${result.promptsInstalled.length} prompts, ${result.workflowsInstalled.length} workflows, and ${result.skillsInstalled.length} skills.`));
+
+  // Attempt to provision core fleet labels (graceful fallback if offline or no gh auth)
+  try {
+    const labelRes = await provisionLabels({ cwd });
+    if (labelRes.created.length > 0) {
+      console.log(pc.green(`✓ Provisioned ${labelRes.created.length} missing fleet label(s)`));
+    }
+  } catch {}
+  console.log();
 }

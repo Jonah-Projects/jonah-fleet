@@ -48,13 +48,16 @@ program
 
 program
   .command('labels [action]')
-  .description('Audit and prune unused repository labels while protecting fleet taxonomy')
+  .description('Audit, prune, or provision repository labels for autonomous fleet taxonomy (audit | prune | provision)')
   .option('-d, --dry-run', 'Preview prunable labels without deleting them', false)
   .option('-y, --yes', 'Confirm automatic deletion of prunable labels', false)
   .option('-r, --repo <repo>', 'Target GitHub repository (defaults to current)')
   .option('-j, --json', 'Output results as JSON', false)
   .action(async (action, options) => {
-    const act = action === 'prune' || action === 'list' || action === 'audit' ? action : 'audit';
+    const act =
+      action === 'prune' || action === 'list' || action === 'audit' || action === 'provision' || action === 'sync'
+        ? (action as 'audit' | 'list' | 'prune' | 'provision')
+        : 'audit';
     await runLabels(act, options);
   });
 

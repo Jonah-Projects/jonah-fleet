@@ -4,6 +4,8 @@ import {
   classifyLabels,
   fetchRepoLabels,
   pruneLabels,
+  provisionLabels,
+  FLEET_CORE_LABELS,
   DEFAULT_PROTECTED_LABEL_PATTERNS,
   RepoLabelInfo,
 } from '../src/lib/labels.js';
@@ -361,6 +363,84 @@ describe('CLI Labels Command Execution', () => {
     expect(loggedJson.active).toHaveLength(1);
     expect(loggedJson.active[0].name).toBe('priority/P1');
 
+    consoleSpy.mockRestore();
+  });
+
+  it('provisions missing fleet labels via provisionLabels and skips existing', async () => {
+    const mockExecutor = vi.fn(async (args: string[]) => {
+      if (args[1] === 'graphql') {
+        // Return existing routine-log label
+        return JSON.stringify({
+          data: {
+            repository: {
+              labels: {
+                nodes: [
+                  {
+                    id: 'L1',
+                    name: 'routine-log',
+                    description: 'Existing log',
+                    color: '5319e7',
+                    issues: { totalCount: 0 },
+                    allIssues: { totalCount: 0 },
+                    pullRequests: { totalCount: 0 },
+                    allPullRequests: { totalCount: 0 },
+                  },
+                ],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        });
+      }
+      if (args[0] === 'label' && args[1] === 'create') {
+        return `Created label ${args[2]}`;
+      }
+      return '';
+    });
+
+    const res = await provisionLabels({
+      repo: 'owner/repo',
+      executor: mockExecutor,
+    });
+
+    expect(res.alreadyExists).toContain('routine-log');
+    expect(res.created).toContain('status:running');
+    expect(res.created).toContain('status:success');
+    expect(res.created).toContain('routine:autowork');
+    expect(res.errors).toHaveLength(0);
+
+    const createCalls = mockExecutor.mock.calls.filter((c) => c[0][0] === 'label' && c[0][1] === 'create');
+    expect(createCalls.length).toBe(FLEET_CORE_LABELS.length - 1);
+  });
+
+  it('executes labels provision action via runLabels command', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const mockExecutor = vi.fn(async (args: string[]) => {
+      if (args[1] === 'graphql') {
+        return JSON.stringify({
+          data: {
+            repository: {
+              labels: {
+                nodes: [],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        });
+      }
+      return '';
+    });
+
+    await runLabels('provision', {
+      repo: 'owner/repo',
+      executor: mockExecutor,
+      json: true,
+    });
+
+    expect(consoleSpy).toHaveBeenCalled();
+    const parsed = JSON.parse(consoleSpy.mock.calls[0][0]);
+    expect(parsed.created).toContain('routine-log');
+    expect(parsed.created).toContain('status:success');
     consoleSpy.mockRestore();
   });
 });
