@@ -22,7 +22,9 @@ function findLatestLogs(logsBaseDir: string, limit: number = 25): LogCandidate[]
 
   for (const routine of routines) {
     const routineDir = path.join(logsBaseDir, routine);
-    const files = fs.readdirSync(routineDir).filter((f) => f.endsWith('.md') && !f.startsWith('_'));
+    const files = fs
+      .readdirSync(routineDir)
+      .filter((f) => f.endsWith('.md') && !f.startsWith('_') && f.toLowerCase() !== 'readme.md');
 
     for (const file of files) {
       const timestamp = file.replace(/\.md$/, '');
