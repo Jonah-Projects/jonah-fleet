@@ -10,10 +10,10 @@ Additionally, this routine acts as the **Upstream Evolution Bridge**: when a pro
 
 The run is SUCCESS if ALL of these are true:
 
-- [ ] All log files from the incremental window in `.github/prompts/logs/` have been scanned
-- [ ] Every FAILURE log has been categorized and analyzed
-- [ ] Inefficiency and review loops per PR have been computed across SUCCESS logs
-- [ ] Per-agent token and cost consumption metrics have been aggregated across in-window logs and evaluated against the 70% weekly budget ceiling in `ORCHESTRATION.md`
+- [ ] All routine run issues from the incremental window (labeled `routine-log`) have been scanned
+- [ ] Every FAILURE run has been categorized and analyzed
+- [ ] Inefficiency and review loops per PR have been computed across SUCCESS runs
+- [ ] Per-agent token and cost consumption metrics have been aggregated across in-window routine runs and evaluated against the 70% weekly budget ceiling in `ORCHESTRATION.md`
 - [ ] Closed bug issues and merged bug-fix PRs in the window have been analyzed for systemic root causes
 - [ ] For each fixable pattern:
   - If project-specific: opened a local PR with a prompt, template, or test fix and marked ready for review
@@ -27,23 +27,23 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 - **Max iterations**: 30 — stop after 30 tool call rounds.
 - **Max scope**: one PR per identified problem. Do not bundle unrelated fixes.
-- **No speculative work**: only fix patterns evidenced by logs, closed bug issues, or reviewer findings.
+- **No speculative work**: only fix patterns evidenced by routine issues, closed bug issues, or reviewer findings.
 - **Language Requirement**: All GitHub issue titles, descriptions, task checklists, and comments MUST be written in **English**.
 
 ## Instructions
 
 ### 0. Establish the incremental scan boundary
 
-1. Check `.github/prompts/logs/optimizer/` for the most recent optimizer log.
+1. Check the most recent routine issue with labels `routine-log,routine:optimizer` via `gh issue list --label routine-log --label routine:optimizer --state all --limit 1`.
 2. Extract the timestamp as the scan boundary (or last 7 days if first run).
 
 ### 1. Collect signals & analyze logs
 
-1. **Scan in-window log files**: Read all log files in `.github/prompts/logs/*/` within the incremental scan window.
-2. **Extract failure categories**: Categorize runs logging `FAILURE` (`prompt_unclear`, `data_issue`, `token_limit`, `infeasible_task`).
+1. **Query in-window routine issues**: List routine run issues within the window using `gh issue list --label routine-log --state all --limit 100 --json number,title,body,state,labels,createdAt`.
+2. **Extract failure categories**: Categorize runs labeled `status:failure` or logging `FAILURE` (`prompt_unclear`, `data_issue`, `token_limit`, `infeasible_task`).
 3. **Compute efficiency metrics**: Identify PRs experiencing $\ge 3$ review bounce rounds and runs with high iteration usage relative to limits.
 4. **Aggregate per-agent token & cost consumption**:
-   - Parse the metadata table from each in-window log: `Routine`, `Input tokens`, `Output tokens`, `Estimated cost`, `Iterations used` (e.g. `26 / 65`), and `Result` (`SUCCESS` or `FAILURE`).
+   - Parse the metadata table from each in-window routine issue body: `Routine`, `Input tokens`, `Output tokens`, `Estimated cost`, `Iterations used` (e.g. `26 / 65`), and `Result` (`SUCCESS` or `FAILURE`).
    - Group logs by `Routine` (`autowork`, `peer-review`, `issues-housekeeping`, `dependency-update-security-check`, `optimizer`, `product-planning`).
    - For each routine, compute:
      - **Run count**: total completed runs.
@@ -88,9 +88,9 @@ Translate findings into concrete preventative improvements and remediation trigg
 
 ## Logging
 
-After completing (SUCCESS or FAILURE), write a log file to `.github/prompts/logs/optimizer/{timestamp}.md` following the schema in `.github/prompts/logs/_template.md`. Include:
+After completing (SUCCESS or FAILURE), record run execution details to `.jonah-fleet/run-report.md`. Include:
 - Prompt SHA
-- Analyzed logs count and identified patterns
+- Analyzed routine issues count and identified patterns
 - **Token & Cost Consumption by Agent** scorecard table:
 
 ```markdown
@@ -109,5 +109,7 @@ After completing (SUCCESS or FAILURE), write a log file to `.github/prompts/logs
 - Weekly token budget pacing evaluation (pacing vs 70% ceiling in `ORCHESTRATION.md`)
 - PRs opened (local or upstream)
 
-**Important**: Commit the log file directly to `main` and push. Follow the Log delivery fallback in `ORCHESTRATION.md` if direct push fails.
+**Issue Logging Protocol**:
+- Record run execution details to `.jonah-fleet/run-report.md` (or update `$ROUTINE_ISSUE_NUMBER`).
+- Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.
 

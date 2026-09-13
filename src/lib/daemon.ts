@@ -429,6 +429,7 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
     if (isStopping || isWorking) return;
     try {
       isWorking = true;
+      nextReviewCheckTime = Date.now() + reviewIntervalMs;
       await drainReviewQueue({
         repoRoot,
         state,
@@ -470,36 +471,44 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
   const runAutoworkCheck = async (): Promise<void> => {
     if (isStopping || isWorking || !routines.includes('autowork')) return;
 
-    // Strict priority invariant: drain reviewable PRs before running autowork
-    if (routines.includes('peer-review')) {
-      const pendingPRs = (await getPRsFn(repoRoot)).length;
-      if (pendingPRs > 0) {
-        console.log(
-          pc.cyan(
-            `\n[${new Date().toLocaleTimeString()}] ⏳ Autowork paused: draining ${pendingPRs} reviewable PR(s) first...`
-          )
-        );
-        await performReviewDrain();
-
-        const remainingPRs = (await getPRsFn(repoRoot)).length;
-        if (remainingPRs > 0) {
-          console.log(
-            pc.yellow(
-              `\n[${new Date().toLocaleTimeString()}] ⚠️  Review backlog still has ${remainingPRs} pending PR(s). Postponing autowork session.`
-            )
-          );
-          nextAutoworkCheckTime = Date.now() + autoworkIntervalMs;
-          updateTicker();
-          return;
-        }
-      }
-    }
-
-    state.lastAutoworkCheckAt = new Date().toISOString();
-    writeDaemonState(repoRoot, state);
-
     try {
       isWorking = true;
+      nextAutoworkCheckTime = Date.now() + autoworkIntervalMs;
+
+      // Strict priority invariant: drain reviewable PRs before running autowork
+      if (routines.includes('peer-review')) {
+        const pendingPRs = (await getPRsFn(repoRoot)).length;
+        if (pendingPRs > 0) {
+          console.log(
+            pc.cyan(
+              `\n[${new Date().toLocaleTimeString()}] ⏳ Autowork paused: draining ${pendingPRs} reviewable PR(s) first...`
+            )
+          );
+          await drainReviewQueue({
+            repoRoot,
+            state,
+            options,
+            isStopping: () => isStopping,
+            clearTicker,
+            getPRs: getPRsFn,
+            runRoutine: runRoutineFn,
+          });
+          const prs = await getPRsFn(repoRoot);
+          lastOpenPRCount = prs.length;
+
+          const remainingPRs = (await getPRsFn(repoRoot)).length;
+          if (remainingPRs > 0) {
+            console.log(
+              pc.yellow(
+                `\n[${new Date().toLocaleTimeString()}] ⚠️  Review backlog still has ${remainingPRs} pending PR(s). Postponing autowork session.`
+              )
+            );
+            return;
+          }
+        }
+      }
+
+      state.lastAutoworkCheckAt = new Date().toISOString();
       clearTicker();
       state.status = 'working';
       state.activeRoutine = 'autowork';
@@ -910,22 +919,28 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
   if (isStopping) return;
 
   // Set up 1-second watchdog tick loop for decoupled intervals and ticker
+  let isTicking = false;
   const tick = async () => {
-    if (isStopping || isGracefulStopping || isWorking) return;
+    if (isStopping || isGracefulStopping || isWorking || isTicking) return;
+    isTicking = true;
 
-    if (!isPaused) {
-      const now = Date.now();
-      if (routines.includes('peer-review') && now >= nextReviewCheckTime) {
-        await performReviewDrain();
-        return;
+    try {
+      if (!isPaused) {
+        const now = Date.now();
+        if (routines.includes('peer-review') && now >= nextReviewCheckTime) {
+          await performReviewDrain();
+          return;
+        }
+        if (routines.includes('autowork') && now >= nextAutoworkCheckTime) {
+          await runAutoworkCheck();
+          return;
+        }
       }
-      if (routines.includes('autowork') && now >= nextAutoworkCheckTime) {
-        await runAutoworkCheck();
-        return;
-      }
+
+      updateTicker();
+    } finally {
+      isTicking = false;
     }
-
-    updateTicker();
   };
 
   tickerInterval = setInterval(tick, 1000);

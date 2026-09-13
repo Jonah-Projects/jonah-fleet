@@ -11,7 +11,7 @@ This routine runs behind a **human approval gate**: it **never files autowork-re
 This routine runs in two modes: **Propose** (scheduled cron sweep / unapproved fire) and **Promote** (operator-approved fire).
 
 In **Propose mode**, SUCCESS requires:
-- [ ] Read current roadmap, domain documentation, closed measurement trackers, recent feedback/analytics findings, and the latest open `🎨 Design Review` issue / `.github/prompts/logs/design-review/` directives
+- [ ] Read current roadmap, domain documentation, closed measurement trackers, recent feedback/analytics findings, and the latest open `🎨 Design Review` issue / recent design-review routine run issues
 - [ ] Performed Feature Pruning & Deprecation Audit: evaluated shipped features, measurement outcomes (<2% user adoption or >50% failure rate), and Design Review pruning/clutter directives, drafting deprecation, removal, or simplification proposals
 - [ ] Created or updated exactly one dated staging issue (`🗺️ Product Plan — {date}`) containing:
   - Up to 3 well-scoped proposals (Summary/Tasks/Why/Complexity), covering additions, pivots, or deprecations
@@ -51,7 +51,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 ### Steps 1–3: Propose Mode (Staging Proposals)
 
-1. Read `ROADMAP.md`, `AGENTS.md`, closed measurement trackers with `RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]`, the latest open `🎨 Design Review` issue (and run log in `.github/prompts/logs/design-review/`), and open issues.
+1. Read `ROADMAP.md`, `AGENTS.md`, closed measurement trackers with `RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]`, the latest open `🎨 Design Review` issue (and recent run issues with `gh issue list --label "routine:design-review"`), and open issues.
 2. **Feature Pruning & Deprecation Audit**:
    - Audit shipped features, closed measurement tracker verdicts, and `🎨 Design Review` clutter/pruning findings.
    - For any feature with <2% user adoption, sub-threshold CTR, >50% failure rate, or persistent UI clutter flagged by Design Review, draft explicit deprecation, removal, or pivot proposals to keep the codebase lean and eliminate maintenance waste.
@@ -70,9 +70,13 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 ## Logging
 
-After completing (SUCCESS or FAILURE), write a log file to `.github/prompts/logs/product-planning/{timestamp}.md` following the schema in `.github/prompts/logs/_template.md`. Include:
-- Prompt SHA
-- Mode (Propose or Promote)
-- Staged or promoted proposals tally
+Follow the Routine Issue Logging Protocol in `ORCHESTRATION.md`:
+1. Write the final run report to `.jonah-fleet/run-report.md`.
+2. Include the Run Summary table with:
+   - Routine: `product-planning`
+   - Mode: `Propose` or `Promote`
+   - Result: `SUCCESS` or `FAILURE`
+   - Prompt SHA: (run `git rev-parse --short HEAD:.github/prompts/product-planning.md` or template)
+   - Staged or promoted proposals tally
+3. The surrounding execution harness will reconcile the corresponding GitHub issue.
 
-**Important**: Commit the log file directly to `main` and push. Follow the Log delivery fallback in `ORCHESTRATION.md` if direct push fails.

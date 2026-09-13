@@ -89,4 +89,35 @@ describe('Status Command', () => {
     expect(jsonOutput.tokenUsage.byRoutine.autowork).toBeDefined();
     expect(jsonOutput.tokenUsage.byRoutine.autowork.totalTokens).toBe(85000);
   });
+
+  it('displays status with token usage from .jonah-fleet/runs directory', async () => {
+    fs.writeFileSync(
+      path.join(tempDir, 'agents-manifest.json'),
+      JSON.stringify(
+        {
+          version: '1.8.0',
+          preset: 'standard',
+          routines: { autowork: true },
+          skills: ['tdd'],
+        },
+        null,
+        2
+      )
+    );
+
+    const runsDir = path.join(tempDir, '.jonah-fleet', 'runs');
+    fs.mkdirSync(runsDir, { recursive: true });
+    const logTimestamp = new Date().toISOString();
+    fs.writeFileSync(
+      path.join(runsDir, `autowork-${logTimestamp.replace(/[:.]/g, '-')}.md`),
+      `# Run Log\n## Metadata\n| Field | Value |\n|---|---|\n| Routine | \`autowork\` |\n| Timestamp | \`${logTimestamp}\` |\n| Result | \`SUCCESS\` |\n| Input tokens | \`50000\` |\n| Output tokens | \`4000\` |\n| Estimated cost | \`$0.15\` |\n`
+    );
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await runStatus({ cwd: tempDir, json: true });
+    const jsonOutput = JSON.parse(logSpy.mock.calls[0][0]);
+    expect(jsonOutput.tokenUsage).toBeDefined();
+    expect(jsonOutput.tokenUsage.recentRunCount).toBe(1);
+    expect(jsonOutput.tokenUsage.byRoutine.autowork.totalTokens).toBe(54000);
+  });
 });

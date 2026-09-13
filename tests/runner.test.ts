@@ -10,6 +10,8 @@ import {
   parseStreamJsonEvent,
   formatVerboseEvent,
   buildAgyArgs,
+  tryCreateLocalRunIssue,
+  tryReconcileLocalRunIssue,
 } from '../src/lib/runner.js';
 
 describe('Local Routine Runner', () => {
@@ -237,4 +239,31 @@ describe('Local Routine Runner', () => {
       expect(formatted).toContain('28,400 tokens');
     });
   });
+
+  describe('Routine Run Issue Lifecycle (runner:local)', () => {
+    it('gracefully returns undefined when gh issue create fails or is offline', () => {
+      // Pass a non-existent or invalid directory to trigger failure
+      const result = tryCreateLocalRunIssue(
+        '/dev/null/invalid-dir',
+        'autowork',
+        '2026-09-13T12-00-00Z',
+        'autowork',
+        'test-host'
+      );
+      expect(result).toBeUndefined();
+    });
+
+    it('gracefully handles errors in tryReconcileLocalRunIssue without throwing', () => {
+      expect(() => {
+        tryReconcileLocalRunIssue(
+          '/dev/null/invalid-dir',
+          9999,
+          '# Report',
+          0,
+          'test-host'
+        );
+      }).not.toThrow();
+    });
+  });
 });
+

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **logging:** migrate routine run telemetry and execution logs from git repository files (`.github/prompts/logs/**`) to GitHub Issues with two-phase lifecycle (`routine-log`, `status:running` -> `status:success` closed / `status:failure,needs-attention` open).
+* **runner:** support local runner and daemon issue lifecycle with `runner:local` and offline fallback to `.jonah-fleet/runs/*.md`.
+* **telemetry:** update fleet telemetry hub, status command, and optimizer routine to query routine run issues via `gh issue list --label routine-log` and local `.jonah-fleet/runs/`.
+* **housekeeping:** replace log-only PR sweep with stalled routine run issue audit (`status:running` > 6 hours).
 * **routines:** introduce autonomous Design Review routine for design system purity, UI clutter audit, and feature pruning.
 * **runner:** display clean, truncated PR and Issue titles in foreground daemon spinner alongside target numbers.
 

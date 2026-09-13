@@ -417,46 +417,75 @@ export async function queryRepoFleetStatus(
     // 4. Fetch Logs for Token Spend
     const logContents: string[] = [];
     if (fs.existsSync(repoIdentifier) && fs.statSync(repoIdentifier).isDirectory()) {
-      const logsDir = path.join(repoIdentifier, '.github/prompts/logs');
-      if (fs.existsSync(logsDir)) {
-        const collectLogs = (dir: string) => {
-          const entries = fs.readdirSync(dir, { withFileTypes: true });
-          for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-              collectLogs(fullPath);
-            } else if (entry.isFile() && entry.name.endsWith('.md')) {
-              try {
-                logContents.push(fs.readFileSync(fullPath, 'utf8'));
-              } catch {}
-            }
-          }
-        };
-        collectLogs(logsDir);
-      }
-    } else {
-      // Query recent log files via GitHub API tree or search
-      try {
-        const treeRaw = await executor([
-          'api',
-          `repos/${repoIdentifier}/git/trees/HEAD?recursive=1`,
-        ]);
-        const tree = JSON.parse(treeRaw);
-        if (Array.isArray(tree.tree)) {
-          const logFiles = tree.tree
-            .filter((node: any) => node.path && node.path.startsWith('.github/prompts/logs/') && node.path.endsWith('.md'))
-            .slice(-15); // Take last 15 logs
-          for (const file of logFiles) {
+      const runsDir = path.join(repoIdentifier, '.jonah-fleet/runs');
+      const legacyLogsDir = path.join(repoIdentifier, '.github/prompts/logs');
+      const collectLogs = (dir: string) => {
+        if (!fs.existsSync(dir)) return;
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            collectLogs(fullPath);
+          } else if (entry.isFile() && entry.name.endsWith('.md')) {
             try {
-              const fileRaw = await executor(['api', `repos/${repoIdentifier}/contents/${file.path}`]);
-              const parsed = JSON.parse(fileRaw);
-              if (parsed.content) {
-                logContents.push(Buffer.from(parsed.content, 'base64').toString('utf8'));
-              }
+              logContents.push(fs.readFileSync(fullPath, 'utf8'));
             } catch {}
           }
         }
+      };
+      collectLogs(runsDir);
+      collectLogs(legacyLogsDir);
+    } else {
+      // 1. Primary: query GitHub Issues labeled routine-log
+      try {
+        const issuesRaw = await executor([
+          'issue',
+          'list',
+          '--repo',
+          repoIdentifier,
+          '--label',
+          'routine-log',
+          '--state',
+          'all',
+          '--limit',
+          '25',
+          '--json',
+          'body',
+        ]);
+        const issues = JSON.parse(issuesRaw);
+        if (Array.isArray(issues) && issues.length > 0) {
+          for (const issue of issues) {
+            if (issue.body) {
+              logContents.push(issue.body);
+            }
+          }
+        }
       } catch {}
+
+      // 2. Fallback: query legacy log files via GitHub API tree
+      if (logContents.length === 0) {
+        try {
+          const treeRaw = await executor([
+            'api',
+            `repos/${repoIdentifier}/git/trees/HEAD?recursive=1`,
+          ]);
+          const tree = JSON.parse(treeRaw);
+          if (Array.isArray(tree.tree)) {
+            const logFiles = tree.tree
+              .filter((node: any) => node.path && node.path.startsWith('.github/prompts/logs/') && node.path.endsWith('.md'))
+              .slice(-15);
+            for (const file of logFiles) {
+              try {
+                const fileRaw = await executor(['api', `repos/${repoIdentifier}/contents/${file.path}`]);
+                const parsed = JSON.parse(fileRaw);
+                if (parsed.content) {
+                  logContents.push(Buffer.from(parsed.content, 'base64').toString('utf8'));
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+      }
     }
 
     if (logContents.length > 0) {

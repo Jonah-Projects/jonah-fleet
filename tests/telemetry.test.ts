@@ -5,9 +5,14 @@ import {
   checkWeeklyBudgetLimit,
   emitTelemetry,
   renderTelemetryDashboard,
+  collectLocalTelemetryLogs,
+  collectRepoTelemetry,
   RoutineTelemetrySummary,
   GLOBAL_WEEKLY_TOKEN_BUDGET,
 } from '../src/lib/telemetry.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 
 function stripAnsi(str: string): string {
   // eslint-disable-next-line no-control-regex
@@ -374,5 +379,54 @@ Releasing claim and applying needs-info label.
       expect(text).toContain('Clarifying Questions Posed: 2 targeted questions');
       expect(text).toContain('Est. Wasted Tokens Averted: ~50.0k tokens');
     });
+
+    it('collects local telemetry logs from .jonah-fleet/runs directory', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jonah-fleet-telemetry-test-'));
+      try {
+        const runsDir = path.join(tempDir, '.jonah-fleet', 'runs');
+        fs.mkdirSync(runsDir, { recursive: true });
+        fs.writeFileSync(path.join(runsDir, 'autowork-2026-09-13T12-00-00Z.md'), sampleSuccessLog, 'utf8');
+
+        const summaries = collectLocalTelemetryLogs(tempDir, 'test-repo');
+        expect(summaries.length).toBe(1);
+        expect(summaries[0].routine).toBe('autowork');
+        expect(summaries[0].repository).toBe('test-repo');
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('collects remote telemetry from GitHub issues labeled routine-log', async () => {
+      const mockExecutor = vi.fn().mockResolvedValue(
+        JSON.stringify([
+          {
+            number: 120,
+            title: '[autowork] run 2026-09-13',
+            body: sampleSuccessLog,
+            createdAt: '2026-09-13T12:00:00Z',
+          },
+        ])
+      );
+
+      const summaries = await collectRepoTelemetry('owner/test-repo', mockExecutor);
+      expect(mockExecutor).toHaveBeenCalledWith([
+        'issue',
+        'list',
+        '--repo',
+        'owner/test-repo',
+        '--label',
+        'routine-log',
+        '--state',
+        'all',
+        '--limit',
+        '25',
+        '--json',
+        'body,number,title,createdAt',
+      ]);
+      expect(summaries.length).toBe(1);
+      expect(summaries[0].routine).toBe('autowork');
+      expect(summaries[0].result).toBe('SUCCESS');
+    });
   });
 });
+

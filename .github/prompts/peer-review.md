@@ -70,7 +70,7 @@ Check if `$PR_NUMBER` is set:
 
 ### Steps 1–2: Select a PR (Scan mode only)
 
-1. List all open PRs, excluding drafts, pure log PRs (`.github/prompts/logs/**`), and automated release PRs (`release-please--*` / `chore(main): release*`).
+1. List all open PRs, excluding drafts and automated release PRs (`release-please--*` / `chore(main): release*`).
 2. **Dual Execution Priority Routing**:
    - If running in **Cloud Actions** (`$GITHUB_ACTIONS` / `$CI`): Scan mode prioritizes PRs labeled `priority/P0` or `priority/P1` (or untagged PRs). Lower-priority PRs (`priority/P2`, `priority/P3`) are eligible for cloud review ONLY if they have remained ready and unreviewed for more than 48 hours (`created_at` older than 48h, acting as a cloud catchup sweep).
    - If running in **Local Agent** (`$LOCAL_AGENT`): Scan mode reviews any ready PR across all priorities (P0 → P1 → P2 → P3) with no age gating.
@@ -137,10 +137,12 @@ If the PR is clean and approved for merge, but lacks a `Closes #N` tracking link
 
 ## Logging
 
-After completing (SUCCESS or FAILURE), write a log file to `.github/prompts/logs/peer-review/{timestamp}.md` following the schema in `.github/prompts/logs/_template.md`. Include:
+After completing (SUCCESS or FAILURE), record run execution details to `.jonah-fleet/run-report.md`. Include:
 
 - Prompt SHA
 - Target PR number and decision (MERGE / BOUNCE / ESCALATE)
 - Execution trace and findings summary
 
-**Important**: Commit the log file directly to `main` and push. Follow the Log delivery fallback in `ORCHESTRATION.md` if direct push fails.
+**Issue Logging Protocol**:
+- Record run execution details to `.jonah-fleet/run-report.md` (or update `$ROUTINE_ISSUE_NUMBER`).
+- Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.

@@ -15,7 +15,7 @@ The run is SUCCESS only if ALL of these are true:
 - [ ] Label audit completed: every open issue has consistent type, size, and priority labels
 - [ ] Dependency check completed: issues with `## Dependencies` verified against blocker status
 - [ ] Orphaned-claim sweep completed: stale autowork claims (per `ORCHESTRATION.md`) released back to the unclaimed pool
-- [ ] Draft log-only PR sweep completed: open draft PRs whose changed files are entirely under `.github/prompts/logs/**` undrafted and squash-merged
+- [ ] Stalled routine run audit completed: routine log issues in `status:running` older than 6 hours marked as `status:failure` (timed_out)
 - [ ] Summary posted listing all changes made
 
 If any criterion cannot be met, stop immediately and log FAILURE with the reason.
@@ -24,14 +24,14 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 - **Max iterations**: 40 — after 40 tool call rounds without completing Definition of Done, STOP. Log FAILURE with category `token_limit`.
 - **Max scope**: housekeeping only. Do not implement code fixes or open feature PRs.
-- **No speculative work**: only modify issue metadata (labels, status, comments, releasing stale assignees) and land draft log-only PRs.
+- **No speculative work**: only modify issue metadata (labels, status, comments, releasing stale assignees, reconciling stalled routine runs).
 - **Language Requirement**: All GitHub issue titles, descriptions, task checklists, and comments MUST be written in **English**.
 
 ## Instructions
 
 ### Phase 1: Quick Recovery & Clearing
 
-1. **Draft log-only PR sweep**: Undraft and squash-merge open draft PRs whose diffs are entirely under `.github/prompts/logs/**`.
+1. **Stalled routine run sweep**: Check open issues with labels `routine-log` and `status:running`. If an issue has been in `status:running` for > 6 hours without updates, add label `status:failure`, remove `status:running`, add label `needs-attention`, and comment noting the runner timeout or crash.
 2. **Orphaned-claim sweep**: Sweep assigned issues. If an issue meets the 3 stale-claim conditions in `ORCHESTRATION.md` (autowork claim comment, no open PR, comment > 6 hours old), re-read immediately before writing, unassign the dead owner, and post a release comment.
 
 ### Phase 2: Backlog Hygiene
@@ -44,13 +44,15 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 ### Phase 3: Summary
 
-8. Post a summary comment or log recording all actions taken (priority shifts, closed duplicates, released claims, landed log PRs).
+8. Post a summary comment or log recording all actions taken (priority shifts, closed duplicates, released claims, reconciled stalled runs).
 
 ## Logging
 
-After completing (SUCCESS or FAILURE), write a log file to `.github/prompts/logs/issues-housekeeping/{timestamp}.md` following the schema in `.github/prompts/logs/_template.md`. Include:
+After completing (SUCCESS or FAILURE), record run execution details to `.jonah-fleet/run-report.md`. Include:
 - Prompt SHA
-- Tally of issues audited, claims released, PRs merged
+- Tally of issues audited, claims released, stalled runs reconciled
 - List of closed or modified issues
 
-**Important**: Commit the log file directly to `main` and push. Follow the Log delivery fallback in `ORCHESTRATION.md` if direct push fails.
+**Issue Logging Protocol**:
+- Record run execution details to `.jonah-fleet/run-report.md` (or update `$ROUTINE_ISSUE_NUMBER`).
+- Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.

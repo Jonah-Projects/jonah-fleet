@@ -36,9 +36,11 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 ## Logging
 
-After completing (SUCCESS or FAILURE), write a log file to `.github/prompts/logs/dependency-update-security-check/{timestamp}.md` following the schema in `.github/prompts/logs/_template.md`. Include:
+After completing (SUCCESS or FAILURE), record run execution details to `.jonah-fleet/run-report.md`. Include:
 - Prompt SHA
 - Tally of audited dependencies and security findings
 - List of created or updated issues
 
-**Important**: Commit the log file directly to `main` and push. Follow the Log delivery fallback in `ORCHESTRATION.md` if direct push fails.
+**Issue Logging Protocol**:
+- Record run execution details to `.jonah-fleet/run-report.md` (or update `$ROUTINE_ISSUE_NUMBER`).
+- Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.

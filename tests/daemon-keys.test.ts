@@ -848,6 +848,54 @@ describe('Rotating Status-Line Tips & Viewport Width Guardrails', () => {
       expect(exitSpy).toHaveBeenCalledWith(0);
       expect(readDaemonState(tmpRepo)).toBeNull();
     });
+
+    it('prevents concurrent autowork execution while PR backlog checks are awaiting', async () => {
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+      const mockStdin = new MockStdin();
+
+      let activeConcurrentRuns = 0;
+      let maxConcurrentRuns = 0;
+      let totalRuns = 0;
+
+      const runRoutine = async () => {
+        activeConcurrentRuns++;
+        maxConcurrentRuns = Math.max(maxConcurrentRuns, activeConcurrentRuns);
+        totalRuns++;
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        activeConcurrentRuns--;
+        return { success: true };
+      };
+
+      let prCheckCallCount = 0;
+      const getPRs = async () => {
+        prCheckCallCount++;
+        // Simulate latency during PR list fetch
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        return [];
+      };
+
+      const loopPromise = runDaemonLoop(tmpRepo, {
+        stdin: mockStdin,
+        routines: ['autowork', 'peer-review'],
+        getPRs,
+        runRoutine,
+      });
+
+      // While initial autowork check is in-flight, simulate user pressing 'a' multiple times
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      mockStdin.emit('keypress', 'a', { name: 'a', ctrl: false, meta: false, shift: false });
+      mockStdin.emit('keypress', 'a', { name: 'a', ctrl: false, meta: false, shift: false });
+
+      // Wait for routine to finish
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Stop daemon
+      mockStdin.emit('keypress', 'q', { name: 'q', ctrl: false, meta: false, shift: false });
+      await loopPromise;
+
+      expect(maxConcurrentRuns).toBe(1);
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
   });
 });
 
