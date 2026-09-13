@@ -389,11 +389,11 @@ export async function emitTelemetry(
 
 export function collectLocalTelemetryLogs(dir: string, repositoryName: string = 'local'): RoutineTelemetrySummary[] {
   const summaries: RoutineTelemetrySummary[] = [];
-  const logsDir = path.join(dir, '.github/prompts/logs');
-
-  if (!fs.existsSync(logsDir)) return summaries;
+  const runsDir = path.join(dir, '.jonah-fleet/runs');
+  const legacyLogsDir = path.join(dir, '.github/prompts/logs');
 
   const traverse = (currentDir: string) => {
+    if (!fs.existsSync(currentDir)) return;
     const entries = fs.readdirSync(currentDir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(currentDir, entry.name);
@@ -409,7 +409,12 @@ export function collectLocalTelemetryLogs(dir: string, repositoryName: string = 
     }
   };
 
-  traverse(logsDir);
+  if (fs.existsSync(runsDir)) {
+    traverse(runsDir);
+  }
+  if (fs.existsSync(legacyLogsDir)) {
+    traverse(legacyLogsDir);
+  }
   return summaries;
 }
 
@@ -424,6 +429,37 @@ export async function collectRepoTelemetry(
     return collectLocalTelemetryLogs(repoIdentifier, repoIdentifier);
   }
 
+  // 1. Primary: query GitHub Issues labeled routine-log
+  try {
+    const issuesRaw = await executor([
+      'issue',
+      'list',
+      '--repo',
+      repoIdentifier,
+      '--label',
+      'routine-log',
+      '--state',
+      'all',
+      '--limit',
+      String(options.maxLogs || 25),
+      '--json',
+      'body,number,title,createdAt',
+    ]);
+    const issues = JSON.parse(issuesRaw);
+    if (Array.isArray(issues) && issues.length > 0) {
+      for (const issue of issues) {
+        if (issue.body) {
+          const summary = parseLogToTelemetry(issue.body, { repository: repoIdentifier });
+          if (summary) summaries.push(summary);
+        }
+      }
+      if (summaries.length > 0) {
+        return summaries;
+      }
+    }
+  } catch {}
+
+  // 2. Fallback: query legacy git trees for .github/prompts/logs/
   try {
     const treeRaw = await executor([
       'api',

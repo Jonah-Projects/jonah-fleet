@@ -43,12 +43,17 @@ export async function runTelemetry(options: TelemetryOptions = {}): Promise<void
   if (options.action === 'emit' || options.log) {
     let logPath = options.log;
     if (!logPath) {
-      // Find latest log in .github/prompts/logs
-      const logsDir = path.join(cwd, '.github/prompts/logs');
-      if (fs.existsSync(logsDir)) {
+      // Find latest log in .jonah-fleet/run-report.md, .jonah-fleet/runs, or legacy .github/prompts/logs
+      const reportFile = path.join(cwd, '.jonah-fleet/run-report.md');
+      if (fs.existsSync(reportFile)) {
+        logPath = reportFile;
+      } else {
+        const runsDir = path.join(cwd, '.jonah-fleet/runs');
+        const legacyLogsDir = path.join(cwd, '.github/prompts/logs');
         let latestFile: string | null = null;
         let latestMtime = 0;
         const findLogs = (dir: string) => {
+          if (!fs.existsSync(dir)) return;
           const entries = fs.readdirSync(dir, { withFileTypes: true });
           for (const entry of entries) {
             const p = path.join(dir, entry.name);
@@ -62,7 +67,8 @@ export async function runTelemetry(options: TelemetryOptions = {}): Promise<void
             }
           }
         };
-        findLogs(logsDir);
+        findLogs(runsDir);
+        findLogs(legacyLogsDir);
         logPath = latestFile || undefined;
       }
     }

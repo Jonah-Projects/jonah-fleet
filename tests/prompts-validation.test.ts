@@ -418,36 +418,40 @@ describe("Prompt Validation & Invariants", () => {
     }
   });
 
-  it("validates Log Delivery Protocol & Invariants in autowork.md, _prompt-template.md, and ORCHESTRATION.md", () => {
+  it("validates Routine Issue Logging Protocol & Invariants in autowork.md, _prompt-template.md, and ORCHESTRATION.md", () => {
     const autoworkContent = fs.readFileSync(
       path.join(promptsDir, "autowork.md"),
       "utf8",
     );
-    expect(autoworkContent).toContain("Log Delivery Protocol & Invariants");
+    expect(autoworkContent).toContain("Issue Logging Protocol & Invariants");
     expect(autoworkContent).toContain(
-      "NEVER commit or push run logs to a feature branch or open PR branch",
+      "NEVER commit or push run logs to any git branch",
     );
-    expect(autoworkContent).toContain("Mandatory `[skip ci]`");
-    expect(autoworkContent).toContain("git checkout main");
+    expect(autoworkContent).toContain("ROUTINE_ISSUE_NUMBER");
 
     const templateContent = fs.readFileSync(
       path.join(promptsDir, "_prompt-template.md"),
       "utf8",
     );
-    expect(templateContent).toContain("Log Delivery Protocol & Invariants");
+    expect(templateContent).toContain("Issue Logging Protocol & Invariants");
     expect(templateContent).toContain(
-      "NEVER commit or push run logs to a feature branch or open PR branch",
+      "NEVER commit or push run logs to any git branch",
     );
-    expect(templateContent).toContain("Mandatory `[skip ci]`");
+    expect(templateContent).toContain("ROUTINE_ISSUE_NUMBER");
 
     const orchestrationContent = fs.readFileSync(
       path.join(promptsDir, "ORCHESTRATION.md"),
       "utf8",
     );
     expect(orchestrationContent).toContain(
-      "Never commit logs to an active feature branch",
+      "## Routine Issue Logging & Telemetry Protocol",
     );
-    expect(orchestrationContent).toContain("Mandatory `[skip ci]`");
+    expect(orchestrationContent).toContain(
+      "GitHub Issues as Operational Ledger",
+    );
+    expect(orchestrationContent).toContain("status:running");
+    expect(orchestrationContent).toContain("status:success");
+    expect(orchestrationContent).toContain("status:failure");
   });
 
   it("ensures workflow templates in templates/workflows are strictly synchronized with .github/workflows", () => {

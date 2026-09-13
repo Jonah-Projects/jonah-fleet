@@ -82,10 +82,12 @@ When a measurement tracker is conclusive or reaches sub-threshold adoption (<2% 
 
 ## Logging
 
-After completing (SUCCESS or FAILURE), write a log file to `.github/prompts/logs/analytics-review/{timestamp}.md` following the schema in `.github/prompts/logs/_template.md`. Include:
+After completing (SUCCESS or FAILURE), record run execution details to `.jonah-fleet/run-report.md`. Include:
 - The prompt SHA (run `git rev-parse --short HEAD:.github/prompts/analytics-review.md`)
 - Every Definition of Done criterion with YES/NO and evidence
 - Full execution trace with evaluated trackers and emitted recommendations
 - If FAILURE: root cause, category, and suggested fix
 
-**Important**: Commit the log file directly to `main` and push — explicitly permitted for files under `.github/prompts/logs/**`. Follow the Log delivery fallback in `ORCHESTRATION.md` if direct push fails.
+**Issue Logging Protocol**:
+- Record run execution details to `.jonah-fleet/run-report.md` (or update `$ROUTINE_ISSUE_NUMBER`).
+- Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.

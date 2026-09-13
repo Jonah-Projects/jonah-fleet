@@ -29,7 +29,7 @@ Invariants deliberately upheld from this spec:
 
 - **Single-flight per issue and PR convergence** — at most one run works an issue or pull request at a time, enforced by the autowork claim protocol (assign → read-back → earliest-timestamp tiebreak). For **umbrella** issues, single-flight is maintained at the _child-issue_ level so slices progress cleanly.
 - **Recover dead-run claims** — a crashed run's orphaned claim is released back to the pool rather than starving the issue or PR, both opportunistically during candidate selection and periodically via issues housekeeping.
-- **Reader/writer separation** — the routine that authors a PR never merges it; the Peer Review routine is the sole merge authority for **product** PRs. (Operational log-only PRs are exempt; see Log delivery fallback.)
+- **Reader/writer separation** — the routine that authors a PR never merges it; the Peer Review routine is the sole merge authority for pull requests.
 - **Warm-Context Review Synchronization** — Autowork maintains an active warm session during implementation, polling for Peer Review's verdict. When Peer Review bounces a PR to draft with findings, Autowork immediately detects the draft state in-session, applies fixes directly to its warm working tree, and re-marks the PR ready—re-firing Peer Review for Round N+1 without cold-start overhead.
 
 ---
@@ -111,14 +111,19 @@ The routines invoke specialized engineering skills at key workflow checkpoints:
 
 ---
 
-## Log Delivery Fallback
+## Routine Issue Logging & Telemetry Protocol
 
-Single source of truth for every routine's Logging section:
+Single source of truth for every routine's logging and telemetry lifecycle:
 
-1. **Direct commit to `main` is default**: For operational run logs under `.github/prompts/logs/**`, commit directly to `main` via GitHub API or git push. Never commit logs to an active feature branch.
-2. **Mandatory `[skip ci]`**: All log commits MUST include `[skip ci]` in the commit message (e.g. `docs(log): record {routine-name} run {timestamp} [skip ci]`) to prevent unnecessary CI executions or approval blocks.
-3. **Draft PR fallback**: If direct push fails, commit the log to a dedicated, fresh branch and open a draft PR carrying only the log files.
-4. **Automated landing**: `auto-merge-log-prs.yml` or `issues-housekeeping.md` lands accumulated log PRs. Draft log PRs are never reviewed by Peer Review and do not count toward Autowork's backpressure limits.
+1. **GitHub Issues as Operational Ledger**: Routine run logs are recorded as GitHub Issues instead of git commits, keeping `main` and Git history 100% clean. No operational markdown files are committed to Git, eliminating push conflicts, merge races, and draft-PR fallbacks.
+2. **Two-Phase Issue Lifecycle**:
+   - **Start**: The workflow harness or local runner pre-step creates a tracking issue via `gh issue create` titled `[routine-name] run {timestamp}` with labels `routine-log`, `routine:{name}`, `status:running`, and `runner:{github-actions|local}`. The issue number is exported as `ROUTINE_ISSUE_NUMBER`.
+   - **Execution**: The agent performs the routine and records its structured execution report (Definition of Done table, telemetry metrics, execution trace) to `.jonah-fleet/run-report.md`.
+   - **Finish**: The harness post-step reconciles the tracking issue body:
+     - On **SUCCESS**: Applies label `status:success`, removes `status:running`, and closes the issue immediately via `gh issue close $ROUTINE_ISSUE_NUMBER --reason completed`.
+     - On **FAILURE / CRASH / TIMEOUT**: Applies labels `status:failure`, `needs-attention`, removes `status:running`, and leaves the issue **OPEN** in the issue tracker for human maintainer triage and optimizer diagnosis.
+3. **Local Daemon Parity & Offline Fallback**: `jonah-fleet daemon` and `jonah-fleet run` always record runs locally in `.jonah-fleet/runs/{timestamp}.json` (ignored by git). When online with valid `gh` auth, local daemons create and close tracking issues labeled `runner:local`. If offline or unauthenticated, runs gracefully fall back to local-only logging without interrupting agent execution.
+4. **Issue Backlog Isolation**: Routine run issues carry `label:routine-log`. Human maintainers and product queries filter `-label:routine-log` in issue searches to keep product backlogs pristine.
 
 ---
 
@@ -155,7 +160,7 @@ How external and human contributor pull requests are reconciled into the issue t
 
 Cross-repository telemetry aggregation and token tracking protocol:
 
-1. **Lightweight Routine Telemetry**: Every autonomous routine log (`.github/prompts/logs/*/*.md`) emits a structured `RoutineTelemetrySummary` capturing routine identity, duration, iterations, result, failure category, cost, and tokens.
+1. **Lightweight Routine Telemetry**: Every autonomous routine execution emits a structured `RoutineTelemetrySummary` (recorded in the GitHub Issue body and local `.jonah-fleet/runs/*.json` cache) capturing routine identity, duration, iterations, result, failure category, cost, and tokens.
 2. **Opt-in Emission Step**: GitHub Actions workflows (`autowork-cron.yml`, `trigger-review-routine.yml`, `prompt-optimizer-cron.yml`) run `jonah-fleet telemetry --emit` using optional `JONAH_FLEET_TELEMETRY_ENDPOINT` secrets.
 3. **Global 70% Budget Ceiling**: Tracks rolling 7-day spend across all fleet repositories against the global ceiling (~8.75M tokens/week).
 4. **Health Thresholds**:

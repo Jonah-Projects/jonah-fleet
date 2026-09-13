@@ -233,22 +233,36 @@ export function extractExecutionSummary(output: string): string | null {
 }
 
 /**
- * Finds the latest committed run log in .github/prompts/logs/<routine>/*.md.
+ * Finds the latest run log in .jonah-fleet/runs/<routine>-*.md or legacy .github/prompts/logs/<routine>/*.md.
  */
 export function findLatestRunLog(repoRoot: string, routine: string): string | null {
-  const logsDir = path.join(repoRoot, '.github', 'prompts', 'logs', routine);
-  if (!fs.existsSync(logsDir)) return null;
-
-  try {
-    const files = fs.readdirSync(logsDir).filter((f) => f.endsWith('.md') && !f.startsWith('_'));
-    if (files.length === 0) return null;
-
-    // Sort descending by name (ISO timestamp in name)
-    files.sort().reverse();
-    return path.join(logsDir, files[0]);
-  } catch {
-    return null;
+  // 1. Check local run cache in .jonah-fleet/runs
+  const runsDir = path.join(repoRoot, '.jonah-fleet', 'runs');
+  if (fs.existsSync(runsDir)) {
+    try {
+      const files = fs
+        .readdirSync(runsDir)
+        .filter((f) => f.startsWith(`${routine}-`) && f.endsWith('.md'));
+      if (files.length > 0) {
+        files.sort().reverse();
+        return path.join(runsDir, files[0]);
+      }
+    } catch {}
   }
+
+  // 2. Check legacy logs directory if present
+  const logsDir = path.join(repoRoot, '.github', 'prompts', 'logs', routine);
+  if (fs.existsSync(logsDir)) {
+    try {
+      const files = fs.readdirSync(logsDir).filter((f) => f.endsWith('.md') && !f.startsWith('_'));
+      if (files.length > 0) {
+        files.sort().reverse();
+        return path.join(logsDir, files[0]);
+      }
+    } catch {}
+  }
+
+  return null;
 }
 
 /**

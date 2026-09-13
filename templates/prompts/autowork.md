@@ -159,23 +159,20 @@ a. **Read the target issue and check eligibility.** Eligible = open, unassigned 
 
 ## Logging
 
-After completing (SUCCESS or FAILURE), write a log file to `.github/prompts/logs/autowork/{timestamp}.md` following the schema in `.github/prompts/logs/_template.md`. Include:
+After completing (SUCCESS or FAILURE), record run execution details to `.jonah-fleet/run-report.md`. Include:
 
 - The prompt SHA (run `git rev-parse --short HEAD:.github/prompts/autowork.md`)
 - Every Definition of Done criterion with YES/NO and evidence
 - Full execution trace with tool calls
 - If FAILURE: root cause, category, and suggested fix
 
-**Log Delivery Protocol & Invariants**:
+**Issue Logging Protocol & Invariants**:
 
-- **Negative Rule**: NEVER commit or push run logs to a feature branch or open PR branch. Doing so emits a `pull_request: synchronize` event under bot credentials, triggering GitHub Actions workflow approval gates (`action_required`) that stall CI.
-- **Mandatory `[skip ci]`**: Always append `[skip ci]` to any log commit message.
-- **Direct Push to `main`**: Commit the log file directly to `main` and push — explicitly permitted for files under `.github/prompts/logs/**`:
-  ```bash
-  git checkout main
-  git pull origin main
-  git add .github/prompts/logs/autowork/{timestamp}.md
-  git commit -m "docs(log): record autowork run {timestamp} [skip ci]"
-  git push origin main
-  ```
-  Follow the Log delivery fallback in `ORCHESTRATION.md` if direct push fails.
+- **Negative Rule**: NEVER commit or push run logs to any git branch (`main` or feature branches). Run logs are recorded exclusively as GitHub Issues and local `.jonah-fleet/runs/*.json` artifacts.
+- **Harness Reconciliation**: When running under GitHub Actions or `jonah-fleet daemon`, the harness initializes the run issue (`status:running`) and reconciles the final status upon completion:
+  - If `$ROUTINE_ISSUE_NUMBER` is set in the environment, append or update the issue body:
+    ```bash
+    gh issue comment "$ROUTINE_ISSUE_NUMBER" --body-file .jonah-fleet/run-report.md
+    ```
+  - On clean local runs outside a harness, write `.jonah-fleet/runs/{timestamp}.json`.
+- Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`.

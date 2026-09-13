@@ -41,6 +41,11 @@ export const DEFAULT_PROTECTED_LABEL_PATTERNS: string[] = [
   'autorelease:*',
   'dependencies',
   'security',
+  'routine-log',
+  'routine:*',
+  'status:*',
+  'runner:*',
+  'historical-migration',
 ];
 
 export function isLabelProtected(

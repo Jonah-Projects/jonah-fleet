@@ -44,30 +44,29 @@ export async function runStatus(options: StatusOptions = {}): Promise<void> {
     drift.modifiedWorkflows.length > 0 ||
     drift.missingSkills.length > 0;
 
-  const logsDir = path.join(cwd, '.github/prompts/logs');
+  const runsDir = path.join(cwd, '.jonah-fleet/runs');
+  const legacyLogsDir = path.join(cwd, '.github/prompts/logs');
   let tokenUsage = undefined;
-  if (fs.existsSync(logsDir)) {
-    const logContents: string[] = [];
-    const collectLogs = (dir: string) => {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          collectLogs(fullPath);
-        } else if (entry.isFile() && entry.name.endsWith('.md')) {
-          try {
-            logContents.push(fs.readFileSync(fullPath, 'utf8'));
-          } catch {}
-        }
+  const logContents: string[] = [];
+  const collectLogs = (dir: string) => {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        collectLogs(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        try {
+          logContents.push(fs.readFileSync(fullPath, 'utf8'));
+        } catch {}
       }
-    };
-    try {
-      collectLogs(logsDir);
-    } catch {}
-
-    if (logContents.length > 0) {
-      tokenUsage = computeTokenSpendFromLogs(logContents);
     }
+  };
+  collectLogs(runsDir);
+  collectLogs(legacyLogsDir);
+
+  if (logContents.length > 0) {
+    tokenUsage = computeTokenSpendFromLogs(logContents);
   }
 
   if (options.json) {

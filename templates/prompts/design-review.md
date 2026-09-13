@@ -15,8 +15,8 @@ The run is SUCCESS only if ALL of these are true:
 - [ ] Executed Hybrid Handoff:
   - If self-contained token, class, or contrast violations were found, filed or updated exactly one grouped punchlist issue titled `🎨 Design Polish & Token Cleanup — {YYYY-MM-DD}` labeled `design/polish` for Autowork
   - Created or updated exactly one tracking issue titled `🎨 Design Review — {YYYY-MM-DD}` documenting: Surfaces Reviewed (with any `[NEW SURFACE]` highlighted), Next Surfaces in Rotation, Visual Critique & Clutter Analysis, Feature Pruning & Deprecation Recommendations, and Experience Enhancement Opportunities
-- [ ] Emitted structured design directives in the run log (`DESIGN_DIRECTIVE: [PRUNE | REDESIGN | POLISH]`) and recorded the next queued surfaces for the subsequent run
-- [ ] Wrote and committed the run log to `.github/prompts/logs/design-review/{timestamp}.md` following `ORCHESTRATION.md`
+- [ ] Emitted structured design directives in the run report (`DESIGN_DIRECTIVE: [PRUNE | REDESIGN | POLISH]`) and recorded the next queued surfaces for the subsequent run
+- [ ] Recorded the final execution report to `.jonah-fleet/run-report.md` following `ORCHESTRATION.md`
 
 If any criterion cannot be met, stop immediately and log FAILURE with the reason.
 
@@ -33,7 +33,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 - Do not open multiple separate issues for individual token mismatches — group all simple token and contrast cleanup items into a single grouped punchlist issue for Autowork.
 - Do not file unapproved structural redesigns or feature removals as direct Autowork issues — stage them in the `🎨 Design Review — {date}` tracking issue for Product Planning to review.
 - Do not review the admin back-office (`src/app/[locale]/admin/**`) — it is deliberately utilitarian and exempt from the player-facing design system polish bar.
-- Do not blindly repeat the same surface review order every run — dynamically discover routes and check previous review logs to resume rotation and fast-track unreviewed new surfaces.
+- Do not blindly repeat the same surface review order every run — dynamically discover routes and check previous review issues to resume rotation and fast-track unreviewed new surfaces.
 
 ## Instructions
 
@@ -45,7 +45,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
    - Scan the filesystem for all active player-facing page routes: `src/app/[locale]/**/page.tsx` (ignoring any `admin/**` directories).
    - Normalize the discovered paths into canonical route identifiers (e.g. `Home` (`/`), `Predictions` (`/pronostics`), `Episode Predictions` (`/pronostics/episode/[id]`), `Groups` (`/groupes`), `Group Detail` (`/groupes/[id]`), `Presenter` (`/groupes/[id]/presentateur`), `Leaderboard` (`/classements`), `Profile` (`/profil`), `Account` (`/compte`), `Auth` (`/auth/*`), `Season Overview` (`/saisons/[slug]`), `Share` (`/partage`)).
 3. **Reconcile with Previous Rotation State**:
-   - Locate the most recent `🎨 Design Review` issue or log in `.github/prompts/logs/design-review/`.
+   - Locate the most recent `🎨 Design Review` issue or run issue labeled `routine:design-review`.
    - Read the `Surfaces Reviewed` and `Next Surfaces in Rotation` fields.
    - Any discovered route on disk that has never appeared in prior review logs is flagged as **`[NEW SURFACE]`** and placed at **Priority 0** (Fast-Track).
    - Remaining surfaces are sequenced based on `Next Surfaces in Rotation` (resuming rotation where the previous run stopped).
@@ -111,12 +111,15 @@ For the surfaces being audited:
 
 ## Logging
 
-After completing (SUCCESS or FAILURE), write a log file to `.github/prompts/logs/design-review/{timestamp}.md` following the schema in `.github/prompts/logs/_template.md`. Include:
-- The prompt SHA (run `git rev-parse --short HEAD:.github/prompts/design-review.md`)
-- Every Definition of Done criterion with YES/NO and evidence
-- Full execution trace with surfaces scanned and tool calls
-- List of created issues (`🎨 Design Polish & Token Cleanup`, `🎨 Design Review`)
-- `Next Surfaces in Rotation` explicitly declared
-- If FAILURE: root cause, category, and suggested fix
+Follow the Routine Issue Logging Protocol in `ORCHESTRATION.md`:
+1. Write the final run report to `.jonah-fleet/run-report.md`.
+2. Include the Run Summary table with:
+   - Routine: `design-review`
+   - Prompt SHA (run `git rev-parse --short HEAD:.github/prompts/design-review.md` or template)
+   - Result: `SUCCESS` or `FAILURE`
+   - Every Definition of Done criterion with YES/NO and evidence
+   - Surfaces Reviewed and Next Surfaces in Rotation
+   - Created issues (`🎨 Design Polish & Token Cleanup`, `🎨 Design Review`)
+   - If FAILURE: root cause, category, and suggested fix
+3. The surrounding execution harness will reconcile the corresponding GitHub issue.
 
-**Important**: Commit the log file directly to `main` and push — explicitly permitted for files under `.github/prompts/logs/**`. Follow the Log delivery fallback in `ORCHESTRATION.md` if direct push fails.
