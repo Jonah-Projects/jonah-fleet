@@ -43,6 +43,7 @@ schema.json       # JSON Schema for agents-manifest.json
 
 - **Pure Generic Prompts**: Prompts in `templates/prompts/` are 100% repository-agnostic and dynamically ingest project commands and conventions from the consumer repo's `AGENTS.md`.
 - **Manifest-Driven Installation**: Target projects configure enabled routines and skills via `agents-manifest.json`.
+- **Model Family Discipline**: Always track the latest version strictly within a model's designated family (e.g. Flash stays on Flash). Never substitute across model tiers (e.g. Flash to Pro) because fleet throughput, latency, and weekly token budgets are calibrated specifically for Flash.
 - **Drift Detection**: `jonah-fleet sync` and `jonah-fleet status` compare local project prompt/workflow files against fleet templates to surface updates and drifts.
 - **Bi-directional Bridge**: `optimizer.md` in consumer projects proposes generic orchestrator enhancements upstream to `jonah-fleet`.
 
