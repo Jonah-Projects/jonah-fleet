@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **housekeeping:** replace log-only PR sweep with stalled routine run issue audit (`status:running` > 6 hours).
 * **routines:** introduce autonomous Design Review routine for design system purity, UI clutter audit, and feature pruning.
 * **runner:** display clean, truncated PR and Issue titles in foreground daemon spinner alongside target numbers.
-* **workflows:** harden workflow templates against shell injection, credential persistence, and job timeout mismatches across autowork, review, and cron routines.
 * **peer-review:** link routine tracking log issue directly from "Starting review (round N)" PR comments and review summaries.
+* **models:** upgrade default LLM models to Gemini 3.8 Flash (`gemini-3.8-flash-high` for core reasoning routines, `gemini-3.8-flash-medium` for housekeeping, dependency check, and analytics) to ensure CLI compatibility and access to the latest model capabilities.
 
 ## [1.8.0](https://github.com/juliendurandeu/jonah-fleet/compare/jonah-fleet-v1.7.0...jonah-fleet-v1.8.0) (2026-09-09)
 

@@ -73,7 +73,7 @@ jobs:
         id: routine-config
         run: |
           ROUTINE="dependency-update-security-check"
-          DEFAULT_MODEL="gemini-3.7-flash"
+          DEFAULT_MODEL="gemini-3.8-flash-medium"
           DEFAULT_TIMEOUT="25"
 
           MODEL="$DEFAULT_MODEL"
@@ -140,7 +140,7 @@ jobs:
           ANTIGRAVITY_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
           ROUTINE_ISSUE_NUMBER: ${{ steps.run-issue.outputs.issue_number }}
-          MODEL: ${{ steps.routine-config.outputs.model || 'gemini-3.7-flash' }}
+          MODEL: ${{ steps.routine-config.outputs.model || 'gemini-3.8-flash-medium' }}
           PRINT_TIMEOUT: ${{ steps.routine-config.outputs.print_timeout || '25m' }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}

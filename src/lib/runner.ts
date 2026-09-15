@@ -354,7 +354,7 @@ export function tryReconcileLocalRunIssue(
 export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<RunLocalRoutineResult> {
   const targetDir = path.resolve(options.targetDir);
   const routine = options.routine;
-  const model = options.model || 'gemini-3.7-flash-high';
+  const model = options.model || 'gemini-3.8-flash-high';
   const printTimeout = options.printTimeout || '30m';
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const hostname = os.hostname();

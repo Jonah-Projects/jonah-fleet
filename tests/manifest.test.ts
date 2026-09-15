@@ -81,8 +81,8 @@ describe('Manifest generation', () => {
   it('includes default models and budgets in standard manifest', () => {
     const manifest = createDefaultManifest('standard');
     expect(manifest.models).toBeDefined();
-    expect(manifest.models?.default).toBe('gemini-3.7-flash-high');
-    expect(manifest.models?.['issues-housekeeping']).toBe('gemini-3.7-flash');
+    expect(manifest.models?.default).toBe('gemini-3.8-flash-high');
+    expect(manifest.models?.['issues-housekeeping']).toBe('gemini-3.8-flash-medium');
     expect(manifest.budgets).toBeDefined();
     expect(manifest.budgets?.weeklyTokens).toBe(8_750_000);
     expect(manifest.budgets?.timeoutMinutes?.autowork).toBe(60);
@@ -92,12 +92,12 @@ describe('Manifest generation', () => {
   it('resolves routine configuration with defaults when manifest is empty', async () => {
     const { resolveRoutineConfig } = await import('../src/lib/manifest.js');
     const config = resolveRoutineConfig(null, 'autowork');
-    expect(config.model).toBe('gemini-3.7-flash-high');
+    expect(config.model).toBe('gemini-3.8-flash-high');
     expect(config.timeoutMinutes).toBe(60);
     expect(config.maxIterations).toBe(65);
 
     const housekeeping = resolveRoutineConfig(null, 'issues-housekeeping');
-    expect(housekeeping.model).toBe('gemini-3.7-flash');
+    expect(housekeeping.model).toBe('gemini-3.8-flash-medium');
     expect(housekeeping.timeoutMinutes).toBe(40);
   });
 

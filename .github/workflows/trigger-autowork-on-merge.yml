@@ -117,7 +117,7 @@ jobs:
         id: routine-config
         run: |
           ROUTINE="autowork"
-          DEFAULT_MODEL="gemini-3.7-flash-high"
+          DEFAULT_MODEL="gemini-3.8-flash-high"
           DEFAULT_TIMEOUT="60"
 
           MODEL="$DEFAULT_MODEL"
@@ -188,7 +188,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
           ROUTINE_ISSUE_NUMBER: ${{ steps.run-issue.outputs.issue_number }}
           SKILLS_PROMPT: ${{ steps.skills.outputs.skills_prompt }}
-          MODEL: ${{ steps.routine-config.outputs.model || 'gemini-3.7-flash-high' }}
+          MODEL: ${{ steps.routine-config.outputs.model || 'gemini-3.8-flash-high' }}
           PRINT_TIMEOUT: ${{ steps.routine-config.outputs.print_timeout || '60m' }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}

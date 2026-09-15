@@ -21,7 +21,7 @@ describe('Workflow Validation & Invariants', () => {
     expect(content).toContain('issue_number:');
     expect(content).toContain('TARGET_ISSUE: ${{ inputs.issue_number }}');
     expect(content).toContain('Targeted mode');
-    expect(content).toContain('gemini-3.7-flash-high');
+    expect(content).toContain('gemini-3.8-flash-high');
     expect(content).toContain('Verify Atomic Handoff Invariant');
   });
 

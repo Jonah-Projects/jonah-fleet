@@ -27,7 +27,7 @@ export function resolveRoutineConfig(
   manifest: FleetManifest | null,
   routine: keyof FleetManifest['routines'] | string
 ): ResolvedRoutineConfig {
-  const defaultModel = DEFAULT_ROUTINE_MODELS[routine] || 'gemini-3.7-flash-high';
+  const defaultModel = DEFAULT_ROUTINE_MODELS[routine] || 'gemini-3.8-flash-high';
   const defaultTimeout = DEFAULT_ROUTINE_TIMEOUTS[routine] || 45;
   const defaultIterations = DEFAULT_ROUTINE_MAX_ITERATIONS[routine];
 

@@ -22,7 +22,7 @@ program
   .description('Run a specific prompt routine locally in an isolated git worktree')
   .option('-i, --issue <number>', 'Targeted issue number for autowork')
   .option('-p, --pr <number>', 'Targeted pull request number for peer-review')
-  .option('-m, --model <model>', 'LLM model override (defaults to gemini-3.7-flash-high)')
+  .option('-m, --model <model>', 'LLM model override (defaults to gemini-3.8-flash-high)')
   .option('--timeout <duration>', 'CLI execution print timeout (default: 30m)')
   .option('--no-worktree', 'Execute directly in current directory without creating a git worktree')
   .option('--keep-worktree', 'Preserve the git worktree after routine execution completes')

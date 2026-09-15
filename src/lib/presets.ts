@@ -86,14 +86,14 @@ export interface FleetManifest {
 }
 
 export const DEFAULT_ROUTINE_MODELS: Record<string, string> = {
-  autowork: 'gemini-3.7-flash-high',
-  'peer-review': 'gemini-3.7-flash-high',
-  optimizer: 'gemini-3.7-flash-high',
-  'issues-housekeeping': 'gemini-3.7-flash',
-  'dependency-update-security-check': 'gemini-3.7-flash',
-  'product-planning': 'gemini-3.7-flash-high',
-  'analytics-review': 'gemini-3.7-flash',
-  'design-review': 'gemini-3.7-flash-high',
+  autowork: 'gemini-3.8-flash-high',
+  'peer-review': 'gemini-3.8-flash-high',
+  optimizer: 'gemini-3.8-flash-high',
+  'issues-housekeeping': 'gemini-3.8-flash-medium',
+  'dependency-update-security-check': 'gemini-3.8-flash-medium',
+  'product-planning': 'gemini-3.8-flash-high',
+  'analytics-review': 'gemini-3.8-flash-medium',
+  'design-review': 'gemini-3.8-flash-high',
 };
 
 export const DEFAULT_ROUTINE_TIMEOUTS: Record<string, number> = {
@@ -119,10 +119,10 @@ export const DEFAULT_ROUTINE_MAX_ITERATIONS: Record<string, number> = {
 };
 
 export const DEFAULT_MODELS_CONFIG: RoutineModels = {
-  default: 'gemini-3.7-flash-high',
-  'issues-housekeeping': 'gemini-3.7-flash',
-  'dependency-update-security-check': 'gemini-3.7-flash',
-  'analytics-review': 'gemini-3.7-flash',
+  default: 'gemini-3.8-flash-high',
+  'issues-housekeeping': 'gemini-3.8-flash-medium',
+  'dependency-update-security-check': 'gemini-3.8-flash-medium',
+  'analytics-review': 'gemini-3.8-flash-medium',
 };
 
 export const DEFAULT_BUDGETS_CONFIG: RoutineBudgets = {

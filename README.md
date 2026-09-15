@@ -158,9 +158,9 @@ Each target project contains an `agents-manifest.json` at its root:
     "analytics-review": false
   },
   "models": {
-    "default": "gemini-3.7-flash-high",
-    "issues-housekeeping": "gemini-3.7-flash",
-    "dependency-update-security-check": "gemini-3.7-flash"
+    "default": "gemini-3.8-flash-high",
+    "issues-housekeeping": "gemini-3.8-flash-medium",
+    "dependency-update-security-check": "gemini-3.8-flash-medium"
   },
   "budgets": {
     "weeklyTokens": 8750000,

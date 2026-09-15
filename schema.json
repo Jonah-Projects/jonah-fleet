@@ -51,7 +51,7 @@
         "design-review": { "type": "string", "description": "Target model for design-review routine" }
       },
       "additionalProperties": { "type": "string" },
-      "description": "Per-routine model overrides (e.g. gemini-3.7-flash-high, gemini-3.7-flash)"
+      "description": "Per-routine model overrides (e.g. gemini-3.8-flash-high, gemini-3.8-flash-medium)"
     },
     "budgets": {
       "type": "object",

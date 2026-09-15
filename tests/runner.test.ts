@@ -66,7 +66,7 @@ describe('Local Routine Runner', () => {
   });
 
   it('builds agy invocation args with stream-json output format', () => {
-    const args = buildAgyArgs('Test prompt', 'gemini-3.7-flash-high', '30m');
+    const args = buildAgyArgs('Test prompt', 'gemini-3.8-flash-high', '30m');
     expect(args).toContain('--output-format');
     const idx = args.indexOf('--output-format');
     expect(args[idx + 1]).toBe('stream-json');
