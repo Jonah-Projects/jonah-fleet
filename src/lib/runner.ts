@@ -40,6 +40,7 @@ export interface RunLocalRoutineResult {
   success: boolean;
   exitCode: number;
   output: string;
+  stderr?: string;
   worktreePath?: string;
   branchName?: string;
   issueNumber?: number;
@@ -467,6 +468,45 @@ export function extractFreshRunReport(
   return null;
 }
 
+export interface FallbackReportOptions {
+  routine: string;
+  timestamp: string;
+  exitCode: number;
+  hostname: string;
+  targetLabel: string;
+  durationSec: number;
+  output?: string;
+  stderr?: string;
+}
+
+/**
+ * Resolves child process exit code, ensuring signals (e.g. SIGTERM, SIGINT)
+ * resolve to a non-zero exit code instead of defaulting to 0.
+ */
+export function resolveExitCode(code: number | null, signal: NodeJS.Signals | string | null): number {
+  return code ?? (signal ? 1 : 0);
+}
+
+/**
+ * Formats a fallback summary markdown report when no fresh run-report.md was generated.
+ * Includes sanitized trailing error output from stdout and/or stderr if exitCode is non-zero.
+ */
+export function formatFallbackRunReport(options: FallbackReportOptions): string {
+  const result = options.exitCode === 0 ? 'SUCCESS' : 'FAILURE';
+  let reportContent = `## Run Summary\n\n| Metric | Value |\n|---|---|\n| Routine | \`${options.routine}\` |\n| Timestamp | \`${options.timestamp}\` |\n| Result | \`${result}\` |\n| Exit Code | \`${options.exitCode}\` |\n| Host | \`${options.hostname}\` |\n| Target | \`${options.targetLabel}\` |\n| Duration | \`${options.durationSec}s\` |\n`;
+
+  if (options.exitCode !== 0) {
+    const errorChunks = [options.output?.trim(), options.stderr?.trim()].filter(Boolean);
+    const combinedError = errorChunks.join('\n');
+    if (combinedError.trim()) {
+      const sanitizedOutput = stripAnsi(combinedError.trim()).split('\n').slice(-15).join('\n');
+      reportContent += `\n### Error Output\n\n\`\`\`\n${sanitizedOutput}\n\`\`\`\n`;
+    }
+  }
+
+  return reportContent;
+}
+
 /**
  * Runs a routine locally with worktree isolation and Antigravity CLI invocation.
  */
@@ -734,7 +774,10 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     }
   });
 
+  let accumulatedStderr = '';
+
   const stderrParser = new LineBufferedStreamParser((line: string) => {
+    accumulatedStderr += line + '\n';
     checkTargetDetection(line);
     if (options.verbose) {
       console.error(pc.dim(`[stderr] ${line}`));
@@ -787,9 +830,9 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
         reject(err);
       });
 
-      child.on('close', (code) => {
+      child.on('close', (code, signal) => {
         spinner?.stop();
-        resolve(code ?? 0);
+        resolve(resolveExitCode(code, signal));
       });
     });
   } finally {
@@ -812,11 +855,16 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
   let reportContent = extractFreshRunReport(executionReportPath, targetReportPath, startTime) || '';
 
   if (!reportContent) {
-    reportContent = `## Run Summary\n\n| Metric | Value |\n|---|---|\n| Routine | \`${routine}\` |\n| Timestamp | \`${timestamp}\` |\n| Result | \`${exitCode === 0 ? 'SUCCESS' : 'FAILURE'}\` |\n| Exit Code | \`${exitCode}\` |\n| Host | \`${hostname}\` |\n| Target | \`${targetLabel}\` |\n| Duration | \`${durationSec}s\` |\n`;
-    if (exitCode !== 0 && output.trim()) {
-      const sanitizedOutput = stripAnsi(output.trim()).split('\n').slice(-15).join('\n');
-      reportContent += `\n### Error Output\n\n\`\`\`\n${sanitizedOutput}\n\`\`\`\n`;
-    }
+    reportContent = formatFallbackRunReport({
+      routine,
+      timestamp,
+      exitCode,
+      hostname,
+      targetLabel,
+      durationSec,
+      output,
+      stderr: accumulatedStderr,
+    });
   }
 
   // Ensure report is copied to targetDir/.jonah-fleet/run-report.md
@@ -896,6 +944,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     success: exitCode === 0,
     exitCode,
     output,
+    stderr: accumulatedStderr,
     worktreePath,
     branchName,
     issueNumber: routineIssueNumber,
