@@ -5,6 +5,28 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.8.0...v1.9.0) (2026-09-16)
+
+
+### Features
+
+* **ci:** automate release pipeline with auto-merge and tag alignment ([#105](https://github.com/juliendurandeu/jonah-fleet/issues/105)) ([2e4d34b](https://github.com/juliendurandeu/jonah-fleet/commit/2e4d34bb35a4768372232112c455bb5df6849119))
+* **labels:** support auto-provisioning of fleet labels via CLI and sync ([1729473](https://github.com/juliendurandeu/jonah-fleet/commit/1729473ed9964740e4cba591cd773224c36be298))
+* **logging:** migrate routine run logs to GitHub Issues ([#137](https://github.com/juliendurandeu/jonah-fleet/issues/137)) ([13bff52](https://github.com/juliendurandeu/jonah-fleet/commit/13bff5251da1cbaefc57b942d894413abed6a1a1))
+* **models:** upgrade default LLM models to Gemini 3.8 Flash ([ef436fc](https://github.com/juliendurandeu/jonah-fleet/commit/ef436fc6d893cff487d9a5ae1017cb5081f3bafb))
+* **peer-review:** link routine run log issue from starting review markers and PR comments ([9bac85a](https://github.com/juliendurandeu/jonah-fleet/commit/9bac85afcf9c23ea5aa46eaf9a0c4de2a37eaf20))
+* **routines:** introduce autonomous Design Review routine ([#110](https://github.com/juliendurandeu/jonah-fleet/issues/110)) ([1e4f05b](https://github.com/juliendurandeu/jonah-fleet/commit/1e4f05ba55bdedadebcce8639102257930ebaf83))
+* **runner:** display truncated PR and issue titles in daemon spinner ([#107](https://github.com/juliendurandeu/jonah-fleet/issues/107)) ([9b2ca79](https://github.com/juliendurandeu/jonah-fleet/commit/9b2ca796ab37872ff056dad486c9faea80d6c1a0))
+* **telemetry:** live progress reporting and compact milestone cards in routine run issues ([#168](https://github.com/juliendurandeu/jonah-fleet/issues/168)) ([0899cdc](https://github.com/juliendurandeu/jonah-fleet/commit/0899cdcbdce7b7411bd85beedd1ffe8b05465cb5))
+
+
+### Bug Fixes
+
+* **daemon:** scope routine prompts strictly to target repository working directory ([62affb8](https://github.com/juliendurandeu/jonah-fleet/commit/62affb8b6dade15f7296e09d28a52359d1d05bb1))
+* **prompts:** enforce active origin sync in autowork and conflict resolution in peer-review ([2bb1832](https://github.com/juliendurandeu/jonah-fleet/commit/2bb1832154312f78503da1e7035dc91e4247c9a8))
+* **runner,daemon:** prevent stale report ghosting and fix keyboard lockup in targeted prompts ([#166](https://github.com/juliendurandeu/jonah-fleet/issues/166)) ([0de89e2](https://github.com/juliendurandeu/jonah-fleet/commit/0de89e24427f9e575f08cd721434ab5156fdcb94))
+* **workflows:** harden workflow templates against shell injection, credential persistence, and timeouts ([04a0dd3](https://github.com/juliendurandeu/jonah-fleet/commit/04a0dd3a0457fd4d6db74fcd4709fcef0d28d84e))
+
 ## [Unreleased] - 2026-09-16
 
 ### Features

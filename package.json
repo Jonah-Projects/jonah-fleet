@@ -1,6 +1,6 @@
 {
   "name": "jonah-fleet",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Standalone autonomous agent fleet with Symphony orchestration, claim protocols, and continuous improvement loops",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
