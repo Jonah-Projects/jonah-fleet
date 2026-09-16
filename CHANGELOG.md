@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1](https://github.com/juliendurandeu/jonah-fleet/compare/v1.9.0...v1.9.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* **ci:** supply GH_REPO to gh cli in release-please workflow ([a5a3669](https://github.com/juliendurandeu/jonah-fleet/commit/a5a3669fe3849de013e6d915af874b88f23b1867))
+
 ## [1.9.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.8.0...v1.9.0) (2026-09-16)
 
 
