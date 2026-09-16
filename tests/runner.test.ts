@@ -12,6 +12,9 @@ import {
   buildAgyArgs,
   tryCreateLocalRunIssue,
   tryReconcileLocalRunIssue,
+  tryPostLocalRunMilestone,
+  formatMilestoneCard,
+  formatInterruptionCard,
   extractFreshRunReport,
 } from '../src/lib/runner.js';
 
@@ -268,6 +271,50 @@ describe('Local Routine Runner', () => {
           '# Report',
           0,
           'test-host'
+        );
+      }).not.toThrow();
+    });
+
+    it('formats a compact milestone card conforming to the 5-point schema', () => {
+      const card = formatMilestoneCard({
+        emoji: '🧭',
+        milestoneTitle: 'Intake & Strategy',
+        phase: 'Phase 1 · Target Selection & Planning',
+        status: '⏳ In Progress',
+        targetOrContext: '#124 (Fix token refresh in auth client)',
+        keyDecisionOrFinding: 'Identified race condition in token-store.ts. Adding failing regression test first.',
+        next: 'Implementation & Test Verification',
+      });
+
+      expect(card).toContain('### 🧭 Milestone: Intake & Strategy');
+      expect(card).toContain('- **Phase**: `Phase 1 · Target Selection & Planning`');
+      expect(card).toContain('- **Status**: ⏳ In Progress');
+      expect(card).toContain('- **Target / Context**: `#124 (Fix token refresh in auth client)`');
+      expect(card).toContain('- **Key Decision / Finding**: Identified race condition in token-store.ts. Adding failing regression test first.');
+      expect(card).toContain('- **Next**: Implementation & Test Verification');
+    });
+
+    it('formats an interruption card for failed/interrupted runs', () => {
+      const card = formatInterruptionCard({
+        routine: 'autowork',
+        status: 'failure',
+        step: 'Run Autowork agy step',
+        logUrl: 'https://github.com/org/repo/actions/runs/12345',
+      });
+
+      expect(card).toContain('### ❌ Milestone: Run Interrupted / Failed');
+      expect(card).toContain('- **Routine**: `autowork`');
+      expect(card).toContain('- **Status**: Routine execution interrupted or failed (`failure`)');
+      expect(card).toContain('- **Step**: Run Autowork agy step');
+      expect(card).toContain('- **Action Log**: [View Run Logs](https://github.com/org/repo/actions/runs/12345)');
+    });
+
+    it('gracefully handles errors in tryPostLocalRunMilestone without throwing', () => {
+      expect(() => {
+        tryPostLocalRunMilestone(
+          '/dev/null/invalid-dir',
+          9999,
+          '### 🧭 Milestone: Test'
         );
       }).not.toThrow();
     });

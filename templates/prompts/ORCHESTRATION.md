@@ -125,6 +125,34 @@ Single source of truth for every routine's logging and telemetry lifecycle:
 3. **Local Daemon Parity & Offline Fallback**: `jonah-fleet daemon` and `jonah-fleet run` always record runs locally in `.jonah-fleet/runs/{timestamp}.json` (ignored by git). When online with valid `gh` auth, local daemons create and close tracking issues labeled `runner:local`. If offline or unauthenticated, runs gracefully fall back to local-only logging without interrupting agent execution.
 4. **Issue Backlog Isolation**: Routine run issues carry `label:routine-log`. Human maintainers and product queries filter `-label:routine-log` in issue searches to keep product backlogs pristine.
 
+### Routine Issue Progress Reporting & Milestone Protocol
+
+How live execution progress is reported during autonomous routine runs:
+
+1. **Comment Stream for Live Telemetry**: Rather than leaving tracking issues static until completion, routines emit structured milestone comments into the thread of `$ROUTINE_ISSUE_NUMBER`. This gives maintainers real-time visibility into agent decisions and progress with GitHub timestamps without needing to inspect raw Actions logs.
+2. **Issue Isolation Invariant (Negative Rule)**: Milestone comments are posted exclusively to the routine tracking issue (`gh issue comment "$ROUTINE_ISSUE_NUMBER"`). Agents MUST NEVER post progress telemetry comments to target product issues or pull requests (except for required PR linkage and review comments).
+3. **Compact Milestone Cards (5-Point Schema)**: Every milestone comment follows this standard structure:
+   ```markdown
+   ### <Emoji> Milestone: <Milestone Name>
+   - **Phase**: `<Phase Identifier>`
+   - **Status**: <Status Emoji + Summary>
+   - **Target / Context**: `<Target Issue/PR or Context>`
+   - **Key Decision / Finding**: <Summary of key decision, root cause, or verification outcome>
+   - **Next**: <Next planned milestone>
+   ```
+4. **Bounded 4-Stage Milestone Cadence**: Routines enforce strictly 3–4 bounded milestones per flight:
+   - **Milestone 1 (Intake & Strategy)**: Target claimed, scope clarified, initial strategy/reproduction plan established.
+   - **Milestone 2 (Verification & Tests)**: Implementation complete, unit/integration tests passing, lint clean.
+   - **Milestone 3 (Autonomous Handoff)**: Branch pushed, PR opened with link, or review decision submitted.
+   - **Milestone 4 (Run Completed)**: Final compact status closing out the comment stream.
+5. **Soft Failure & Offline Tolerance**: All milestone commands use `|| true`:
+   ```bash
+   gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "..." || true
+   ```
+   If offline, unauthenticated, or rate-limited, agent execution continues uninterrupted.
+6. **Harness Interruption Card**: If a routine run fails, times out, or crashes abruptly before Milestone 4, the workflow harness or local runner post-step automatically appends an Interruption Card (`### ❌ Milestone: Run Interrupted / Failed`) before marking `status:failure`.
+7. **Final State Reconciliation**: The final comment is Milestone 4 (Compact completion card). The workflow harness replaces the top-level issue body with the comprehensive telemetry & audit report (`.jonah-fleet/run-report.md`) and closes the issue on success.
+
 ---
 
 ## Token Anomaly Triage & Remediation

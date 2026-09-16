@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **telemetry:** introduce live progress reporting in routine run tracking issues (`routine-log`) using bounded Compact Milestone Cards (3–5 bullet points for Intake & Strategy, Verification & Tests, Autonomous Handoff, and Run Completed) across `autowork`, `peer-review`, `optimizer`, and `ORCHESTRATION.md`.
+* **workflows:** automatically post Interruption Cards to routine run issue comment streams upon failure, timeout, or cancellation, linking directly to the Actions run logs before applying `status:failure,needs-attention`.
+* **runner:** add `formatMilestoneCard`, `formatInterruptionCard`, and `tryPostLocalRunMilestone` helpers to local runner `runner.ts` to post interruption cards on non-zero exit codes with offline fallback.
 * **logging:** migrate routine run telemetry and execution logs from git repository files (`.github/prompts/logs/**`) to GitHub Issues with two-phase lifecycle (`routine-log`, `status:running` -> `status:success` closed / `status:failure,needs-attention` open).
 * **runner:** support local runner and daemon issue lifecycle with `runner:local` and offline fallback to `.jonah-fleet/runs/*.md`.
 * **telemetry:** update fleet telemetry hub, status command, and optimizer routine to query routine run issues via `gh issue list --label routine-log` and local `.jonah-fleet/runs/`.
@@ -22,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **daemon:** prevent keyboard lockup and prompt corruption during targeted input by resuming stdin stream, restoring raw mode, and suppressing status ticker during prompt interactions.
 * **runner:** prevent stale report ghosting on routine failure or timeout by cleaning up preexisting run reports before execution, validating report modification timestamps against run start, and appending trailing error output to fallback failure summaries.
+* **daemon:** prevent keyboard lockup by explicitly resuming `stdin` after targeted interactive prompts (`R` and `A`) and ensure `KeyboardController.resume()` unpauses the underlying stream.
+* **daemon:** suppress status-line ticker updates and interval check dispatches while waiting for targeted user input to avoid prompt visual corruption and background task collisions.
 
 ## [1.8.0](https://github.com/juliendurandeu/jonah-fleet/compare/jonah-fleet-v1.7.0...jonah-fleet-v1.8.0) (2026-09-09)
 

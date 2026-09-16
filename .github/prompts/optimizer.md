@@ -36,6 +36,15 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 1. Check the most recent routine issue with labels `routine-log,routine:optimizer` via `gh issue list --label routine-log --label routine:optimizer --state all --limit 1`.
 2. Extract the timestamp as the scan boundary (or last 7 days if first run).
+3. **Milestone 1 (Intake & Fleet Telemetry Scan)**: If `$ROUTINE_ISSUE_NUMBER` is set, emit milestone card to the routine issue thread:
+   ```bash
+   gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🧭 Milestone: Intake & Fleet Telemetry Scan
+- **Phase**: \`Phase 1 · Telemetry Intake & Boundary Scan\`
+- **Status**: ⏳ In Progress
+- **Target / Context**: \`Fleet Telemetry Window\`
+- **Key Decision / Finding**: Established scan boundary; analyzing in-window routine issues and token pacing.
+- **Next**: Anomaly Diagnosis & Proposals" || true
+   ```
 
 ### 1. Collect signals & analyze logs
 
@@ -110,6 +119,14 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
 - PRs opened (local or upstream)
 
 **Issue Logging Protocol**:
-- Record run execution details to `.jonah-fleet/run-report.md` (or update `$ROUTINE_ISSUE_NUMBER`).
+- **Milestone 4 (Run Completed)**: If `$ROUTINE_ISSUE_NUMBER` is set, emit compact milestone card to close out the comment stream:
+  ```bash
+  gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🏁 Milestone: Run Completed
+- **Phase**: \`Phase 4 · Reconciliation\`
+- **Status**: ✅ SUCCESS
+- **Target / Context**: \`Fleet Optimization Sweep\`
+- **Key Decision / Finding**: Fleet telemetry sweep completed and scored against token ceiling.
+- **Next**: Routine finished; issue closed by harness" || true
+  ```
 - Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.
 

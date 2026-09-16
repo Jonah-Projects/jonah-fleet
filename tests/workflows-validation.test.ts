@@ -57,6 +57,8 @@ describe('Workflow Validation & Invariants', () => {
       expect(content).toContain('routine-log');
       expect(content).toContain('status:running');
       expect(content).toContain('status:success');
+      expect(content).toContain('Milestone: Run Interrupted / Failed');
+      expect(content).toContain('gh issue comment "$ISSUE_NUMBER"');
     }
   });
 

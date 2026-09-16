@@ -139,10 +139,28 @@ a. **Read the target issue and check eligibility.** Eligible = open, unassigned 
     - Read `🧭 Decomposition plan` comment (or create if first run).
     - Pick next slice(s), batching up to 3 same-recipe slices into one child issue + PR.
     - Create and claim child issue first, then update plan marker to `🚧 in progress — child #M`, release umbrella claim, and implement against child.
+    - **Milestone 1 (Intake & Strategy)**: If `$ROUTINE_ISSUE_NUMBER` is set, emit milestone card to the routine issue thread:
+      ```bash
+      gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🧭 Milestone: Intake & Strategy
+- **Phase**: \`Phase 1 · Target Selection & Planning\`
+- **Status**: ⏳ In Progress
+- **Target / Context**: \`#<TARGET_ISSUE> (<Title>)\`
+- **Key Decision / Finding**: <Summary of plan, root cause, or reproduction strategy>
+- **Next**: Implementation & Test Verification" || true
+      ```
 13. **Implementation & PR creation:**
     - Branch from freshly fetched `origin/main` with descriptive name (e.g. `feat/...` or `fix/...`).
     - Drive implementation via `/tdd` (red-green-refactor).
     - Run repository tests and verification.
+    - **Milestone 2 (Verification & Tests)**: Once implementation passes tests and type checks, emit milestone card if `$ROUTINE_ISSUE_NUMBER` is set:
+      ```bash
+      gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🧪 Milestone: Verification & Tests
+- **Phase**: \`Phase 2 · Implementation & Verification\`
+- **Status**: ✅ Tests Passing
+- **Target / Context**: \`#<TARGET_ISSUE>\`
+- **Key Decision / Finding**: Tests verified passing with zero failures and clean type-check.
+- **Next**: PR Creation & Autonomous Handoff" || true
+      ```
     - Check for competing open PRs immediately before creating PR. If collision, bail cleanly.
     - Open draft PR via `gh pr create --draft --head <branch> --base main --title "<title>" --body "<body referencing Closes #N>"`.
     - **PR Priority Label Mirroring**: If the issue carried a priority label (`priority/P0`, `priority/P1`, `priority/P2`, `priority/P3`), add the identical priority label to the PR (`gh pr edit <PR> --add-label "<label>"` or via `--label` in create) so downstream review workflows can filter triggers immediately.
@@ -150,6 +168,15 @@ a. **Read the target issue and check eligibility.** Eligible = open, unassigned 
     - **Issue Cross-Reference Comment Guardrail**: Post an explicit comment on the tracking issue referencing the newly created PR (`gh issue comment <ISSUE_NUMBER> --body "Work in progress in PR #<PR_NUMBER>."`). This guarantees an unambiguous, permanent link on the issue timeline even when GitHub's native UI link is suppressed for bot draft PRs.
     - **Warm Context Assignment**: Assign yourself to the newly opened PR (`gh pr edit <PR> --add-assignee <login>`) to hold the reservation across Step 15's in-session review wait so parallel Scan routines recognise the PR as actively held by a live session.
     - Mark PR ready (`gh pr ready <PR>`).
+    - **Milestone 3 (Autonomous Handoff)**: Once PR is marked ready, emit milestone card if `$ROUTINE_ISSUE_NUMBER` is set:
+      ```bash
+      gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🚀 Milestone: Autonomous Handoff
+- **Phase**: \`Phase 3 · Autonomous Handoff\`
+- **Status**: ✅ PR Marked Ready
+- **Target / Context**: \`PR #<PR_NUMBER> (closes #<TARGET_ISSUE>)\`
+- **Key Decision / Finding**: Pushed branch and marked PR ready for review.
+- **Next**: In-session review wait or run completion" || true
+      ```
 14. If run aborts before opening PR, release claim (unassign).
 15. **In-Session Peer Review Wait & Immediate Convergence (Warm Context):**
     - Poll PR status for up to 10–12 minutes.
@@ -169,10 +196,17 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
 **Issue Logging Protocol & Invariants**:
 
 - **Negative Rule**: NEVER commit or push run logs to any git branch (`main` or feature branches). Run logs are recorded exclusively as GitHub Issues and local `.jonah-fleet/runs/*.json` artifacts.
-- **Harness Reconciliation**: When running under GitHub Actions or `jonah-fleet daemon`, the harness initializes the run issue (`status:running`) and reconciles the final status upon completion:
-  - If `$ROUTINE_ISSUE_NUMBER` is set in the environment, append or update the issue body:
-    ```bash
-    gh issue comment "$ROUTINE_ISSUE_NUMBER" --body-file .jonah-fleet/run-report.md
-    ```
+- **Milestone 4 (Run Completed)**: If `$ROUTINE_ISSUE_NUMBER` is set in the environment, append the concluding compact milestone card to close out the comment stream:
+  ```bash
+  gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🏁 Milestone: Run Completed
+- **Phase**: \`Phase 4 · Reconciliation\`
+- **Status**: ✅ SUCCESS
+- **Target / Context**: \`#<TARGET_ISSUE>\` · \`PR #<PR_NUMBER>\`
+- **Key Decision / Finding**: All DoD criteria satisfied and verified.
+- **Next**: Routine finished; issue closed by harness" || true
+  ```
+- **Harness Reconciliation**: When running under GitHub Actions or `jonah-fleet daemon`, the harness initializes the run issue (`status:running`), replaces the top-level issue body with `.jonah-fleet/run-report.md`, and reconciles the final status upon completion:
+  - On **SUCCESS**: Labels `status:success`, removes `status:running`, and closes the issue.
+  - On **FAILURE**: If interrupted or failed, the harness posts the Interruption Card, edits the body, and marks `status:failure,needs-attention`.
   - On clean local runs outside a harness, write `.jonah-fleet/runs/{timestamp}.json`.
 - Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`.
