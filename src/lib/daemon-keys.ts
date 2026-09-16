@@ -66,6 +66,11 @@ export class KeyboardController {
 
   public resume(): void {
     this.isPaused = false;
+    if (this.listening && this.stdin && typeof this.stdin.resume === 'function') {
+      try {
+        this.stdin.resume();
+      } catch {}
+    }
   }
 
   public handleKeypress(str: string, key?: readline.Key): void {
@@ -243,6 +248,12 @@ export async function promptTargetedInput(
       if (wasRaw && stdin && typeof stdin.setRawMode === 'function' && stdin.isTTY) {
         try {
           stdin.setRawMode(true);
+        } catch {}
+      }
+
+      if (stdin && typeof stdin.resume === 'function') {
+        try {
+          stdin.resume();
         } catch {}
       }
       resolve(val);

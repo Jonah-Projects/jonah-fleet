@@ -5,7 +5,7 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-13
+## [Unreleased] - 2026-09-15
 
 ### Features
 
@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **runner:** display clean, truncated PR and Issue titles in foreground daemon spinner alongside target numbers.
 * **peer-review:** link routine tracking log issue directly from "Starting review (round N)" PR comments and review summaries.
 * **models:** upgrade default LLM models to Gemini 3.8 Flash (`gemini-3.8-flash-high` for core reasoning routines, `gemini-3.8-flash-medium` for housekeeping, dependency check, and analytics) to ensure CLI compatibility and access to the latest model capabilities.
+
+### Bug Fixes
+
+* **runner:** prevent stale report ghosting on routine failure or timeout by cleaning up preexisting run reports before execution, validating report modification timestamps against run start, and appending trailing error output to fallback failure summaries.
 
 ## [1.8.0](https://github.com/juliendurandeu/jonah-fleet/compare/jonah-fleet-v1.7.0...jonah-fleet-v1.8.0) (2026-09-09)
 
