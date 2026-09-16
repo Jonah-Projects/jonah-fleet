@@ -37,8 +37,8 @@ jobs:
       - name: Run jonah-fleet sync
         id: sync
         run: |
-          npx jonah-fleet sync --check || true
-          npx jonah-fleet sync --force
+          npx --yes jonah-fleet sync --check || true
+          npx --yes jonah-fleet sync --force
 
       - name: Check for changes
         id: git-check

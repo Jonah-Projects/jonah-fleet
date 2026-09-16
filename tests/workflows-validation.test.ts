@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { parse } from 'yaml';
 import { getTemplatesDir } from '../src/lib/installer.js';
 import { ROUTINE_TO_WORKFLOW_MAP } from '../src/lib/presets.js';
 
@@ -165,5 +166,18 @@ describe('Workflow Validation & Invariants', () => {
       expect(templateContent).toBe(githubContent);
     }
   });
+
+  it('ensures all workflow YAML files in templates and .github parse without syntax errors', () => {
+    const dirs = [workflowsDir, path.join(process.cwd(), '.github/workflows')];
+    for (const dir of dirs) {
+      const files = fs.readdirSync(dir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+      for (const file of files) {
+        const filePath = path.join(dir, file);
+        const content = fs.readFileSync(filePath, 'utf8');
+        expect(() => parse(content)).not.toThrow();
+      }
+    }
+  });
 });
+
 

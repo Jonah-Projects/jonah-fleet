@@ -69,8 +69,8 @@ describe('Sync Fleet Workflow Logic & Drift Scenarios', () => {
     const wfPath = path.join(process.cwd(), 'templates/workflows/sync-fleet.yml');
     const content = fs.readFileSync(wfPath, 'utf8');
 
-    expect(content).toContain('npx jonah-fleet sync --check');
-    expect(content).toContain('npx jonah-fleet sync --force');
+    expect(content).toContain('npx --yes jonah-fleet sync --check');
+    expect(content).toContain('npx --yes jonah-fleet sync --force');
     expect(content).toContain('git checkout -B "$BRANCH_NAME"');
     expect(content).toContain('gh pr create');
     expect(content).toContain('--title "chore(fleet): sync prompt routines and workflows from jonah-fleet"');
