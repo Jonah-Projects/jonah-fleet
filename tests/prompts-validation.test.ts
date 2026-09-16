@@ -142,6 +142,37 @@ describe("Prompt Validation & Invariants", () => {
     expect(autoworkContent).toContain('git log -n 50 --grep="#<ISSUE_NUMBER>"');
   });
 
+  it("validates ORCHESTRATION.md, autowork.md, peer-review.md, and optimizer.md define Routine Progress Reporting and Compact Milestone Cards", () => {
+    const orchestrationPath = path.join(templatesDir, "prompts", "ORCHESTRATION.md");
+    const autoworkPath = path.join(promptsDir, "autowork.md");
+    const peerReviewPath = path.join(promptsDir, "peer-review.md");
+    const optimizerPath = path.join(promptsDir, "optimizer.md");
+
+    const orchestrationContent = fs.readFileSync(orchestrationPath, "utf8");
+    const autoworkContent = fs.readFileSync(autoworkPath, "utf8");
+    const peerReviewContent = fs.readFileSync(peerReviewPath, "utf8");
+    const optimizerContent = fs.readFileSync(optimizerPath, "utf8");
+
+    // ORCHESTRATION.md protocol definition
+    expect(orchestrationContent).toContain("Routine Issue Progress Reporting & Milestone Protocol");
+    expect(orchestrationContent).toContain("Compact Milestone Cards");
+    expect(orchestrationContent).toContain('gh issue comment "$ROUTINE_ISSUE_NUMBER"');
+
+    // autowork.md milestones
+    expect(autoworkContent).toContain("Milestone: Intake & Strategy");
+    expect(autoworkContent).toContain("Milestone: Verification & Tests");
+    expect(autoworkContent).toContain("Milestone: Autonomous Handoff");
+    expect(autoworkContent).toContain("Milestone: Run Completed");
+
+    // peer-review.md milestones
+    expect(peerReviewContent).toContain("Milestone: Intake & Review Scope");
+    expect(peerReviewContent).toContain("Milestone: Run Completed");
+
+    // optimizer.md milestones
+    expect(optimizerContent).toContain("Milestone: Intake & Fleet Telemetry Scan");
+    expect(optimizerContent).toContain("Milestone: Run Completed");
+  });
+
   it("validates trigger-review-routine.yml supports workflow_dispatch, issue_comment, and review_requested triggers", () => {
     const workflowPath = path.join(
       templatesDir,

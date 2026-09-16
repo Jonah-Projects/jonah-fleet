@@ -42,11 +42,11 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
 
 **Issue Logging Protocol & Invariants**:
 - **Negative Rule**: NEVER commit or push run logs to any git branch (`main` or feature branches). Run logs are recorded exclusively as GitHub Issues and local `.jonah-fleet/runs/*.json` artifacts.
-- **Harness Reconciliation**: When running under GitHub Actions or `jonah-fleet daemon`, the harness initializes the run issue (`status:running`) and reconciles the final status upon completion:
-  - If `$ROUTINE_ISSUE_NUMBER` is set in the environment, append or update the issue body:
-    ```bash
-    gh issue comment "$ROUTINE_ISSUE_NUMBER" --body-file .jonah-fleet/run-report.md
-    ```
+- **Routine Issue Progress Milestones**: Emit bounded Compact Milestone Cards (3–5 bullet points) to `$ROUTINE_ISSUE_NUMBER` at major phase transitions using `gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "..." || true`.
+- **Milestone 4 (Run Completed)**: Append the final compact milestone card to close out the comment stream.
+- **Harness Reconciliation**: When running under GitHub Actions or `jonah-fleet daemon`, the harness initializes the run issue (`status:running`), replaces the top-level issue body with `.jonah-fleet/run-report.md`, and reconciles the final status upon completion:
+  - On **SUCCESS**: Labels `status:success`, removes `status:running`, and closes the issue.
+  - On **FAILURE**: Posts the Interruption Card, edits the body, and marks `status:failure,needs-attention`.
   - On clean local runs outside a harness, write `.jonah-fleet/runs/{timestamp}.json`.
 - Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`.
 

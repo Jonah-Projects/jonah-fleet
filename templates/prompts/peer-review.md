@@ -86,6 +86,15 @@ Check if `$PR_NUMBER` is set:
     (or `Starting review (round N) · Run log: #$ROUTINE_ISSUE_NUMBER`).
   - If `$ROUTINE_ISSUE_NUMBER` is not set, post `Starting review (round N)`.
 - Check round count `N`. If `N >= 5` and blocking findings persist, prepare to escalate.
+- **Milestone 1 (Intake & Review Scope)**: If `$ROUTINE_ISSUE_NUMBER` is set, emit milestone card to the routine issue thread:
+  ```bash
+  gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🧭 Milestone: Intake & Review Scope
+- **Phase**: \`Phase 1 · Review Target & Scope\`
+- **Status**: ⏳ In Progress
+- **Target / Context**: \`PR #<PR_NUMBER> (Round N)\`
+- **Key Decision / Finding**: Claimed review window; starting multi-angle evaluation passes.
+- **Next**: Multi-Angle Code Review Pass" || true
+  ```
 
 ### Step 4: Multi-Angle Code Review Pass
 
@@ -150,5 +159,13 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
 - Execution trace and findings summary
 
 **Issue Logging Protocol**:
-- Record run execution details to `.jonah-fleet/run-report.md` (or update `$ROUTINE_ISSUE_NUMBER`).
+- **Milestone 4 (Run Completed)**: If `$ROUTINE_ISSUE_NUMBER` is set, emit compact milestone card to close out the comment stream:
+  ```bash
+  gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🏁 Milestone: Run Completed
+- **Phase**: \`Phase 4 · Reconciliation\`
+- **Status**: ✅ SUCCESS
+- **Target / Context**: \`PR #<PR_NUMBER>\`
+- **Key Decision / Finding**: Review completed with decision \`<MERGE | BOUNCE | ESCALATE>\`.
+- **Next**: Routine finished; issue closed by harness" || true
+  ```
 - Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.
