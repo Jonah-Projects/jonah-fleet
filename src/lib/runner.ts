@@ -14,6 +14,7 @@ import {
   fetchTargetTitleAsync,
   renderSummaryCard,
   renderErrorCard,
+  stripAnsi,
 } from './terminal-card.js';
 import pc from 'picocolors';
 
@@ -349,6 +350,36 @@ export function tryReconcileLocalRunIssue(
 }
 
 /**
+ * Reads a freshly generated run report from execution or target directory.
+ * Returns null if no fresh report exists (e.g. file missing or older than run start).
+ */
+export function extractFreshRunReport(
+  executionReportPath: string,
+  targetReportPath: string,
+  startTime: number
+): string | null {
+  try {
+    if (fs.existsSync(executionReportPath)) {
+      const stat = fs.statSync(executionReportPath);
+      if (stat.mtimeMs >= startTime - 1000) {
+        return fs.readFileSync(executionReportPath, 'utf8');
+      }
+    }
+  } catch {}
+
+  try {
+    if (executionReportPath !== targetReportPath && fs.existsSync(targetReportPath)) {
+      const stat = fs.statSync(targetReportPath);
+      if (stat.mtimeMs >= startTime - 1000) {
+        return fs.readFileSync(targetReportPath, 'utf8');
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
  * Runs a routine locally with worktree isolation and Antigravity CLI invocation.
  */
 export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<RunLocalRoutineResult> {
@@ -442,6 +473,21 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
   const logFilePath = path.join(logDir, 'daemon.log');
   const runsDir = path.join(logDir, 'runs');
   fs.mkdirSync(runsDir, { recursive: true });
+
+  // Remove preexisting run-report.md in executionDir and targetDir before routine starts
+  // to guarantee stale reports from previous runs cannot leak into this run's summary or tracking issue
+  const executionReportPath = path.join(executionDir, '.jonah-fleet', 'run-report.md');
+  const targetReportPath = path.join(targetDir, '.jonah-fleet', 'run-report.md');
+  try {
+    if (fs.existsSync(executionReportPath)) {
+      fs.unlinkSync(executionReportPath);
+    }
+  } catch {}
+  try {
+    if (fs.existsSync(targetReportPath)) {
+      fs.unlinkSync(targetReportPath);
+    }
+  } catch {}
 
   let activePhase = 'Starting session...';
   let lastActionDesc: string | null = null;
@@ -674,23 +720,15 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
   const durationMs = Date.now() - startTime;
   const durationSec = Math.round(durationMs / 1000);
 
-  // Check for .jonah-fleet/run-report.md (in executionDir or targetDir)
-  const executionReportPath = path.join(executionDir, '.jonah-fleet', 'run-report.md');
-  const targetReportPath = path.join(targetDir, '.jonah-fleet', 'run-report.md');
-
-  let reportContent = '';
-  if (fs.existsSync(executionReportPath)) {
-    try {
-      reportContent = fs.readFileSync(executionReportPath, 'utf8');
-    } catch {}
-  } else if (fs.existsSync(targetReportPath)) {
-    try {
-      reportContent = fs.readFileSync(targetReportPath, 'utf8');
-    } catch {}
-  }
+  // Check for freshly generated .jonah-fleet/run-report.md (in executionDir or targetDir)
+  let reportContent = extractFreshRunReport(executionReportPath, targetReportPath, startTime) || '';
 
   if (!reportContent) {
     reportContent = `## Run Summary\n\n| Metric | Value |\n|---|---|\n| Routine | \`${routine}\` |\n| Timestamp | \`${timestamp}\` |\n| Result | \`${exitCode === 0 ? 'SUCCESS' : 'FAILURE'}\` |\n| Exit Code | \`${exitCode}\` |\n| Host | \`${hostname}\` |\n| Target | \`${targetLabel}\` |\n| Duration | \`${durationSec}s\` |\n`;
+    if (exitCode !== 0 && output.trim()) {
+      const sanitizedOutput = stripAnsi(output.trim()).split('\n').slice(-15).join('\n');
+      reportContent += `\n### Error Output\n\n\`\`\`\n${sanitizedOutput}\n\`\`\`\n`;
+    }
   }
 
   // Ensure report is copied to targetDir/.jonah-fleet/run-report.md

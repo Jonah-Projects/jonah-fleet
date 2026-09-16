@@ -12,6 +12,7 @@ import {
   buildAgyArgs,
   tryCreateLocalRunIssue,
   tryReconcileLocalRunIssue,
+  extractFreshRunReport,
 } from '../src/lib/runner.js';
 
 describe('Local Routine Runner', () => {
@@ -269,6 +270,63 @@ describe('Local Routine Runner', () => {
           'test-host'
         );
       }).not.toThrow();
+    });
+  });
+
+  describe('extractFreshRunReport & Stale Report Guardrails', () => {
+    it('reads fresh execution report when created during routine', () => {
+      const execDir = path.join(tmpRepo, 'exec');
+      const targetDir = path.join(tmpRepo, 'target');
+      fs.mkdirSync(path.join(execDir, '.jonah-fleet'), { recursive: true });
+      fs.mkdirSync(path.join(targetDir, '.jonah-fleet'), { recursive: true });
+
+      const execReport = path.join(execDir, '.jonah-fleet', 'run-report.md');
+      const targetReport = path.join(targetDir, '.jonah-fleet', 'run-report.md');
+      fs.writeFileSync(execReport, '# Fresh Execution Report', 'utf8');
+
+      const startTime = Date.now() - 5000;
+      const report = extractFreshRunReport(execReport, targetReport, startTime);
+      expect(report).toBe('# Fresh Execution Report');
+    });
+
+    it('reads fresh target report when execution report does not exist', () => {
+      const execDir = path.join(tmpRepo, 'exec');
+      const targetDir = path.join(tmpRepo, 'target');
+      fs.mkdirSync(path.join(targetDir, '.jonah-fleet'), { recursive: true });
+
+      const execReport = path.join(execDir, '.jonah-fleet', 'run-report.md');
+      const targetReport = path.join(targetDir, '.jonah-fleet', 'run-report.md');
+      fs.writeFileSync(targetReport, '# Fresh Target Report', 'utf8');
+
+      const startTime = Date.now() - 5000;
+      const report = extractFreshRunReport(execReport, targetReport, startTime);
+      expect(report).toBe('# Fresh Target Report');
+    });
+
+    it('ignores stale report modified prior to routine startTime', () => {
+      const execDir = path.join(tmpRepo, 'exec');
+      const targetDir = path.join(tmpRepo, 'target');
+      fs.mkdirSync(path.join(targetDir, '.jonah-fleet'), { recursive: true });
+
+      const execReport = path.join(execDir, '.jonah-fleet', 'run-report.md');
+      const targetReport = path.join(targetDir, '.jonah-fleet', 'run-report.md');
+      fs.writeFileSync(targetReport, '# Stale Report From Yesterday', 'utf8');
+
+      // Backdate the file mtime by 1 hour
+      const pastTime = new Date(Date.now() - 3600 * 1000);
+      fs.utimesSync(targetReport, pastTime, pastTime);
+
+      const startTime = Date.now() - 5000;
+      const report = extractFreshRunReport(execReport, targetReport, startTime);
+      expect(report).toBeNull();
+    });
+
+    it('returns null when neither execution nor target report exists', () => {
+      const execReport = path.join(tmpRepo, 'non-existent-exec', '.jonah-fleet', 'run-report.md');
+      const targetReport = path.join(tmpRepo, 'non-existent-target', '.jonah-fleet', 'run-report.md');
+
+      const report = extractFreshRunReport(execReport, targetReport, Date.now() - 5000);
+      expect(report).toBeNull();
     });
   });
 });
