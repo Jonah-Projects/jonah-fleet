@@ -16,6 +16,8 @@ import {
   formatMilestoneCard,
   formatInterruptionCard,
   extractFreshRunReport,
+  resolveExitCode,
+  formatFallbackRunReport,
 } from '../src/lib/runner.js';
 
 describe('Local Routine Runner', () => {
@@ -374,6 +376,128 @@ describe('Local Routine Runner', () => {
 
       const report = extractFreshRunReport(execReport, targetReport, Date.now() - 5000);
       expect(report).toBeNull();
+    });
+  });
+
+  describe('resolveExitCode', () => {
+    it('returns code when code is non-null and no signal', () => {
+      expect(resolveExitCode(0, null)).toBe(0);
+      expect(resolveExitCode(1, null)).toBe(1);
+      expect(resolveExitCode(127, null)).toBe(127);
+    });
+
+    it('returns non-zero exit code (1) when code is null and process was killed by a signal', () => {
+      expect(resolveExitCode(null, 'SIGTERM')).toBe(1);
+      expect(resolveExitCode(null, 'SIGINT')).toBe(1);
+      expect(resolveExitCode(null, 'SIGKILL')).toBe(1);
+    });
+
+    it('returns 0 when code is null and signal is null or undefined', () => {
+      expect(resolveExitCode(null, null)).toBe(0);
+      expect(resolveExitCode(null, undefined as any)).toBe(0);
+    });
+
+    it('preserves numeric exit code even if signal is present', () => {
+      expect(resolveExitCode(130, 'SIGINT')).toBe(130);
+    });
+  });
+
+  describe('formatFallbackRunReport & Stderr Diagnostics', () => {
+    it('formats a successful run summary table without error output block when exitCode is 0', () => {
+      const report = formatFallbackRunReport({
+        routine: 'autowork',
+        timestamp: '2026-09-16T12-00-00Z',
+        exitCode: 0,
+        hostname: 'test-runner',
+        targetLabel: 'Issue #171',
+        durationSec: 42,
+        output: 'Completed successfully',
+        stderr: '',
+      });
+
+      expect(report).toContain('## Run Summary');
+      expect(report).toContain('| Result | `SUCCESS` |');
+      expect(report).toContain('| Exit Code | `0` |');
+      expect(report).toContain('| Host | `test-runner` |');
+      expect(report).toContain('| Target | `Issue #171` |');
+      expect(report).toContain('| Duration | `42s` |');
+      expect(report).not.toContain('### Error Output');
+    });
+
+    it('includes stderr in Error Output when exitCode is non-zero even if stdout is empty', () => {
+      const report = formatFallbackRunReport({
+        routine: 'autowork',
+        timestamp: '2026-09-16T12-00-00Z',
+        exitCode: 1,
+        hostname: 'test-runner',
+        targetLabel: 'Issue #171',
+        durationSec: 10,
+        output: '',
+        stderr: 'Error: Cannot find module agy\n    at Function.execute (cli.js:12:3)',
+      });
+
+      expect(report).toContain('| Result | `FAILURE` |');
+      expect(report).toContain('| Exit Code | `1` |');
+      expect(report).toContain('### Error Output');
+      expect(report).toContain('Error: Cannot find module agy');
+      expect(report).toContain('at Function.execute (cli.js:12:3)');
+    });
+
+    it('combines stdout and stderr and trims to trailing 15 lines', () => {
+      const stdoutLines = Array.from({ length: 10 }, (_, i) => `stdout line ${i + 1}`).join('\n');
+      const stderrLines = Array.from({ length: 10 }, (_, i) => `stderr line ${i + 1}`).join('\n');
+
+      const report = formatFallbackRunReport({
+        routine: 'peer-review',
+        timestamp: '2026-09-16T12-00-00Z',
+        exitCode: 1,
+        hostname: 'test-runner',
+        targetLabel: 'PR #100',
+        durationSec: 15,
+        output: stdoutLines,
+        stderr: stderrLines,
+      });
+
+      expect(report).toContain('### Error Output');
+      // Total 20 lines, should only contain the trailing 15 lines
+      expect(report).not.toContain('stdout line 1\n');
+      expect(report).not.toContain('stdout line 5\n');
+      expect(report).toContain('stdout line 6');
+      expect(report).toContain('stderr line 10');
+    });
+
+    it('strips ANSI color escape sequences from error output', () => {
+      const report = formatFallbackRunReport({
+        routine: 'autowork',
+        timestamp: '2026-09-16T12-00-00Z',
+        exitCode: 1,
+        hostname: 'test-runner',
+        targetLabel: 'Issue #171',
+        durationSec: 5,
+        output: '',
+        stderr: '\u001b[31mFatal error:\u001b[39m \u001b[1mProcess crashed\u001b[22m',
+      });
+
+      expect(report).toContain('### Error Output');
+      expect(report).toContain('Fatal error: Process crashed');
+      expect(report).not.toContain('\u001b[31m');
+    });
+
+    it('omits Error Output block when exitCode is non-zero but output and stderr are empty', () => {
+      const report = formatFallbackRunReport({
+        routine: 'autowork',
+        timestamp: '2026-09-16T12-00-00Z',
+        exitCode: 1,
+        hostname: 'test-runner',
+        targetLabel: 'Issue #171',
+        durationSec: 5,
+        output: '   ',
+        stderr: '',
+      });
+
+      expect(report).toContain('| Result | `FAILURE` |');
+      expect(report).toContain('| Exit Code | `1` |');
+      expect(report).not.toContain('### Error Output');
     });
   });
 });
