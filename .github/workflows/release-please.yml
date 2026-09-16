@@ -37,6 +37,7 @@ jobs:
       - name: Enable auto-merge on Release PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GH_PAT || github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           PR_NUMBER="${{ steps.release.outputs.pr && fromJson(steps.release.outputs.pr).number || '' }}"
           if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
