@@ -367,6 +367,7 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
   let isGracefulStopping = false;
   let isWorking = false;
   let isPaused = false;
+  let isPrompting = false;
   let pendingRoutine: 'peer-review' | 'autowork' | null = null;
   let keyboard: KeyboardController | undefined;
   let tickerInterval: NodeJS.Timeout | undefined;
@@ -390,7 +391,7 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
   };
 
   const updateTicker = () => {
-    if (isStopping || isWorking || options.verbose || !process.stderr.isTTY) return;
+    if (isStopping || isWorking || isPrompting || options.verbose || !process.stderr.isTTY) return;
 
     const line = formatDaemonStatusLine({
       now: Date.now(),
@@ -745,7 +746,7 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
       await runAutoworkCheck();
     },
     onTargetedReview: async () => {
-      if (isStopping || isGracefulStopping) return;
+      if (isStopping || isGracefulStopping || isPrompting) return;
       if (isWorking) {
         clearTicker();
         console.log(
@@ -759,11 +760,17 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
 
       clearTicker();
       keyboard?.pause();
-      const rawInput = await promptTargetedInput(`\n${pc.cyan('Enter PR # to review (Esc/Enter to cancel):')} `, {
-        stdin: options.stdin || process.stdin,
-        stdout: process.stdout,
-      });
-      keyboard?.resume();
+      isPrompting = true;
+      let rawInput: string | null = null;
+      try {
+        rawInput = await promptTargetedInput(`\n${pc.cyan('Enter PR # to review (Esc/Enter to cancel):')} `, {
+          stdin: options.stdin || process.stdin,
+          stdout: process.stdout,
+        });
+      } finally {
+        isPrompting = false;
+        keyboard?.resume();
+      }
 
       if (!rawInput) {
         console.log(pc.dim(`[${new Date().toLocaleTimeString()}] Targeted review cancelled.\n`));
@@ -783,7 +790,7 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
       await runTargetedReview(prNumber);
     },
     onTargetedAutowork: async () => {
-      if (isStopping || isGracefulStopping) return;
+      if (isStopping || isGracefulStopping || isPrompting) return;
       if (isWorking) {
         clearTicker();
         console.log(
@@ -797,11 +804,17 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
 
       clearTicker();
       keyboard?.pause();
-      const rawInput = await promptTargetedInput(`\n${pc.cyan('Enter Issue # to work (Esc/Enter to cancel):')} `, {
-        stdin: options.stdin || process.stdin,
-        stdout: process.stdout,
-      });
-      keyboard?.resume();
+      isPrompting = true;
+      let rawInput: string | null = null;
+      try {
+        rawInput = await promptTargetedInput(`\n${pc.cyan('Enter Issue # to work (Esc/Enter to cancel):')} `, {
+          stdin: options.stdin || process.stdin,
+          stdout: process.stdout,
+        });
+      } finally {
+        isPrompting = false;
+        keyboard?.resume();
+      }
 
       if (!rawInput) {
         console.log(pc.dim(`[${new Date().toLocaleTimeString()}] Targeted autowork cancelled.\n`));
@@ -921,7 +934,7 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
   // Set up 1-second watchdog tick loop for decoupled intervals and ticker
   let isTicking = false;
   const tick = async () => {
-    if (isStopping || isGracefulStopping || isWorking || isTicking) return;
+    if (isStopping || isGracefulStopping || isWorking || isPrompting || isTicking) return;
     isTicking = true;
 
     try {

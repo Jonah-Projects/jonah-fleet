@@ -61,6 +61,19 @@ describe('KeyboardController', () => {
     expect(mockStdin.listenerCount('keypress')).toBe(0);
   });
 
+  it('resumes stdin stream when resume() is called', () => {
+    const controller = new KeyboardController({ stdin: mockStdin as any });
+    controller.start();
+    mockStdin.pause();
+    expect(mockStdin.paused).toBe(true);
+
+    controller.resume();
+    expect(mockStdin.resumed).toBe(true);
+    expect(mockStdin.paused).toBe(false);
+
+    controller.stop();
+  });
+
   it('gracefully skips raw mode when isTTY is false', () => {
     mockStdin.isTTY = false;
     const controller = new KeyboardController({ stdin: mockStdin as any });
@@ -580,6 +593,38 @@ describe('promptTargetedInput', () => {
 
     const result = await promptPromise;
     expect(result).toBeNull();
+  });
+
+  it('resumes stdin and restores raw mode upon completion with MockStdin', async () => {
+    const { promptTargetedInput } = await import('../src/lib/daemon-keys.js');
+    const stdin = new MockStdin();
+    stdin.rawMode = true;
+    const stdout = Object.assign(new EventEmitter(), { write: vi.fn() });
+
+    const promptPromise = promptTargetedInput('Enter PR #: ', { stdin: stdin as any, stdout });
+    stdin.emit('data', '42\n');
+
+    const result = await promptPromise;
+    expect(result).toBe('42');
+    expect(stdin.rawMode).toBe(true);
+    expect(stdin.resumed).toBe(true);
+    expect(stdin.paused).toBe(false);
+  });
+
+  it('resumes stdin and restores raw mode upon Esc cancellation with MockStdin', async () => {
+    const { promptTargetedInput } = await import('../src/lib/daemon-keys.js');
+    const stdin = new MockStdin();
+    stdin.rawMode = true;
+    const stdout = Object.assign(new EventEmitter(), { write: vi.fn() });
+
+    const promptPromise = promptTargetedInput('Enter PR #: ', { stdin: stdin as any, stdout });
+    stdin.emit('data', '\u001b');
+
+    const result = await promptPromise;
+    expect(result).toBeNull();
+    expect(stdin.rawMode).toBe(true);
+    expect(stdin.resumed).toBe(true);
+    expect(stdin.paused).toBe(false);
   });
 });
 
