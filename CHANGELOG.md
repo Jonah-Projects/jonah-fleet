@@ -5,7 +5,7 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-15
+## [Unreleased] - 2026-09-16
 
 ### Features
 
@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+* **daemon:** prevent keyboard lockup and prompt corruption during targeted input by resuming stdin stream, restoring raw mode, and suppressing status ticker during prompt interactions.
 * **runner:** prevent stale report ghosting on routine failure or timeout by cleaning up preexisting run reports before execution, validating report modification timestamps against run start, and appending trailing error output to fallback failure summaries.
 
 ## [1.8.0](https://github.com/juliendurandeu/jonah-fleet/compare/jonah-fleet-v1.7.0...jonah-fleet-v1.8.0) (2026-09-09)
