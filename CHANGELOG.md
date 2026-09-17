@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.10.0...v1.11.0) (2026-09-17)
+
+
+### Features
+
+* **daemon:** auto-reconcile orphaned local routine runs on startup ([#188](https://github.com/juliendurandeu/jonah-fleet/issues/188)) ([dcc7746](https://github.com/juliendurandeu/jonah-fleet/commit/dcc7746268cd1921dbfb8e23c57ac46cf9217b83))
+
 ## [1.10.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.9.2...v1.10.0) (2026-09-17)
 
 
