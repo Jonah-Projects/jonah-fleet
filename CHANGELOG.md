@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **daemon:** auto-reconcile orphaned local routine run issues on daemon startup after host reboots or process crashes.
 * **telemetry:** introduce live progress reporting in routine run tracking issues (`routine-log`) using bounded Compact Milestone Cards (3–5 bullet points for Intake & Strategy, Verification & Tests, Autonomous Handoff, and Run Completed) across `autowork`, `peer-review`, `optimizer`, and `ORCHESTRATION.md`.
 * **workflows:** automatically post Interruption Cards to routine run issue comment streams upon failure, timeout, or cancellation, linking directly to the Actions run logs before applying `status:failure,needs-attention`.
 * **runner:** add `formatMilestoneCard`, `formatInterruptionCard`, and `tryPostLocalRunMilestone` helpers to local runner `runner.ts` to post interruption cards on non-zero exit codes with offline fallback.

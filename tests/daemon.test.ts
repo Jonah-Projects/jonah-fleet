@@ -11,6 +11,7 @@ import {
   DaemonState,
   filterReviewablePRs,
   drainReviewQueue,
+  reconcileOrphanedLocalRuns,
 } from '../src/lib/daemon.js';
 
 describe('Local Agent Daemon Manager', () => {
@@ -237,6 +238,77 @@ describe('Local Agent Daemon Manager', () => {
 
       // Should execute exactly once and not loop infinitely because attemptedPRNumbers tracks #401
       expect(runCount).toBe(1);
+    });
+  });
+
+  describe('reconcileOrphanedLocalRuns', () => {
+    it('returns 0 when no orphaned issues exist', async () => {
+      const mockExec = (cmd: string) => {
+        if (cmd.includes('gh issue list')) return '[]';
+        return '';
+      };
+
+      const count = await reconcileOrphanedLocalRuns(tmpRepo, mockExec);
+      expect(count).toBe(0);
+    });
+
+    it('reconciles an orphaned run that died mid-execution', async () => {
+      const commandsRun: string[] = [];
+      const mockExec = (cmd: string) => {
+        commandsRun.push(cmd);
+        if (cmd.includes('gh issue list')) {
+          return JSON.stringify([
+            { number: 890, title: '[peer-review] run 2026-09-14T06-59-51Z', createdAt: '2026-09-14T06:59:51Z' },
+          ]);
+        }
+        return '';
+      };
+
+      const count = await reconcileOrphanedLocalRuns(tmpRepo, mockExec);
+      expect(count).toBe(1);
+      expect(commandsRun.some((c) => c.includes('gh issue comment 890') && c.includes('Run Interrupted / Orphaned'))).toBe(true);
+      expect(commandsRun.some((c) => c.includes('gh issue edit 890 --add-label "status:failure,needs-attention"'))).toBe(true);
+    });
+
+    it('reconciles an orphaned run that completed before daemon termination', async () => {
+      const runsDir = path.join(tmpRepo, '.jonah-fleet', 'runs');
+      fs.mkdirSync(runsDir, { recursive: true });
+
+      const timestamp = '2026-09-15T06-43-40-758Z';
+      fs.writeFileSync(
+        path.join(runsDir, `autowork-${timestamp}.json`),
+        JSON.stringify({ routine: 'autowork', issueNumber: 911, success: true, exitCode: 0 })
+      );
+      fs.writeFileSync(
+        path.join(runsDir, `autowork-${timestamp}.md`),
+        '# Autowork Report\n\nResult: SUCCESS'
+      );
+
+      const commandsRun: string[] = [];
+      const mockExec = (cmd: string) => {
+        commandsRun.push(cmd);
+        if (cmd.includes('gh issue list')) {
+          return JSON.stringify([
+            { number: 911, title: '[autowork] run 2026-09-15T06-43-40Z', createdAt: '2026-09-15T06:43:40Z' },
+          ]);
+        }
+        return '';
+      };
+
+      const count = await reconcileOrphanedLocalRuns(tmpRepo, mockExec);
+      expect(count).toBe(1);
+      expect(commandsRun.some((c) => c.includes('gh issue edit 911 --body-file'))).toBe(true);
+      expect(commandsRun.some((c) => c.includes('gh issue edit 911 --add-label "status:success"'))).toBe(true);
+      expect(commandsRun.some((c) => c.includes('gh issue close 911 --reason completed'))).toBe(true);
+    });
+
+    it('fails gracefully if gh CLI command throws', async () => {
+      const mockExec = () => {
+        throw new Error('Network error or offline');
+      };
+
+      const count = await reconcileOrphanedLocalRuns(tmpRepo, mockExec);
+      expect(count).toBe(0);
     });
   });
 });
