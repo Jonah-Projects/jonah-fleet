@@ -93,6 +93,310 @@ export function evaluateActivity(symphonyData, funesData, options = {}) {
   };
 }
 
+/**
+ * Classifies an upstream change (commit, PR, spec update, release) into Category A, B, or C.
+ *
+ * - Category A (Adopt Directly): Security guardrails, claim lock invariants, reader/writer rules,
+ *   token budget optimizations, deterministic zero-LLM indexing, or direct SPEC.md updates.
+ * - Category B (Adapt to Actions/CLI): Dynamic orchestrator pacing, backpressure controls,
+ *   multi-stage review checks, pull-based memory MCP integrations, hybrid search, trace parsing.
+ * - Category C (Skip): Elixir/OTP supervision trees, BEAM internals, non-GitHub platforms (GitLab/Bitbucket),
+ *   low-level storage engine bumps, internal caching workarounds, and maintenance/lint refactors.
+ */
+export function classifyUpstreamItem(item, options = {}) {
+  const isSpec = options.isSpec || item.isSpec || false;
+  const repo = options.repo || item.repo || '';
+  const title = (item.title || item.summary || item.name || item.tag_name || item.commit?.message?.split('\n')[0] || '').trim();
+  const body = item.body || item.commit?.message || '';
+  const text = `${title} ${body}`.toLowerCase();
+
+  // 1. Direct SPEC.md changes are unconditionally Category A
+  if (isSpec) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Direct revision to OpenAI Symphony specification (`SPEC.md`); review for claim invariant or protocol updates.'
+    };
+  }
+
+  // 2. Category A: Core claim protocols, invariants, security, budget, prompt engineering
+  // Precedence: Category A invariant and prompt engineering keywords take precedence over general platform/runtime keywords
+  const isClaimOrInvariant = /\b(claim|single-flight|claim lock|claim invariant|invariants?|reader[/-]writer|state machine)\b/i.test(text);
+  const isSecurityOrToken = /\b(security|token scrub|token alias|least privilege|sanitiz)\b/i.test(text);
+  const isTokenEconomyOrBudget = /\b(token budget|budget ceiling|loop stagnation|retry limit|token limit)\b/i.test(text);
+  const isZeroLlmIngest = /\b(zero-llm|deterministic indexing|provenance retention)\b/i.test(text);
+  const isPromptEngineering = /\b(prompt engineering|prompt optimiz|system prompt)\b/i.test(text);
+
+  if (isClaimOrInvariant) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Touches core claim protocols, reader/writer locks, or orchestration state machine invariants.'
+    };
+  }
+
+  if (isSecurityOrToken) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Security guardrail or credential/token sanitization pattern relevant to fleet workflows.'
+    };
+  }
+
+  if (isTokenEconomyOrBudget) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Token economy, budget ceiling, or stagnation prevention optimization.'
+    };
+  }
+
+  if (isZeroLlmIngest) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Deterministic zero-LLM indexing or provenance retention pattern.'
+    };
+  }
+
+  if (isPromptEngineering) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Prompt engineering optimization or system prompt refinement relevant to fleet routines.'
+    };
+  }
+
+  // 3. Filter explicit platform mismatches & runtime-specific internals to Category C
+  const isGitLabOrNonGitHub = /\b(gitlab|bitbucket|azure)\b/i.test(text);
+  if (isGitLabOrNonGitHub) {
+    return {
+      category: 'C',
+      badge: '🔴 **Category C** (Skip)',
+      isOpportunity: false,
+      rationale: 'Targets non-GitHub issue tracker or provider not applicable to Jonah Fleet.'
+    };
+  }
+
+  const isElixirInternals = /\b(elixir|otp|beam|mix|phoenix)\b/i.test(text);
+  if (isElixirInternals) {
+    return {
+      category: 'C',
+      badge: '🔴 **Category C** (Skip)',
+      isOpportunity: false,
+      rationale: 'Elixir/OTP/BEAM runtime internal specific to Symphony; skip for Node.js/Actions architecture.'
+    };
+  }
+
+  const isCacheOrInternal = /\b(corrupt cache|repair cached|workaround corrupt|refuse a cached|scan blocks|trim lance)\b/i.test(text);
+  if (isCacheOrInternal) {
+    return {
+      category: 'C',
+      badge: '🔴 **Category C** (Skip)',
+      isOpportunity: false,
+      rationale: 'Upstream low-level binary cache workaround or internal dataset scan detail; no action needed.'
+    };
+  }
+
+  const isLowLevelDepOrBump = /\b(bump lance|bump version|dependency bump|dependencies)\b/i.test(text);
+  if (isLowLevelDepOrBump) {
+    return {
+      category: 'C',
+      badge: '🔴 **Category C** (Skip)',
+      isOpportunity: false,
+      rationale: 'Internal dependency bump for upstream storage engine; no action required.'
+    };
+  }
+
+  const isInternalQueryOrFilter = /\b(select pending rows|id filter|giant id filter)\b/i.test(text);
+  if (isInternalQueryOrFilter) {
+    return {
+      category: 'C',
+      badge: '🔴 **Category C** (Skip)',
+      isOpportunity: false,
+      rationale: 'Upstream internal database query optimization; not applicable to fleet architecture.'
+    };
+  }
+
+  // 4. Category B: Adaptable patterns (MCP, memory retrieval, backpressure, review loops)
+  const isMcpOrTools = /\b(mcp|model context protocol|tool|skill)\b/i.test(text);
+  const isMemoryOrSearch = /\b(recall|hybrid search|bm25|vector search|rrf|rerank|lance)\b/i.test(text);
+  const isPacingOrReview = /\b(pacing|backpressure|rate limit|review loop|multi-stage review|concurrency)\b/i.test(text);
+  const isSessionOrTrace = /\b(session|trace|transcript|tracesource)\b/i.test(text);
+
+  if (isMcpOrTools || isMemoryOrSearch) {
+    return {
+      category: 'B',
+      badge: '🟡 **Category B** (Adapt)',
+      isOpportunity: true,
+      rationale: 'Agent memory or MCP retrieval pattern adaptable as Jonah Fleet skill or routine integration.'
+    };
+  }
+
+  if (isPacingOrReview || isSessionOrTrace) {
+    return {
+      category: 'B',
+      badge: '🟡 **Category B** (Adapt)',
+      isOpportunity: true,
+      rationale: 'Orchestrator pacing, session trace parsing, or review loop pattern adaptable to Actions/CLI.'
+    };
+  }
+
+  // 5. Default Category C
+  if (repo.includes('symphony')) {
+    return {
+      category: 'C',
+      badge: '🔴 **Category C** (Skip)',
+      isOpportunity: false,
+      rationale: 'Upstream Symphony implementation detail; not identified as a direct orchestration opportunity.'
+    };
+  }
+
+  return {
+    category: 'C',
+    badge: '🔴 **Category C** (Skip)',
+    isOpportunity: false,
+    rationale: 'Upstream Funes internal implementation detail; no immediate action required.'
+  };
+}
+
+/**
+ * Classifies all recent upstream activity and surfaces actionable opportunities.
+ */
+export function classifyAllActivity(symRecent = {}, funesRecent = {}) {
+  const items = [];
+
+  const getPrNumber = (msg) => {
+    const match = msg.match(/\(#(\d+)\)/);
+    return match ? parseInt(match[1], 10) : null;
+  };
+
+  const symPRNumbers = new Set((symRecent.pullRequests || []).map(p => p.number));
+  const funesPRNumbers = new Set((funesRecent.pullRequests || []).map(p => p.number));
+
+  // 1. SPEC commits (Symphony only)
+  for (const sc of (symRecent.specCommits || [])) {
+    const summary = sc.commit.message.split('\n')[0];
+    const classification = classifyUpstreamItem(sc, { isSpec: true, repo: 'openai/symphony' });
+    items.push({
+      repo: 'openai/symphony',
+      type: 'spec',
+      ref: `[\`${sc.sha.slice(0, 7)}\`](${sc.html_url})`,
+      title: summary,
+      url: sc.html_url,
+      ...classification
+    });
+  }
+
+  // 2. Merged PRs
+  for (const pr of (symRecent.pullRequests || [])) {
+    const classification = classifyUpstreamItem(pr, { repo: 'openai/symphony' });
+    items.push({
+      repo: 'openai/symphony',
+      type: 'pr',
+      ref: `[#${pr.number}](${pr.html_url})`,
+      title: pr.title,
+      url: pr.html_url,
+      ...classification
+    });
+  }
+
+  for (const pr of (funesRecent.pullRequests || [])) {
+    const classification = classifyUpstreamItem(pr, { repo: 'huggingface/funes' });
+    items.push({
+      repo: 'huggingface/funes',
+      type: 'pr',
+      ref: `[#${pr.number}](${pr.html_url})`,
+      title: pr.title,
+      url: pr.html_url,
+      ...classification
+    });
+  }
+
+  // 3. Releases
+  for (const rel of (symRecent.releases || [])) {
+    const classification = classifyUpstreamItem(rel, { repo: 'openai/symphony' });
+    items.push({
+      repo: 'openai/symphony',
+      type: 'release',
+      ref: `**[${rel.name || rel.tag_name}](${rel.html_url})**`,
+      title: rel.name || rel.tag_name,
+      url: rel.html_url,
+      ...classification
+    });
+  }
+
+  for (const rel of (funesRecent.releases || [])) {
+    const classification = classifyUpstreamItem(rel, { repo: 'huggingface/funes' });
+    items.push({
+      repo: 'huggingface/funes',
+      type: 'release',
+      ref: `**[${rel.name || rel.tag_name}](${rel.html_url})**`,
+      title: rel.name || rel.tag_name,
+      url: rel.html_url,
+      ...classification
+    });
+  }
+
+  // 4. Standalone commits
+  for (const c of (symRecent.commits || [])) {
+    const summary = c.commit.message.split('\n')[0];
+    const prNum = getPrNumber(summary);
+    if (prNum && symPRNumbers.has(prNum)) continue;
+    if ((symRecent.specCommits || []).some(sc => sc.sha === c.sha)) continue;
+
+    const classification = classifyUpstreamItem(c, { repo: 'openai/symphony' });
+    items.push({
+      repo: 'openai/symphony',
+      type: 'commit',
+      ref: `[\`${c.sha.slice(0, 7)}\`](${c.html_url})`,
+      title: summary,
+      url: c.html_url,
+      ...classification
+    });
+  }
+
+  for (const c of (funesRecent.commits || [])) {
+    const summary = c.commit.message.split('\n')[0];
+    const prNum = getPrNumber(summary);
+    if (prNum && funesPRNumbers.has(prNum)) continue;
+
+    const classification = classifyUpstreamItem(c, { repo: 'huggingface/funes' });
+    items.push({
+      repo: 'huggingface/funes',
+      type: 'commit',
+      ref: `[\`${c.sha.slice(0, 7)}\`](${c.html_url})`,
+      title: summary,
+      url: c.html_url,
+      ...classification
+    });
+  }
+
+  const categoryA = items.filter(i => i.category === 'A');
+  const categoryB = items.filter(i => i.category === 'B');
+  const categoryC = items.filter(i => i.category === 'C');
+
+  return {
+    items,
+    categoryA,
+    categoryB,
+    categoryC,
+    counts: {
+      total: items.length,
+      A: categoryA.length,
+      B: categoryB.length,
+      C: categoryC.length
+    },
+    hasActionableOpportunities: categoryA.length > 0 || categoryB.length > 0
+  };
+}
+
 export function generateRadarReport(params = {}) {
   const symphony = params.symphony || { commits: [], specCommits: [], releases: [], pullRequests: [] };
   const funes = params.funes || { commits: [], releases: [], pullRequests: [] };
@@ -104,11 +408,42 @@ export function generateRadarReport(params = {}) {
 
   const evalResult = evaluateActivity(symphony, funes, { lookbackDays, forceReport: true });
   const { symphony: symRecent, funes: funesRecent } = evalResult.recent;
+  const analysis = classifyAllActivity(symRecent, funesRecent);
 
   let report = `# 📡 Upstream Ecosystem Radar: Intel Digest (${dateStr})\n\n`;
   report += `> Tracking upstream architectural changes, specification updates, and feature additions across:\n`;
   report += `> - [openai/symphony](https://github.com/openai/symphony) (Orchestration & Claim Invariants)\n`;
   report += `> - [huggingface/funes](https://github.com/huggingface/funes) (Agent Memory & Session Indexing)\n\n`;
+
+  // Top Section: Opportunities & Triage Summary
+  report += `## 🎯 Upstream Opportunities & Triage Summary\n\n`;
+
+  if (analysis.counts.A > 0) {
+    report += `> [!IMPORTANT]\n`;
+    report += `> **Actionable Opportunities Detected (${analysis.counts.A} Category A, ${analysis.counts.B} Category B):**\n`;
+    report += `> High-leverage architectural updates detected upstream (e.g. \`SPEC.md\` revisions, claim invariants, or security guardrails). Prioritize reviewing the Category A items below for prompt or workflow adoption.\n\n`;
+  } else if (analysis.counts.B > 0) {
+    report += `> [!TIP]\n`;
+    report += `> **Adaptation Opportunities Detected (${analysis.counts.B} Category B):**\n`;
+    report += `> Upstream patterns detected in agent memory, MCP tools, or orchestrator pacing that may be adapted for Jonah Fleet. Review the breakdown below for feasibility.\n\n`;
+  } else if (analysis.counts.total > 0) {
+    report += `> [!NOTE]\n`;
+    report += `> **No Actionable Opportunities (All ${analysis.counts.total} items Category C / Skip):**\n`;
+    report += `> Detected upstream changes are low-level runtime internals, dependency bumps, cache management, or non-GitHub infrastructure. **Safe to review and close without action.**\n\n`;
+  } else {
+    report += `> [!NOTE]\n`;
+    report += `> **Zero Activity Detected:** No commits, releases, or pull requests detected in the lookback window (${lookbackDays} days).\n\n`;
+  }
+
+  if (analysis.items.length > 0) {
+    report += `### 📊 Opportunity Breakdown (Past ${lookbackDays} Days: ${analysis.counts.total} items)\n\n`;
+    report += `| Upstream Source | Item / Reference | Classification | Architectural Opportunity & Rationale |\n`;
+    report += `|---|---|:---:|---|\n`;
+    for (const item of analysis.items) {
+      report += `| \`${item.repo}\` | ${item.ref} ${item.title} | ${item.badge} | ${item.rationale} |\n`;
+    }
+    report += `\n`;
+  }
 
   // Section 1: Symphony
   report += `## 🎼 Upstream Orchestration Watch (\`openai/symphony\`)\n\n`;
@@ -160,7 +495,8 @@ export function generateRadarReport(params = {}) {
   if (symRecent.pullRequests.length > 0) {
     report += `### 🔀 Merged Pull Requests\n\n`;
     for (const pr of symRecent.pullRequests) {
-      report += `- [#${pr.number}](${pr.html_url}) **${pr.title}** by @${pr.user.login} (merged ${pr.merged_at.split('T')[0]})\n`;
+      const author = pr.user?.login ? `@${pr.user.login}` : 'contributor';
+      report += `- [#${pr.number}](${pr.html_url}) **${pr.title}** by ${author} (merged ${pr.merged_at.split('T')[0]})\n`;
     }
     report += `\n`;
   }
@@ -199,7 +535,8 @@ export function generateRadarReport(params = {}) {
   if (funesRecent.pullRequests.length > 0) {
     report += `### 🔀 Merged Pull Requests\n\n`;
     for (const pr of funesRecent.pullRequests) {
-      report += `- [#${pr.number}](${pr.html_url}) **${pr.title}** by @${pr.user.login} (merged ${pr.merged_at.split('T')[0]})\n`;
+      const author = pr.user?.login ? `@${pr.user.login}` : 'contributor';
+      report += `- [#${pr.number}](${pr.html_url}) **${pr.title}** by ${author} (merged ${pr.merged_at.split('T')[0]})\n`;
     }
     report += `\n`;
   }
@@ -228,13 +565,29 @@ export function generateRadarReport(params = {}) {
   report += `- **🔴 Category C (Skip)**: Elixir/OTP supervision trees, BEAM memory tuning, proprietary runtime internals, always-loaded memory context dumps.\n\n`;
 
   report += `### 💡 Maintainer & Optimizer Triage Checklist\n\n`;
-  report += `- [ ] **Classify Changes**: Classify detected upstream changes into Category A, B, or C across Orchestration and Memory domains.\n`;
+  report += `- [x] **Automated Classification**: Evaluated ${analysis.counts.total} upstream change(s) (${analysis.counts.A} Category A, ${analysis.counts.B} Category B, ${analysis.counts.C} Category C).\n`;
+  if (analysis.counts.A > 0) {
+    report += `- [ ] **Triage Category A Opportunities**: Prioritize ${analysis.counts.A} direct adoption candidate(s) for claim protocol or invariant updates.\n`;
+  } else {
+    report += `- [x] **Category A Gate**: No direct adoption items detected this cycle.\n`;
+  }
+  if (analysis.counts.B > 0) {
+    report += `- [ ] **Evaluate Category B Adaptations**: Assess ${analysis.counts.B} concept(s) for potential Actions/CLI or MCP skill integration.\n`;
+  } else {
+    report += `- [x] **Category B Gate**: No candidate adaptation items detected this cycle.\n`;
+  }
   report += `- [ ] **Zero-Daemon Check**: Confirm no persistent server or long-lived socket requirement is introduced.\n`;
   report += `- [ ] **Token Economy Gate**: Verify that indexing or memory retrieval does not exceed the 70% weekly token ceiling (~8.75M tokens).\n`;
   report += `- [ ] **Prompt & Skill Ports**: If applicable, port routines to \`templates/prompts/\` or \`.agents/skills/\` (e.g. MCP memory skill).\n`;
   report += `- [ ] **Empirical Evals**: Run \`npm run test:evals\` and \`npm test\` to ensure no regressions.\n`;
   report += `- [ ] **Downstream Sync**: Verify \`jonah-fleet sync\` distributes updates cleanly to target repositories.\n`;
-  report += `- [ ] **Close Issue**: Close once triage and any resulting PRs are merged.\n\n`;
+  if (analysis.counts.total === 0) {
+    report += `- [ ] **Close Issue**: Close once triage is verified (no upstream items detected — safe to close immediately).\n\n`;
+  } else if (analysis.counts.A === 0 && analysis.counts.B === 0) {
+    report += `- [ ] **Close Issue**: Close once triage is verified (all items Category C — safe to close immediately).\n\n`;
+  } else {
+    report += `- [ ] **Close Issue**: Close once triage and any resulting PRs are merged.\n\n`;
+  }
 
   report += `---\n_Generated by [Antigravity](${serverUrl}/${repository}/actions/runs/${runId})_\n`;
 

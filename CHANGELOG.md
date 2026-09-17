@@ -5,6 +5,19 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.9.2...v1.10.0) (2026-09-17)
+
+
+### Features
+
+* **radar:** expand Category A heuristics to include prompt engineering optimizations and release tag_name ([#186](https://github.com/juliendurandeu/jonah-fleet/issues/186)) ([37fb3fc](https://github.com/juliendurandeu/jonah-fleet/commit/37fb3fca85b2f880de90df6a4baf9ec50f624003))
+* **radar:** surface actionable opportunities with deterministic A/B/C classification ([#181](https://github.com/juliendurandeu/jonah-fleet/issues/181)) ([b9809c0](https://github.com/juliendurandeu/jonah-fleet/commit/b9809c0c1b54cb690c878d574cecbe1a4ce33480))
+
+
+### Bug Fixes
+
+* **runner:** capture stderr and handle signal exit codes in fallback error diagnostics ([#176](https://github.com/juliendurandeu/jonah-fleet/issues/176)) ([9bbe8eb](https://github.com/juliendurandeu/jonah-fleet/commit/9bbe8eb7cd52deab74c0bc9d503011511502a98f))
+
 ## [1.9.2](https://github.com/juliendurandeu/jonah-fleet/compare/v1.9.1...v1.9.2) (2026-09-16)
 
 
@@ -41,11 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **runner,daemon:** prevent stale report ghosting and fix keyboard lockup in targeted prompts ([#166](https://github.com/juliendurandeu/jonah-fleet/issues/166)) ([0de89e2](https://github.com/juliendurandeu/jonah-fleet/commit/0de89e24427f9e575f08cd721434ab5156fdcb94))
 * **workflows:** harden workflow templates against shell injection, credential persistence, and timeouts ([04a0dd3](https://github.com/juliendurandeu/jonah-fleet/commit/04a0dd3a0457fd4d6db74fcd4709fcef0d28d84e))
 
-## [Unreleased] - 2026-09-16
+## [Unreleased] - 2026-09-17
 
 ### Features
 
 * **daemon:** auto-reconcile orphaned local routine run issues on daemon startup after host reboots or process crashes.
+* **radar:** expand Category A heuristics in `fetch-symphony-radar.js` to detect prompt engineering optimizations and release `tag_name` fallbacks, prioritize Category A invariants over runtime keywords, and refine empty lookback checklist phrasing ([#184](https://github.com/juliendurandeu/jonah-fleet/issues/184)).
+* **radar:** deterministically classify upstream changes across Symphony and Funes into Category A/B/C and surface architectural opportunities with callout summaries, breakdown matrices, and dynamic triage checklists ([#152](https://github.com/juliendurandeu/jonah-fleet/issues/152)).
 * **telemetry:** introduce live progress reporting in routine run tracking issues (`routine-log`) using bounded Compact Milestone Cards (3–5 bullet points for Intake & Strategy, Verification & Tests, Autonomous Handoff, and Run Completed) across `autowork`, `peer-review`, `optimizer`, and `ORCHESTRATION.md`.
 * **workflows:** automatically post Interruption Cards to routine run issue comment streams upon failure, timeout, or cancellation, linking directly to the Actions run logs before applying `status:failure,needs-attention`.
 * **runner:** add `formatMilestoneCard`, `formatInterruptionCard`, and `tryPostLocalRunMilestone` helpers to local runner `runner.ts` to post interruption cards on non-zero exit codes with offline fallback.
