@@ -12,7 +12,10 @@ import {
   buildAgyArgs,
   tryCreateLocalRunIssue,
   tryReconcileLocalRunIssue,
+  tryReconcileLocalRunIssueAsync,
+  tryMarkLocalRunInterruptedAsync,
   tryPostLocalRunMilestone,
+  tryPostLocalRunMilestoneAsync,
   formatMilestoneCard,
   formatInterruptionCard,
   extractFreshRunReport,
@@ -275,6 +278,35 @@ describe('Local Routine Runner', () => {
           'test-host'
         );
       }).not.toThrow();
+    });
+
+    it('gracefully handles errors in tryReconcileLocalRunIssueAsync without throwing', async () => {
+      const result = await tryReconcileLocalRunIssueAsync(
+        '/dev/null/invalid-dir',
+        9999,
+        '# Report',
+        0,
+        'test-host'
+      );
+      expect(result).toBe(false);
+    });
+
+    it('gracefully handles errors in tryMarkLocalRunInterruptedAsync without throwing', async () => {
+      const result = await tryMarkLocalRunInterruptedAsync(
+        '/dev/null/invalid-dir',
+        9999,
+        'test-host'
+      );
+      expect(result).toBe(false);
+    });
+
+    it('gracefully handles errors in tryPostLocalRunMilestoneAsync without throwing', async () => {
+      const result = await tryPostLocalRunMilestoneAsync(
+        '/dev/null/invalid-dir',
+        9999,
+        'card'
+      );
+      expect(result).toBe(false);
     });
 
     it('formats a compact milestone card conforming to the 5-point schema', () => {

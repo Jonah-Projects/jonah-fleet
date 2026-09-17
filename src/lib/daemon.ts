@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn, execFile, execSync } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { runLocalRoutine } from './runner.js';
+import {
+  runLocalRoutine,
+  tryReconcileLocalRunIssueAsync,
+  tryMarkLocalRunInterruptedAsync,
+} from './runner.js';
 import { cleanupStaleWorktrees, listActiveWorktrees } from './worktree.js';
 import {
   KeyboardController,
@@ -215,76 +219,124 @@ export async function stopDaemon(repoRoot: string): Promise<boolean> {
   }
 }
 
+export interface ReconcileOrphanedRunsOptions {
+  repoRoot: string;
+  queryIssues?: (repoRoot: string) => Promise<Array<{ number: number; title: string; createdAt: string }>>;
+  reconcileRun?: (
+    repoRoot: string,
+    issueNumber: number,
+    report: string | undefined,
+    isSuccess: boolean,
+    routine?: string
+  ) => Promise<boolean>;
+}
+
+export async function queryOrphanedLocalRunIssues(
+  repoRoot: string
+): Promise<Array<{ number: number; title: string; createdAt: string }>> {
+  try {
+    const { stdout } = await execFileAsync(
+      'gh',
+      ['issue', 'list', '--state', 'open', '--label', 'runner:local,status:running', '--json', 'number,title,createdAt', '--limit', '20'],
+      { cwd: repoRoot }
+    );
+    return JSON.parse(stdout || '[]') as Array<{ number: number; title: string; createdAt: string }>;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Scans for open routine run issues labeled `runner:local,status:running` that were abandoned
  * by a process crash, SIGKILL, or host machine reboot, and reconciles them.
- * Fails gracefully if offline or unauthenticated.
+ * Operates asynchronously and fails gracefully on network / CLI errors without preventing daemon startup.
  */
 export async function reconcileOrphanedLocalRuns(
-  repoRoot: string,
-  execFn: (cmd: string) => string = (cmd) =>
-    execSync(cmd, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8' })
+  optionsOrRepoRoot: string | ReconcileOrphanedRunsOptions
 ): Promise<number> {
+  const options: ReconcileOrphanedRunsOptions =
+    typeof optionsOrRepoRoot === 'string'
+      ? { repoRoot: optionsOrRepoRoot }
+      : optionsOrRepoRoot;
+
+  const { repoRoot } = options;
+  const queryFn = options.queryIssues || queryOrphanedLocalRunIssues;
+
   try {
-    const stdout = execFn(
-      'gh issue list --state open --label "runner:local,status:running" --json number,title,createdAt --limit 20'
-    );
-    const issues = JSON.parse(stdout || '[]') as Array<{ number: number; title: string; createdAt: string }>;
+    const issues = await queryFn(repoRoot);
     if (!issues || issues.length === 0) return 0;
 
     const runsDir = path.join(repoRoot, '.jonah-fleet', 'runs');
     let reconciledCount = 0;
+    const hostname = os.hostname();
 
     for (const issue of issues) {
-      let completedReport: string | undefined;
-      let isSuccess = false;
+      try {
+        let completedReport: string | undefined;
+        let isSuccess = false;
+        let metaRoutine: string | undefined;
 
-      if (fs.existsSync(runsDir)) {
-        const files = fs.readdirSync(runsDir);
-        for (const file of files) {
-          if (file.endsWith('.json')) {
-            try {
-              const meta = JSON.parse(fs.readFileSync(path.join(runsDir, file), 'utf8'));
-              if (meta.issueNumber === issue.number) {
-                const mdFile = file.replace(/\.json$/, '.md');
-                const mdPath = path.join(runsDir, mdFile);
-                if (fs.existsSync(mdPath)) {
-                  completedReport = fs.readFileSync(mdPath, 'utf8');
-                  isSuccess = meta.success === true || meta.exitCode === 0;
-                  break;
+        if (fs.existsSync(runsDir)) {
+          const files = fs.readdirSync(runsDir);
+          for (const file of files) {
+            if (file.endsWith('.json')) {
+              try {
+                const meta = JSON.parse(fs.readFileSync(path.join(runsDir, file), 'utf8'));
+                if (meta.issueNumber === issue.number) {
+                  metaRoutine = meta.routine;
+                  const mdFile = file.replace(/\.json$/, '.md');
+                  const mdPath = path.join(runsDir, mdFile);
+                  if (fs.existsSync(mdPath)) {
+                    completedReport = fs.readFileSync(mdPath, 'utf8');
+                    isSuccess = meta.success === true || meta.exitCode === 0;
+                    break;
+                  }
                 }
-              }
-            } catch {}
+              } catch {}
+            }
           }
         }
-      }
 
-      if (completedReport) {
-        const tmpFile = path.join(os.tmpdir(), `jonah-fleet-reconcile-${issue.number}-${Date.now()}.md`);
-        try {
-          fs.writeFileSync(tmpFile, completedReport, 'utf8');
-          execFn(`gh issue edit ${issue.number} --body-file ${JSON.stringify(tmpFile)}`);
-          if (isSuccess) {
-            execFn(`gh issue edit ${issue.number} --add-label "status:success" --remove-label "status:running"`);
-            execFn(`gh issue close ${issue.number} --reason completed`);
-          } else {
-            execFn(`gh issue edit ${issue.number} --add-label "status:failure,needs-attention" --remove-label "status:running"`);
-          }
-          reconciledCount++;
-        } finally {
-          if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+        if (options.reconcileRun) {
+          const ok = await options.reconcileRun(
+            repoRoot,
+            issue.number,
+            completedReport,
+            isSuccess,
+            metaRoutine
+          );
+          if (ok) reconciledCount++;
+        } else if (completedReport) {
+          const ok = await tryReconcileLocalRunIssueAsync(
+            repoRoot,
+            issue.number,
+            completedReport,
+            isSuccess ? 0 : 1,
+            hostname,
+            metaRoutine
+          );
+          if (ok) reconciledCount++;
+        } else {
+          const ok = await tryMarkLocalRunInterruptedAsync(
+            repoRoot,
+            issue.number,
+            hostname,
+            'Host machine daemon process was terminated before completion (e.g. machine reboot or SIGKILL).',
+            metaRoutine || 'local-routine'
+          );
+          if (ok) reconciledCount++;
         }
-      } else {
-        const hostname = os.hostname();
-        const interruptBody = `### ❌ Milestone: Run Interrupted / Orphaned\n- **Status**: Host machine daemon process was terminated before completion (e.g. machine reboot or SIGKILL).\n- **Step**: Local execution interrupted.\n\n---\n_Generated by Jonah Fleet local daemon on ${hostname}._`;
-        execFn(`gh issue comment ${issue.number} --body ${JSON.stringify(interruptBody)}`);
-        execFn(`gh issue edit ${issue.number} --add-label "status:failure,needs-attention" --remove-label "status:running"`);
-        reconciledCount++;
+      } catch {
+        // Granular error recovery: individual issue failure does not abort processing remaining issues
       }
     }
 
     if (reconciledCount > 0) {
-      console.log(pc.yellow(`\n⚠️  Reconciled ${reconciledCount} orphaned local routine run issue(s) from previous session.`));
+      console.log(
+        pc.yellow(
+          `\n⚠️  Reconciled ${reconciledCount} orphaned local routine run issue(s) from previous session.`
+        )
+      );
     }
 
     return reconciledCount;
@@ -1000,8 +1052,8 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
 
   keyboard?.start();
 
-  // Reconcile any orphaned local routine issues left behind by host reboots/crashes
-  await reconcileOrphanedLocalRuns(repoRoot);
+  // Reconcile any orphaned local routine issues left behind by host reboots/crashes non-blockingly
+  void reconcileOrphanedLocalRuns(repoRoot).catch(() => {});
 
   // Run initial checks on start: drain review queue first, then move to autowork
   if (routines.includes('peer-review')) {

@@ -243,31 +243,27 @@ describe('Local Agent Daemon Manager', () => {
 
   describe('reconcileOrphanedLocalRuns', () => {
     it('returns 0 when no orphaned issues exist', async () => {
-      const mockExec = (cmd: string) => {
-        if (cmd.includes('gh issue list')) return '[]';
-        return '';
-      };
-
-      const count = await reconcileOrphanedLocalRuns(tmpRepo, mockExec);
+      const count = await reconcileOrphanedLocalRuns({
+        repoRoot: tmpRepo,
+        queryIssues: async () => [],
+      });
       expect(count).toBe(0);
     });
 
     it('reconciles an orphaned run that died mid-execution', async () => {
-      const commandsRun: string[] = [];
-      const mockExec = (cmd: string) => {
-        commandsRun.push(cmd);
-        if (cmd.includes('gh issue list')) {
-          return JSON.stringify([
-            { number: 890, title: '[peer-review] run 2026-09-14T06-59-51Z', createdAt: '2026-09-14T06:59:51Z' },
-          ]);
-        }
-        return '';
-      };
-
-      const count = await reconcileOrphanedLocalRuns(tmpRepo, mockExec);
+      const reconciled: Array<{ issue: number; report?: string; isSuccess: boolean }> = [];
+      const count = await reconcileOrphanedLocalRuns({
+        repoRoot: tmpRepo,
+        queryIssues: async () => [
+          { number: 890, title: '[peer-review] run 2026-09-14T06-59-51Z', createdAt: '2026-09-14T06:59:51Z' },
+        ],
+        reconcileRun: async (_root, issueNumber, report, isSuccess) => {
+          reconciled.push({ issue: issueNumber, report, isSuccess });
+          return true;
+        },
+      });
       expect(count).toBe(1);
-      expect(commandsRun.some((c) => c.includes('gh issue comment 890') && c.includes('Run Interrupted / Orphaned'))).toBe(true);
-      expect(commandsRun.some((c) => c.includes('gh issue edit 890 --add-label "status:failure,needs-attention"'))).toBe(true);
+      expect(reconciled).toEqual([{ issue: 890, report: undefined, isSuccess: false }]);
     });
 
     it('reconciles an orphaned run that completed before daemon termination', async () => {
@@ -284,30 +280,51 @@ describe('Local Agent Daemon Manager', () => {
         '# Autowork Report\n\nResult: SUCCESS'
       );
 
-      const commandsRun: string[] = [];
-      const mockExec = (cmd: string) => {
-        commandsRun.push(cmd);
-        if (cmd.includes('gh issue list')) {
-          return JSON.stringify([
-            { number: 911, title: '[autowork] run 2026-09-15T06-43-40Z', createdAt: '2026-09-15T06:43:40Z' },
-          ]);
-        }
-        return '';
-      };
-
-      const count = await reconcileOrphanedLocalRuns(tmpRepo, mockExec);
+      const reconciled: Array<{ issue: number; report?: string; isSuccess: boolean; routine?: string }> = [];
+      const count = await reconcileOrphanedLocalRuns({
+        repoRoot: tmpRepo,
+        queryIssues: async () => [
+          { number: 911, title: '[autowork] run 2026-09-15T06-43-40Z', createdAt: '2026-09-15T06:43:40Z' },
+        ],
+        reconcileRun: async (_root, issueNumber, report, isSuccess, routine) => {
+          reconciled.push({ issue: issueNumber, report, isSuccess, routine });
+          return true;
+        },
+      });
       expect(count).toBe(1);
-      expect(commandsRun.some((c) => c.includes('gh issue edit 911 --body-file'))).toBe(true);
-      expect(commandsRun.some((c) => c.includes('gh issue edit 911 --add-label "status:success"'))).toBe(true);
-      expect(commandsRun.some((c) => c.includes('gh issue close 911 --reason completed'))).toBe(true);
+      expect(reconciled[0].issue).toBe(911);
+      expect(reconciled[0].report).toBe('# Autowork Report\n\nResult: SUCCESS');
+      expect(reconciled[0].isSuccess).toBe(true);
+      expect(reconciled[0].routine).toBe('autowork');
     });
 
-    it('fails gracefully if gh CLI command throws', async () => {
-      const mockExec = () => {
-        throw new Error('Network error or offline');
-      };
+    it('recovers granularly if one issue reconciliation fails without aborting others', async () => {
+      const processed: number[] = [];
+      const count = await reconcileOrphanedLocalRuns({
+        repoRoot: tmpRepo,
+        queryIssues: async () => [
+          { number: 101, title: '[autowork] run 1', createdAt: '2026-09-15T06-40-00Z' },
+          { number: 102, title: '[peer-review] run 2', createdAt: '2026-09-15T06-41-00Z' },
+        ],
+        reconcileRun: async (_root, issueNumber) => {
+          processed.push(issueNumber);
+          if (issueNumber === 101) {
+            throw new Error('Network timeout on issue 101');
+          }
+          return true;
+        },
+      });
+      expect(processed).toEqual([101, 102]);
+      expect(count).toBe(1);
+    });
 
-      const count = await reconcileOrphanedLocalRuns(tmpRepo, mockExec);
+    it('fails gracefully if query throws', async () => {
+      const count = await reconcileOrphanedLocalRuns({
+        repoRoot: tmpRepo,
+        queryIssues: async () => {
+          throw new Error('Network error or offline');
+        },
+      });
       expect(count).toBe(0);
     });
   });
