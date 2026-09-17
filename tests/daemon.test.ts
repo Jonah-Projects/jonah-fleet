@@ -11,6 +11,7 @@ import {
   DaemonState,
   filterReviewablePRs,
   drainReviewQueue,
+  reconcileOrphanedLocalRuns,
 } from '../src/lib/daemon.js';
 
 describe('Local Agent Daemon Manager', () => {
@@ -237,6 +238,94 @@ describe('Local Agent Daemon Manager', () => {
 
       // Should execute exactly once and not loop infinitely because attemptedPRNumbers tracks #401
       expect(runCount).toBe(1);
+    });
+  });
+
+  describe('reconcileOrphanedLocalRuns', () => {
+    it('returns 0 when no orphaned issues exist', async () => {
+      const count = await reconcileOrphanedLocalRuns({
+        repoRoot: tmpRepo,
+        queryIssues: async () => [],
+      });
+      expect(count).toBe(0);
+    });
+
+    it('reconciles an orphaned run that died mid-execution', async () => {
+      const reconciled: Array<{ issue: number; report?: string; isSuccess: boolean }> = [];
+      const count = await reconcileOrphanedLocalRuns({
+        repoRoot: tmpRepo,
+        queryIssues: async () => [
+          { number: 890, title: '[peer-review] run 2026-09-14T06-59-51Z', createdAt: '2026-09-14T06:59:51Z' },
+        ],
+        reconcileRun: async (_root, issueNumber, report, isSuccess) => {
+          reconciled.push({ issue: issueNumber, report, isSuccess });
+          return true;
+        },
+      });
+      expect(count).toBe(1);
+      expect(reconciled).toEqual([{ issue: 890, report: undefined, isSuccess: false }]);
+    });
+
+    it('reconciles an orphaned run that completed before daemon termination', async () => {
+      const runsDir = path.join(tmpRepo, '.jonah-fleet', 'runs');
+      fs.mkdirSync(runsDir, { recursive: true });
+
+      const timestamp = '2026-09-15T06-43-40-758Z';
+      fs.writeFileSync(
+        path.join(runsDir, `autowork-${timestamp}.json`),
+        JSON.stringify({ routine: 'autowork', issueNumber: 911, success: true, exitCode: 0 })
+      );
+      fs.writeFileSync(
+        path.join(runsDir, `autowork-${timestamp}.md`),
+        '# Autowork Report\n\nResult: SUCCESS'
+      );
+
+      const reconciled: Array<{ issue: number; report?: string; isSuccess: boolean; routine?: string }> = [];
+      const count = await reconcileOrphanedLocalRuns({
+        repoRoot: tmpRepo,
+        queryIssues: async () => [
+          { number: 911, title: '[autowork] run 2026-09-15T06-43-40Z', createdAt: '2026-09-15T06:43:40Z' },
+        ],
+        reconcileRun: async (_root, issueNumber, report, isSuccess, routine) => {
+          reconciled.push({ issue: issueNumber, report, isSuccess, routine });
+          return true;
+        },
+      });
+      expect(count).toBe(1);
+      expect(reconciled[0].issue).toBe(911);
+      expect(reconciled[0].report).toBe('# Autowork Report\n\nResult: SUCCESS');
+      expect(reconciled[0].isSuccess).toBe(true);
+      expect(reconciled[0].routine).toBe('autowork');
+    });
+
+    it('recovers granularly if one issue reconciliation fails without aborting others', async () => {
+      const processed: number[] = [];
+      const count = await reconcileOrphanedLocalRuns({
+        repoRoot: tmpRepo,
+        queryIssues: async () => [
+          { number: 101, title: '[autowork] run 1', createdAt: '2026-09-15T06-40-00Z' },
+          { number: 102, title: '[peer-review] run 2', createdAt: '2026-09-15T06-41-00Z' },
+        ],
+        reconcileRun: async (_root, issueNumber) => {
+          processed.push(issueNumber);
+          if (issueNumber === 101) {
+            throw new Error('Network timeout on issue 101');
+          }
+          return true;
+        },
+      });
+      expect(processed).toEqual([101, 102]);
+      expect(count).toBe(1);
+    });
+
+    it('fails gracefully if query throws', async () => {
+      const count = await reconcileOrphanedLocalRuns({
+        repoRoot: tmpRepo,
+        queryIssues: async () => {
+          throw new Error('Network error or offline');
+        },
+      });
+      expect(count).toBe(0);
     });
   });
 });
