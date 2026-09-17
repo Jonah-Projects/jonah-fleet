@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   generateRadarReport,
   evaluateActivity,
-  fetchRepoData
+  fetchRepoData,
+  classifyUpstreamItem,
+  classifyAllActivity
 } from '../.github/scripts/fetch-symphony-radar.js';
 
 describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
@@ -181,5 +183,157 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
     expect(data.pullRequests).toEqual([]);
 
     global.fetch = originalFetch;
+  });
+
+  describe('Deterministic Heuristic Classifier', () => {
+    it('classifies SPEC.md updates as Category A', () => {
+      const res = classifyUpstreamItem({ title: 'docs: update claim state machine' }, { isSpec: true, repo: 'openai/symphony' });
+      expect(res.category).toBe('A');
+      expect(res.isOpportunity).toBe(true);
+      expect(res.badge).toContain('Category A');
+      expect(res.rationale).toContain('SPEC.md');
+    });
+
+    it('classifies claim protocols and invariants as Category A', () => {
+      const res = classifyUpstreamItem({ title: 'feat: add single-flight claim validation check' }, { repo: 'openai/symphony' });
+      expect(res.category).toBe('A');
+      expect(res.isOpportunity).toBe(true);
+      expect(res.badge).toContain('Category A');
+      expect(res.rationale).toContain('claim protocols');
+    });
+
+    it('classifies security and token budget controls as Category A', () => {
+      const sec = classifyUpstreamItem({ title: 'fix: scrub token alias credentials from log output' }, { repo: 'openai/symphony' });
+      expect(sec.category).toBe('A');
+      expect(sec.isOpportunity).toBe(true);
+
+      const budget = classifyUpstreamItem({ title: 'feat: prevent loop stagnation when token budget ceiling reached' }, { repo: 'openai/symphony' });
+      expect(budget.category).toBe('A');
+      expect(budget.isOpportunity).toBe(true);
+    });
+
+    it('classifies zero-LLM deterministic ingestion as Category A', () => {
+      const res = classifyUpstreamItem({ title: 'feat(memory): add zero-llm deterministic indexing for transcripts' }, { repo: 'huggingface/funes' });
+      expect(res.category).toBe('A');
+      expect(res.isOpportunity).toBe(true);
+      expect(res.rationale).toContain('zero-LLM');
+    });
+
+    it('classifies MCP tools and memory retrieval as Category B', () => {
+      const mcp = classifyUpstreamItem({ title: 'feat(mcp): add recall tool with hybrid vector search' }, { repo: 'huggingface/funes' });
+      expect(mcp.category).toBe('B');
+      expect(mcp.isOpportunity).toBe(true);
+      expect(mcp.badge).toContain('Category B');
+      expect(mcp.rationale).toContain('Agent memory or MCP');
+
+      const pacing = classifyUpstreamItem({ title: 'feat: dynamic backpressure and orchestrator pacing' }, { repo: 'openai/symphony' });
+      expect(pacing.category).toBe('B');
+      expect(pacing.isOpportunity).toBe(true);
+      expect(pacing.badge).toContain('Category B');
+    });
+
+    it('classifies non-GitHub platforms and low-level internals as Category C', () => {
+      const gitlab = classifyUpstreamItem({ title: 'Use Bearer authentication for GitLab API requests (#124)' }, { repo: 'openai/symphony' });
+      expect(gitlab.category).toBe('C');
+      expect(gitlab.isOpportunity).toBe(false);
+      expect(gitlab.badge).toContain('Category C');
+      expect(gitlab.rationale).toContain('non-GitHub');
+
+      const elixir = classifyUpstreamItem({ title: 'refactor: supervise OTP BEAM worker tree' }, { repo: 'openai/symphony' });
+      expect(elixir.category).toBe('C');
+      expect(elixir.isOpportunity).toBe(false);
+
+      const bump = classifyUpstreamItem({ title: 'Bump lance version to 11' }, { repo: 'huggingface/funes' });
+      expect(bump.category).toBe('C');
+      expect(bump.isOpportunity).toBe(false);
+
+      const cache = classifyUpstreamItem({ title: 'Workaround corrupt cache entries' }, { repo: 'huggingface/funes' });
+      expect(cache.category).toBe('C');
+      expect(cache.isOpportunity).toBe(false);
+
+      const query = classifyUpstreamItem({ title: 'fix(push): select pending rows without a giant id filter' }, { repo: 'huggingface/funes' });
+      expect(query.category).toBe('C');
+      expect(query.isOpportunity).toBe(false);
+    });
+
+    it('aggregates activity and surfaces opportunities in classifyAllActivity', () => {
+      const analysis = classifyAllActivity(
+        {
+          specCommits: [{ sha: 'spec111', commit: { message: 'update SPEC.md', author: { name: 'Dev', date: new Date().toISOString() } }, html_url: 'https://github.com' }],
+          pullRequests: [{ number: 124, title: 'Use Bearer auth for GitLab', html_url: 'https://github.com' }],
+          releases: [],
+          commits: [{ sha: 'c124', commit: { message: 'Use Bearer auth for GitLab (#124)', author: { name: 'Dev', date: new Date().toISOString() } }, html_url: 'https://github.com' }]
+        },
+        {
+          pullRequests: [
+            { number: 146, title: 'Bump lance version to 11', html_url: 'https://github.com' },
+            { number: 147, title: 'Add MCP recall tool', html_url: 'https://github.com' }
+          ],
+          releases: [],
+          commits: []
+        }
+      );
+
+      expect(analysis.counts.A).toBe(1); // spec commit
+      expect(analysis.counts.B).toBe(1); // MCP recall PR
+      expect(analysis.counts.C).toBe(2); // GitLab PR + lance PR
+      expect(analysis.hasActionableOpportunities).toBe(true);
+      // The commit with (#124) should be deduplicated since PR #124 is present
+      expect(analysis.items.some(i => i.type === 'commit' && i.title.includes('(#124)'))).toBe(false);
+    });
+
+    it('generates a report highlighting opportunities when Category A or B exists', () => {
+      const now = new Date().toISOString();
+      const report = generateRadarReport({
+        symphony: {
+          commits: [],
+          specCommits: [{ sha: 's1', commit: { message: 'docs: update SPEC.md claim lifecycle', author: { name: 'Dev', date: now } }, html_url: 'https://github.com' }],
+          releases: [],
+          pullRequests: []
+        },
+        funes: {
+          commits: [],
+          releases: [],
+          pullRequests: [{ number: 99, title: 'feat: add MCP recall tool', merged_at: now, html_url: 'https://github.com' }]
+        },
+        lookbackDays: 7
+      });
+
+      expect(report).toContain('Upstream Opportunities & Triage Summary');
+      expect(report).toContain('[!IMPORTANT]');
+      expect(report).toContain('Actionable Opportunities Detected (1 Category A, 1 Category B)');
+      expect(report).toContain('Opportunity Breakdown');
+      expect(report).toContain('🟢 **Category A** (Adopt Directly)');
+      expect(report).toContain('🟡 **Category B** (Adapt)');
+      expect(report).toContain('- [ ] **Triage Category A Opportunities**');
+      expect(report).toContain('- [ ] **Evaluate Category B Adaptations**');
+    });
+
+    it('generates a report with clear "Safe to close" notice when all items are Category C', () => {
+      const now = new Date().toISOString();
+      const report = generateRadarReport({
+        symphony: {
+          commits: [],
+          specCommits: [],
+          releases: [],
+          pullRequests: [{ number: 124, title: 'Use Bearer authentication for GitLab API requests', merged_at: now, html_url: 'https://github.com' }]
+        },
+        funes: {
+          commits: [],
+          releases: [],
+          pullRequests: [{ number: 146, title: 'Bump lance version to 11', merged_at: now, html_url: 'https://github.com' }]
+        },
+        lookbackDays: 7
+      });
+
+      expect(report).toContain('Upstream Opportunities & Triage Summary');
+      expect(report).toContain('[!NOTE]');
+      expect(report).toContain('No Actionable Opportunities (All 2 items Category C / Skip)');
+      expect(report).toContain('Safe to review and close without action');
+      expect(report).toContain('🔴 **Category C** (Skip)');
+      expect(report).toContain('- [x] **Category A Gate**: No direct adoption items detected this cycle.');
+      expect(report).toContain('- [x] **Category B Gate**: No candidate adaptation items detected this cycle.');
+      expect(report).toContain('- [ ] **Close Issue**: Close once triage is verified (all items Category C — safe to close immediately).');
+    });
   });
 });
