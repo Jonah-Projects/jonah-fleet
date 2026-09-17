@@ -106,7 +106,7 @@ export function evaluateActivity(symphonyData, funesData, options = {}) {
 export function classifyUpstreamItem(item, options = {}) {
   const isSpec = options.isSpec || item.isSpec || false;
   const repo = options.repo || item.repo || '';
-  const title = (item.title || item.summary || item.name || item.commit?.message?.split('\n')[0] || '').trim();
+  const title = (item.title || item.summary || item.name || item.tag_name || item.commit?.message?.split('\n')[0] || '').trim();
   const body = item.body || item.commit?.message || '';
   const text = `${title} ${body}`.toLowerCase();
 
@@ -120,7 +120,60 @@ export function classifyUpstreamItem(item, options = {}) {
     };
   }
 
-  // 2. Filter explicit platform mismatches & runtime-specific internals to Category C
+  // 2. Category A: Core claim protocols, invariants, security, budget, prompt engineering
+  // Precedence: Category A invariant and prompt engineering keywords take precedence over general platform/runtime keywords
+  const isClaimOrInvariant = /\b(claim|single-flight|claim lock|claim invariant|invariants?|reader[/-]writer|state machine)\b/i.test(text);
+  const isSecurityOrToken = /\b(security|token scrub|token alias|least privilege|sanitiz)\b/i.test(text);
+  const isTokenEconomyOrBudget = /\b(token budget|budget ceiling|loop stagnation|retry limit|token limit)\b/i.test(text);
+  const isZeroLlmIngest = /\b(zero-llm|deterministic indexing|provenance retention)\b/i.test(text);
+  const isPromptEngineering = /\b(prompt engineering|prompt optimiz|system prompt)\b/i.test(text);
+
+  if (isClaimOrInvariant) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Touches core claim protocols, reader/writer locks, or orchestration state machine invariants.'
+    };
+  }
+
+  if (isSecurityOrToken) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Security guardrail or credential/token sanitization pattern relevant to fleet workflows.'
+    };
+  }
+
+  if (isTokenEconomyOrBudget) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Token economy, budget ceiling, or stagnation prevention optimization.'
+    };
+  }
+
+  if (isZeroLlmIngest) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Deterministic zero-LLM indexing or provenance retention pattern.'
+    };
+  }
+
+  if (isPromptEngineering) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Prompt engineering optimization or system prompt refinement relevant to fleet routines.'
+    };
+  }
+
+  // 3. Filter explicit platform mismatches & runtime-specific internals to Category C
   const isGitLabOrNonGitHub = /\b(gitlab|bitbucket|azure)\b/i.test(text);
   if (isGitLabOrNonGitHub) {
     return {
@@ -168,48 +221,6 @@ export function classifyUpstreamItem(item, options = {}) {
       badge: '🔴 **Category C** (Skip)',
       isOpportunity: false,
       rationale: 'Upstream internal database query optimization; not applicable to fleet architecture.'
-    };
-  }
-
-  // 3. Category A: Core claim protocols, invariants, security, budget
-  const isClaimOrInvariant = /\b(claim|single-flight|claim lock|claim invariant|invariants?|reader[/-]writer|state machine)\b/i.test(text);
-  const isSecurityOrToken = /\b(security|token scrub|token alias|least privilege|sanitiz)\b/i.test(text);
-  const isTokenEconomyOrBudget = /\b(token budget|budget ceiling|loop stagnation|retry limit|token limit)\b/i.test(text);
-  const isZeroLlmIngest = /\b(zero-llm|deterministic indexing|provenance retention)\b/i.test(text);
-
-  if (isClaimOrInvariant) {
-    return {
-      category: 'A',
-      badge: '🟢 **Category A** (Adopt Directly)',
-      isOpportunity: true,
-      rationale: 'Touches core claim protocols, reader/writer locks, or orchestration state machine invariants.'
-    };
-  }
-
-  if (isSecurityOrToken) {
-    return {
-      category: 'A',
-      badge: '🟢 **Category A** (Adopt Directly)',
-      isOpportunity: true,
-      rationale: 'Security guardrail or credential/token sanitization pattern relevant to fleet workflows.'
-    };
-  }
-
-  if (isTokenEconomyOrBudget) {
-    return {
-      category: 'A',
-      badge: '🟢 **Category A** (Adopt Directly)',
-      isOpportunity: true,
-      rationale: 'Token economy, budget ceiling, or stagnation prevention optimization.'
-    };
-  }
-
-  if (isZeroLlmIngest) {
-    return {
-      category: 'A',
-      badge: '🟢 **Category A** (Adopt Directly)',
-      isOpportunity: true,
-      rationale: 'Deterministic zero-LLM indexing or provenance retention pattern.'
     };
   }
 
@@ -570,7 +581,9 @@ export function generateRadarReport(params = {}) {
   report += `- [ ] **Prompt & Skill Ports**: If applicable, port routines to \`templates/prompts/\` or \`.agents/skills/\` (e.g. MCP memory skill).\n`;
   report += `- [ ] **Empirical Evals**: Run \`npm run test:evals\` and \`npm test\` to ensure no regressions.\n`;
   report += `- [ ] **Downstream Sync**: Verify \`jonah-fleet sync\` distributes updates cleanly to target repositories.\n`;
-  if (analysis.counts.A === 0 && analysis.counts.B === 0) {
+  if (analysis.counts.total === 0) {
+    report += `- [ ] **Close Issue**: Close once triage is verified (no upstream items detected — safe to close immediately).\n\n`;
+  } else if (analysis.counts.A === 0 && analysis.counts.B === 0) {
     report += `- [ ] **Close Issue**: Close once triage is verified (all items Category C — safe to close immediately).\n\n`;
   } else {
     report += `- [ ] **Close Issue**: Close once triage and any resulting PRs are merged.\n\n`;
