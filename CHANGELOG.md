@@ -41,10 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **runner,daemon:** prevent stale report ghosting and fix keyboard lockup in targeted prompts ([#166](https://github.com/juliendurandeu/jonah-fleet/issues/166)) ([0de89e2](https://github.com/juliendurandeu/jonah-fleet/commit/0de89e24427f9e575f08cd721434ab5156fdcb94))
 * **workflows:** harden workflow templates against shell injection, credential persistence, and timeouts ([04a0dd3](https://github.com/juliendurandeu/jonah-fleet/commit/04a0dd3a0457fd4d6db74fcd4709fcef0d28d84e))
 
-## [Unreleased] - 2026-09-16
+## [Unreleased] - 2026-09-17
 
 ### Features
 
+* **radar:** deterministically classify upstream changes across Symphony and Funes into Category A/B/C and surface architectural opportunities with callout summaries, breakdown matrices, and dynamic triage checklists ([#152](https://github.com/juliendurandeu/jonah-fleet/issues/152)).
 * **telemetry:** introduce live progress reporting in routine run tracking issues (`routine-log`) using bounded Compact Milestone Cards (3–5 bullet points for Intake & Strategy, Verification & Tests, Autonomous Handoff, and Run Completed) across `autowork`, `peer-review`, `optimizer`, and `ORCHESTRATION.md`.
 * **workflows:** automatically post Interruption Cards to routine run issue comment streams upon failure, timeout, or cancellation, linking directly to the Actions run logs before applying `status:failure,needs-attention`.
 * **runner:** add `formatMilestoneCard`, `formatInterruptionCard`, and `tryPostLocalRunMilestone` helpers to local runner `runner.ts` to post interruption cards on non-zero exit codes with offline fallback.
