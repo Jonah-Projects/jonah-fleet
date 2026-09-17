@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **radar:** expand Category A heuristics in `fetch-symphony-radar.js` to detect prompt engineering optimizations and release `tag_name` fallbacks, prioritize Category A invariants over runtime keywords, and refine empty lookback checklist phrasing ([#184](https://github.com/juliendurandeu/jonah-fleet/issues/184)).
 * **radar:** deterministically classify upstream changes across Symphony and Funes into Category A/B/C and surface architectural opportunities with callout summaries, breakdown matrices, and dynamic triage checklists ([#152](https://github.com/juliendurandeu/jonah-fleet/issues/152)).
 * **telemetry:** introduce live progress reporting in routine run tracking issues (`routine-log`) using bounded Compact Milestone Cards (3–5 bullet points for Intake & Strategy, Verification & Tests, Autonomous Handoff, and Run Completed) across `autowork`, `peer-review`, `optimizer`, and `ORCHESTRATION.md`.
 * **workflows:** automatically post Interruption Cards to routine run issue comment streams upon failure, timeout, or cancellation, linking directly to the Actions run logs before applying `status:failure,needs-attention`.

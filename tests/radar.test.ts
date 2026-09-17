@@ -335,5 +335,53 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
       expect(report).toContain('- [x] **Category B Gate**: No candidate adaptation items detected this cycle.');
       expect(report).toContain('- [ ] **Close Issue**: Close once triage is verified (all items Category C — safe to close immediately).');
     });
+
+    it('classifies prompt engineering optimizations as Category A', () => {
+      const promptOpt = classifyUpstreamItem({ title: 'feat: prompt engineering optimizations for tool calling' }, { repo: 'openai/symphony' });
+      expect(promptOpt.category).toBe('A');
+      expect(promptOpt.isOpportunity).toBe(true);
+      expect(promptOpt.badge).toContain('Category A');
+      expect(promptOpt.rationale).toContain('Prompt engineering');
+
+      const sysPrompt = classifyUpstreamItem({ title: 'refactor: system prompt refinement for claim checks' }, { repo: 'openai/symphony' });
+      expect(sysPrompt.category).toBe('A');
+      expect(sysPrompt.isOpportunity).toBe(true);
+    });
+
+    it('falls back to release tag_name when release name is absent', () => {
+      const relWithTag = classifyUpstreamItem({ tag_name: 'v0.6.0-claim-invariants' }, { repo: 'openai/symphony' });
+      expect(relWithTag.category).toBe('A');
+      expect(relWithTag.isOpportunity).toBe(true);
+      expect(relWithTag.badge).toContain('Category A');
+    });
+
+    it('gives Category A invariant keywords precedence over platform/runtime keywords', () => {
+      const elixirClaim = classifyUpstreamItem({ title: 'feat(elixir): single-flight claim lock state machine in OTP runner' }, { repo: 'openai/symphony' });
+      expect(elixirClaim.category).toBe('A');
+      expect(elixirClaim.isOpportunity).toBe(true);
+      expect(elixirClaim.rationale).toContain('claim protocols');
+
+      const gitlabClaim = classifyUpstreamItem({ title: 'docs(gitlab): align claim invariant protocol with github actions' }, { repo: 'openai/symphony' });
+      expect(gitlabClaim.category).toBe('A');
+      expect(gitlabClaim.isOpportunity).toBe(true);
+
+      const otpBudget = classifyUpstreamItem({ title: 'fix(otp): token budget and stagnation controls for beam runners' }, { repo: 'openai/symphony' });
+      expect(otpBudget.category).toBe('A');
+      expect(otpBudget.isOpportunity).toBe(true);
+    });
+
+    it('generates checklist with refined phrasing when zero activity is detected (total === 0)', () => {
+      const report = generateRadarReport({
+        symphony: { commits: [], specCommits: [], releases: [], pullRequests: [] },
+        funes: { commits: [], releases: [], pullRequests: [] },
+        lookbackDays: 7
+      });
+
+      expect(report).toContain('Upstream Opportunities & Triage Summary');
+      expect(report).toContain('[!NOTE]');
+      expect(report).toContain('Zero Activity Detected');
+      expect(report).toContain('- [ ] **Close Issue**: Close once triage is verified (no upstream items detected — safe to close immediately).');
+      expect(report).not.toContain('all items Category C — safe to close immediately');
+    });
   });
 });
