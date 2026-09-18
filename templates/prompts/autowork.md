@@ -130,6 +130,7 @@ a. **Read the target issue and check eligibility.** Eligible = open, unassigned 
     - Read the issue description, linked code, and comment thread.
     - If bug: use `/diagnosing-bugs` to establish reproduction test before fixing.
     - If large/complex: use `/domain-modeling` and `/codebase-design`.
+    - **Pre-Flight Memory Scan**: If `LESSONS.md` exists, grep matching subsystem tags (`grep -E "^### \[(subsystem)\]" LESSONS.md -A 4`) to incorporate known landmines into implementation plans before writing code.
     - **Ambiguity & Missing Acceptance Criteria Gate**: Challenge underspecified or incomplete requests before writing any code. If the issue lacks observable acceptance criteria, relies on unverified assumptions, or leaves critical technical/UX decisions ambiguous:
       - Do NOT guess or invent arbitrary requirements to force completion.
       - Post a comment on the issue posing 1–3 focused clarifying questions that identify the exact decisions or trade-offs needed.
@@ -153,7 +154,9 @@ a. **Read the target issue and check eligibility.** Eligible = open, unassigned 
 13. **Implementation & PR creation:**
     - Branch from freshly fetched `origin/main` with descriptive name (e.g. `feat/...` or `fix/...`).
     - Drive implementation via `/tdd` (red-green-refactor).
+    - **Diagnostic Reflex**: On unexpected test/build failure during TDD, grep symptom text in `LESSONS.md` before making speculative code edits.
     - Run repository tests and verification.
+    - **Pre-PR Lessons Capture Gate**: If solving the issue required overcoming a non-obvious quirk not caught by tests/linters, append a 3-line structured entry on the active PR branch adhering to the 25-entry hard cap. Never write to `LESSONS.md` directly on `main`.
     - **Milestone 2 (Verification & Tests)**: Once implementation passes tests and type checks, emit milestone card if `$ROUTINE_ISSUE_NUMBER` is set:
       ```bash
       gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🧪 Milestone: Verification & Tests

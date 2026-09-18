@@ -78,6 +78,16 @@ describe('Manifest generation', () => {
     expect(manifest.dualExecution.cloudCatchupHours).toBe(48);
   });
 
+  it('supports lessons configuration in manifest', () => {
+    const manifest = createDefaultManifest('standard');
+    manifest.lessons = {
+      enabled: true,
+      maxEntries: 25,
+    };
+    expect(manifest.lessons.enabled).toBe(true);
+    expect(manifest.lessons.maxEntries).toBe(25);
+  });
+
   it('includes default models and budgets in standard manifest', () => {
     const manifest = createDefaultManifest('standard');
     expect(manifest.models).toBeDefined();
