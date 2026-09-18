@@ -5,6 +5,18 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.11.0...v1.12.0) (2026-09-18)
+
+
+### Features
+
+* **radar:** add zqiren/Orbital to ecosystem radar and evaluation matrix ([#212](https://github.com/juliendurandeu/jonah-fleet/issues/212)) ([910febb](https://github.com/juliendurandeu/jonah-fleet/commit/910febbbc8196d53c20f05730770aae231a6b8ea)), closes [#206](https://github.com/juliendurandeu/jonah-fleet/issues/206)
+
+
+### Bug Fixes
+
+* **runner:** prevent premature routine termination on async background tasks in headless mode ([6641b2b](https://github.com/juliendurandeu/jonah-fleet/commit/6641b2b2e46ab363b73d490aac1144a33a1c69f9))
+
 ## [Unreleased] - 2026-09-18
 
 ### Bug Fixes
