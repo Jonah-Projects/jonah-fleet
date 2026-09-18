@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-09-18
 
+### Features
+
+* **guard:** implement CLI runner loop-guard and circuit-breaker wrapper ([#208](https://github.com/juliendurandeu/jonah-fleet/issues/208))
+
 ### Bug Fixes
 
 * **runner:** detect premature routine termination caused by async background task turn yielding in headless CLI mode (`agy -p`), preventing false-positive success logging on uncompleted runs.

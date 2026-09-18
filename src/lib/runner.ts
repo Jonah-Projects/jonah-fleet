@@ -19,6 +19,12 @@ import {
   renderErrorCard,
   stripAnsi,
 } from './terminal-card.js';
+import {
+  LoopGuard,
+  formatLoopGuardFailureCard,
+  formatLoopGuardReport,
+  LoopGuardTrip,
+} from './loop-guard.js';
 import pc from 'picocolors';
 
 export interface RunLocalRoutineOptions {
@@ -866,6 +872,33 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     }
   };
 
+  let loopGuardTrip: LoopGuardTrip | null = null;
+  let activeChild: any = null;
+
+  const loopGuard = new LoopGuard({
+    repetitionThreshold: 5,
+    pingPongThreshold: 3,
+    consecutiveErrorThreshold: 2,
+    slidingWindowSize: 20,
+    onTrip: (trip) => {
+      loopGuardTrip = trip;
+      spinner?.stop();
+      if (activeChild && !activeChild.killed) {
+        try {
+          activeChild.kill('SIGTERM');
+        } catch {}
+        const killTimer = setTimeout(() => {
+          try {
+            if (activeChild && !activeChild.killed) {
+              activeChild.kill('SIGKILL');
+            }
+          } catch {}
+        }, 3000);
+        killTimer.unref();
+      }
+    },
+  });
+
   const stdoutParser = new LineBufferedStreamParser((line: string) => {
     const event = parseStreamJsonEvent(line);
     if (event) {
@@ -877,6 +910,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
           const toolParams = su.tool_info?.parameters;
 
           if (su.state === 'ACTIVE') {
+            loopGuard.recordAction(toolName, toolParams, false);
             const actionDesc = formatActionDescription(toolName, toolParams);
             lastActionDesc = actionDesc;
             if (spinner) {
@@ -889,6 +923,9 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
               const formatted = formatVerboseEvent(event);
               if (formatted) console.log(formatted);
             }
+          } else if (su.state === 'ERROR') {
+            loopGuard.recordAction(toolName, toolParams, true);
+            lastActionDesc = null;
           } else if (su.state === 'DONE') {
             lastActionDesc = null;
             if (su.tool_info?.output) {
@@ -1000,6 +1037,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
         env: childEnv,
         stdio: ['inherit', 'pipe', 'pipe'],
       });
+      activeChild = child;
 
       child.stdout?.on('data', (data) => {
         processChunk(data.toString(), false);
@@ -1046,7 +1084,26 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     }
   }
 
-  if (!reportContent) {
+  if (loopGuardTrip) {
+    exitCode = 1;
+    reportContent = formatLoopGuardReport({
+      routine,
+      timestamp,
+      trip: loopGuardTrip,
+    });
+    try {
+      fs.writeFileSync(executionReportPath, reportContent, 'utf8');
+      fs.writeFileSync(targetReportPath, reportContent, 'utf8');
+    } catch {}
+
+    if (routineIssueNumber) {
+      const failureCard = formatLoopGuardFailureCard({
+        routine,
+        trip: loopGuardTrip,
+      });
+      tryPostLocalRunMilestone(targetDir, routineIssueNumber, failureCard);
+    }
+  } else if (!reportContent) {
     reportContent = formatFallbackRunReport({
       routine,
       timestamp,

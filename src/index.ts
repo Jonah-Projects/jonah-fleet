@@ -138,3 +138,5 @@ program
   });
 
 program.parse(process.argv);
+
+export * from './lib/loop-guard.js';

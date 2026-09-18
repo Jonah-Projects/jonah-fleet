@@ -108,6 +108,23 @@ export function installFleet(targetDir: string, manifest: FleetManifest, options
     }
   }
 
+  // 1a. Install execution scripts (.github/scripts)
+  const targetScriptsDir = path.join(targetDir, '.github/scripts');
+  fs.mkdirSync(targetScriptsDir, { recursive: true });
+  const baseScripts = ['run-with-loop-guard.js'];
+  for (const file of baseScripts) {
+    const src = path.join(templatesDir, 'scripts', file);
+    const dest = path.join(targetScriptsDir, file);
+    if (fs.existsSync(src)) {
+      if (!fs.existsSync(dest) || options.force) {
+        fs.copyFileSync(src, dest);
+        try {
+          fs.chmodSync(dest, 0o755);
+        } catch {}
+      }
+    }
+  }
+
   // 2. Install enabled routines and their workflows
   for (const [routineName, isEnabled] of Object.entries(manifest.routines)) {
     if (!isEnabled) continue;

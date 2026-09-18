@@ -179,6 +179,23 @@ describe('Workflow Validation & Invariants', () => {
       }
     }
   });
+
+  it('ensures run-with-loop-guard.js execution script exists in .github/scripts and templates/scripts with byte-for-byte parity', () => {
+    const scriptGithub = path.join(process.cwd(), '.github/scripts/run-with-loop-guard.js');
+    const scriptTemplate = path.join(templatesDir, 'scripts/run-with-loop-guard.js');
+
+    expect(fs.existsSync(scriptGithub)).toBe(true);
+    expect(fs.existsSync(scriptTemplate)).toBe(true);
+
+    const githubScriptContent = fs.readFileSync(scriptGithub, 'utf8');
+    const templateScriptContent = fs.readFileSync(scriptTemplate, 'utf8');
+    expect(githubScriptContent).toBe(templateScriptContent);
+    expect(githubScriptContent).toContain('class LoopGuard');
+    expect(githubScriptContent).toContain('repetitionThreshold');
+    expect(githubScriptContent).toContain('pingPongThreshold');
+    expect(githubScriptContent).toContain('consecutiveErrorThreshold');
+    expect(githubScriptContent).toContain('loop_circuit_breaker');
+  });
 });
 
 
