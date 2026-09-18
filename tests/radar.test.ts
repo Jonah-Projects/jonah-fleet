@@ -83,10 +83,43 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
     ]
   };
 
-  it('generates a comprehensive report covering both Symphony and Funes', () => {
+  const mockOrbitalData = {
+    commits: [
+      {
+        sha: 'orb1234567',
+        commit: {
+          message: 'feat(guard): add fail-closed loop guard and repetition circuit breaker',
+          author: { name: 'Grace', date: new Date().toISOString() }
+        },
+        author: { login: 'grace' },
+        html_url: 'https://github.com/zqiren/Orbital/commit/orb1234567'
+      }
+    ],
+    releases: [
+      {
+        name: 'orbital v0.4.0',
+        tag_name: 'v0.4.0',
+        published_at: new Date().toISOString(),
+        html_url: 'https://github.com/zqiren/Orbital/releases/tag/v0.4.0',
+        body: 'Orbital release with ACP worker transport'
+      }
+    ],
+    pullRequests: [
+      {
+        number: 33,
+        title: 'Support ACP/PTY worker transport delegation',
+        merged_at: new Date().toISOString(),
+        html_url: 'https://github.com/zqiren/Orbital/pull/33',
+        user: { login: 'heidi' }
+      }
+    ]
+  };
+
+  it('generates a comprehensive report covering Symphony, Funes, and Orbital', () => {
     const report = generateRadarReport({
       symphony: mockSymphonyData,
       funes: mockFunesData,
+      orbital: mockOrbitalData,
       lookbackDays: 7,
       serverUrl: 'https://github.com',
       repository: 'juliendurandeu/jonah-fleet',
@@ -97,6 +130,7 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
     expect(report).toContain('Upstream Ecosystem Radar: Intel Digest');
     expect(report).toContain('openai/symphony');
     expect(report).toContain('huggingface/funes');
+    expect(report).toContain('zqiren/Orbital');
 
     // Symphony Orchestration section
     expect(report).toContain('Upstream Orchestration Watch (`openai/symphony`)');
@@ -112,6 +146,12 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
     expect(report).toContain('add zero-llm LanceDB transcript indexing');
     expect(report).toContain('Support hybrid BM25 and vector search with RRF');
 
+    // Orbital Project Agent & Worker Transports section
+    expect(report).toContain('Project Agent & Worker Transports Watch (`zqiren/Orbital`)');
+    expect(report).toContain('orbital v0.4.0');
+    expect(report).toContain('fail-closed loop guard and repetition circuit breaker');
+    expect(report).toContain('Support ACP/PTY worker transport delegation');
+
     // Evaluation matrices
     expect(report).toContain('Upstream Architectural Evaluation Matrix');
     expect(report).toContain('Zero-Daemon Invariant');
@@ -125,11 +165,36 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
     expect(report).toContain('Pull-Based Memory Delivery');
     expect(report).toContain('Cross-Session Provenance');
 
+    // Orbital specific evaluation
+    expect(report).toContain('Project Agent & Worker Transports Evaluation (Orbital Integration)');
+    expect(report).toContain('Layer-1 Context Memory Files');
+    expect(report).toContain('ACP/PTY Worker Transports');
+    expect(report).toContain('Prompt Prefix Caching Benchmarks');
+    expect(report).toContain('Fail-Closed Safety Guards');
+
     // Classification & Checklist
     expect(report).toContain('Category A');
     expect(report).toContain('Category B');
     expect(report).toContain('Category C');
     expect(report).toContain('Maintainer & Optimizer Triage Checklist');
+  });
+
+  it('correctly evaluates new activity when only Orbital has updates', () => {
+    const emptySymphony = { commits: [], specCommits: [], releases: [], pullRequests: [] };
+    const emptyFunes = { commits: [], releases: [], pullRequests: [] };
+    const { hasNewActivity, shouldCreateIssue, orbitalActivity } = evaluateActivity(
+      emptySymphony,
+      emptyFunes,
+      mockOrbitalData,
+      {
+        lookbackDays: 7,
+        forceReport: false
+      }
+    );
+
+    expect(hasNewActivity).toBe(true);
+    expect(shouldCreateIssue).toBe(true);
+    expect(orbitalActivity).toBe(true);
   });
 
   it('correctly evaluates new activity when only Funes has updates', () => {
@@ -181,6 +246,19 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
     expect(data.commits).toEqual([]);
     expect(data.releases).toEqual([]);
     expect(data.pullRequests).toEqual([]);
+
+    global.fetch = originalFetch;
+  });
+
+  it('handles fetch failures gracefully for Orbital and returns empty arrays', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn().mockRejectedValue(new Error('Network error / 403 Rate limit'));
+
+    const data = await fetchRepoData('zqiren/Orbital', { lookbackDays: 7, token: '' });
+    expect(data.commits).toEqual([]);
+    expect(data.releases).toEqual([]);
+    expect(data.pullRequests).toEqual([]);
+    expect(data.specCommits).toBeUndefined();
 
     global.fetch = originalFetch;
   });
@@ -374,6 +452,7 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
       const report = generateRadarReport({
         symphony: { commits: [], specCommits: [], releases: [], pullRequests: [] },
         funes: { commits: [], releases: [], pullRequests: [] },
+        orbital: { commits: [], releases: [], pullRequests: [] },
         lookbackDays: 7
       });
 
@@ -382,6 +461,67 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
       expect(report).toContain('Zero Activity Detected');
       expect(report).toContain('- [ ] **Close Issue**: Close once triage is verified (no upstream items detected — safe to close immediately).');
       expect(report).not.toContain('all items Category C — safe to close immediately');
+    });
+
+    it('classifies Orbital fail-closed safety guards and loop circuit breakers as Category A', () => {
+      const guard = classifyUpstreamItem({ title: 'feat(guard): add fail-closed loop guard and repetition circuit breaker' }, { repo: 'zqiren/Orbital' });
+      expect(guard.category).toBe('A');
+      expect(guard.isOpportunity).toBe(true);
+      expect(guard.badge).toContain('Category A');
+      expect(guard.rationale).toContain('Fail-closed safety guard');
+
+      const hash = classifyUpstreamItem({ title: 'fix: action hash cycle detection to halt runaway token burn' }, { repo: 'zqiren/Orbital' });
+      expect(hash.category).toBe('A');
+      expect(hash.isOpportunity).toBe(true);
+    });
+
+    it('classifies Orbital prompt prefix caching optimizations as Category A', () => {
+      const cache = classifyUpstreamItem({ title: 'perf: prompt prefix caching tiering to maximize hit rate' }, { repo: 'zqiren/Orbital' });
+      expect(cache.category).toBe('A');
+      expect(cache.isOpportunity).toBe(true);
+      expect(cache.badge).toContain('Category A');
+    });
+
+    it('classifies Orbital ACP/PTY worker transports as Category B', () => {
+      const transport = classifyUpstreamItem({ title: 'feat: add ACP/PTY worker transport delegation' }, { repo: 'zqiren/Orbital' });
+      expect(transport.category).toBe('B');
+      expect(transport.isOpportunity).toBe(true);
+      expect(transport.badge).toContain('Category B');
+      expect(transport.rationale).toContain('worker transport');
+    });
+
+    it('classifies Orbital internal details as Category C', () => {
+      const internal = classifyUpstreamItem({ title: 'refactor: clean up internal logger formatting' }, { repo: 'zqiren/Orbital' });
+      expect(internal.category).toBe('C');
+      expect(internal.isOpportunity).toBe(false);
+      expect(internal.badge).toContain('Category C');
+      expect(internal.rationale).toContain('Orbital');
+    });
+
+    it('aggregates activity across Symphony, Funes, and Orbital in classifyAllActivity', () => {
+      const analysis = classifyAllActivity(
+        {
+          specCommits: [{ sha: 'spec111', commit: { message: 'update SPEC.md', author: { name: 'Dev', date: new Date().toISOString() } }, html_url: 'https://github.com' }],
+          pullRequests: [],
+          releases: [],
+          commits: []
+        },
+        {
+          pullRequests: [{ number: 147, title: 'Add MCP recall tool', html_url: 'https://github.com' }],
+          releases: [],
+          commits: []
+        },
+        {
+          pullRequests: [{ number: 33, title: 'Support ACP/PTY worker transport delegation', html_url: 'https://github.com' }],
+          releases: [{ name: 'v0.4.0', published_at: new Date().toISOString(), html_url: 'https://github.com' }],
+          commits: [{ sha: 'orb1', commit: { message: 'feat: fail-closed circuit breaker', author: { name: 'Dev', date: new Date().toISOString() } }, html_url: 'https://github.com' }]
+        }
+      );
+
+      expect(analysis.counts.A).toBe(2); // spec commit + fail-closed commit
+      expect(analysis.counts.B).toBe(2); // MCP recall PR + ACP/PTY PR
+      expect(analysis.hasActionableOpportunities).toBe(true);
+      expect(analysis.items.some(i => i.repo === 'zqiren/Orbital')).toBe(true);
     });
   });
 });
