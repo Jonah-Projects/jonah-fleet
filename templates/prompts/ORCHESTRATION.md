@@ -262,3 +262,13 @@ How agent routines are partitioned between cloud GitHub Actions (24/7 cloud runn
    - Local agent PR convergence claims post: `🔒 Addressing review findings by local autowork session (host: <hostname>) <timestamp>`.
    - Local processes trap `SIGINT`/`SIGTERM` to unassign claims and remove worktrees cleanly on exit.
    - Standard stale-claim rules (6h for issues, 2h for PRs) safely reclaim orphaned local claims if a machine powers down unexpectedly.
+
+---
+
+## Headless Execution & Asynchronous Non-Yielding Guardrail
+
+In headless CLI environments (`agy -p` / GitHub Actions), agent sessions terminate immediately whenever the model yields a turn without active tool calls. Therefore:
+
+1. **Zero-Yield Waiting Invariant**: Agents MUST NEVER call `schedule` or emit a terminal turn with plain text to "wait" for background commands, timers, or long-running checks. In headless mode, yielding the turn halts the process immediately with exit code 0 before reaching the Definition of Done.
+2. **Active Task Supervision**: If a verification command (`npm test`, `npm run type-check`) is sent to the background by `run_command`, the agent must actively poll `manage_task(Action='status')` or inspect code while waiting within the continuous tool-calling loop.
+3. **CI Trust Bar & Test Discipline**: Peer review routines should trust green passing remote CI checks (GitHub Actions or Vercel preview deployments) on the PR's head commit rather than initiating slow, background-prone full test runs. Run repository verification locally ONLY if CI status is unconfirmed, missing, or failing.

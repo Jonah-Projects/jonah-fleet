@@ -250,22 +250,23 @@ export function buildRoutinePrompt(
   const logPrompt = options.routineIssueNumber
     ? ` Tracking run log issue: #${options.routineIssueNumber}.`
     : '';
+  const headlessGuardrail = ` Execution Guardrail: You are executing in a headless autonomous session. You MUST NEVER call schedule or yield your turn with plain text to wait on background tasks or verification checks. If a verification command (tests, type-check, lint) runs in the background, actively inspect its completion with manage_task or execute commands with sufficient WaitMsBeforeAsync. Never stop calling tools or yield your turn until the routine's terminal Definition of Done is fully reached.`;
 
   if (routine === 'autowork') {
     if (options.issue) {
-      return `You are the Autowork routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is issue #${options.issue}. You are in Targeted mode: work issue #${options.issue} directly, ahead of Phase 1 convergence and priority scan.${logPrompt}`;
+      return `You are the Autowork routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is issue #${options.issue}. You are in Targeted mode: work issue #${options.issue} directly, ahead of Phase 1 convergence and priority scan.${logPrompt}${headlessGuardrail}`;
     }
-    return `You are the Autowork routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs for review comments to fix, close merged issues, then pick the highest-priority unclaimed issue.${logPrompt}`;
+    return `You are the Autowork routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs for review comments to fix, close merged issues, then pick the highest-priority unclaimed issue.${logPrompt}${headlessGuardrail}`;
   }
 
   if (routine === 'peer-review') {
     if (options.pr) {
-      return `You are the Peer Review routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is pull request #${options.pr}. You are in Targeted mode: review PR #${options.pr} directly.${logPrompt}`;
+      return `You are the Peer Review routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}Your target is pull request #${options.pr}. You are in Targeted mode: review PR #${options.pr} directly.${logPrompt}${headlessGuardrail}`;
     }
-    return `You are the Peer Review routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs and select the highest-priority PR to review.${logPrompt}`;
+    return `You are the Peer Review routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}You are in Scan mode: check open PRs and select the highest-priority PR to review.${logPrompt}${headlessGuardrail}`;
   }
 
-  return `You are the ${routine} routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}${logPrompt}`;
+  return `You are the ${routine} routine for this repository. ${repoContext} Read and follow the instructions in ${promptFile} exactly. ${skillsPrompt}${logPrompt}${headlessGuardrail}`;
 }
 
 /**
@@ -607,6 +608,67 @@ export interface FallbackReportOptions {
  */
 export function resolveExitCode(code: number | null, signal: NodeJS.Signals | string | null): number {
   return code ?? (signal ? 1 : 0);
+}
+
+/**
+ * Detects whether an autonomous routine exited prematurely (e.g. agent yielded its
+ * turn to "wait" on background tasks or timers, which causes headless agy -p to terminate
+ * with exit code 0 before reaching the routine's Definition of Done).
+ */
+export function detectPrematureRoutineExit(output: string, routine: string): string | null {
+  if (!output) return null;
+
+  // Check for common premature turn-yielding phrases
+  const prematureYieldPatterns = [
+    /verification is in progress/i,
+    /waiting for .* to (?:finish|complete)/i,
+    /waiting for (?:test|type-check|check|task)/i,
+    /check if .* finished/i,
+    /task-.* is running/i,
+  ];
+
+  for (const pattern of prematureYieldPatterns) {
+    if (pattern.test(output)) {
+      // Check if there was actually a subsequent completion / final report
+      const terminalSuccessPatterns = [
+        /## (?:Run Summary|Execution Report)/i,
+        /Milestone: Run Completed/i,
+        /Squash-merged/i,
+        /Merged PR/i,
+        /converted .* to draft/i,
+        /bounced .* to draft/i,
+        /No PRs to review/i,
+      ];
+      const hasTerminalSuccess = terminalSuccessPatterns.some((p) => p.test(output));
+      if (!hasTerminalSuccess) {
+        return 'Premature session termination: Agent yielded turn on background task before reaching Definition of Done.';
+      }
+    }
+  }
+
+  // Peer review specific guardrail: if started reviewing a PR, must take a terminal action
+  if (routine === 'peer-review') {
+    const startedReview = /Starting review/i.test(output);
+    if (startedReview) {
+      const terminalActionTaken =
+        /Squash-merged/i.test(output) ||
+        /Merged PR/i.test(output) ||
+        /--undo/i.test(output) ||
+        /converted .* to draft/i.test(output) ||
+        /bounced .* to draft/i.test(output) ||
+        /needs-human/i.test(output) ||
+        /escalat/i.test(output) ||
+        /Milestone: Run Completed/i.test(output) ||
+        /Review completed with decision/i.test(output) ||
+        /No PRs to review/i.test(output);
+
+      if (!terminalActionTaken) {
+        return 'Premature peer-review termination: Review was started but agent exited without executing terminal action (merge, draft bounce, or escalation).';
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -976,6 +1038,14 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
   // Check for freshly generated .jonah-fleet/run-report.md (in executionDir or targetDir)
   let reportContent = extractFreshRunReport(executionReportPath, targetReportPath, startTime) || '';
 
+  let prematureError: string | null = null;
+  if (exitCode === 0 && !reportContent) {
+    prematureError = detectPrematureRoutineExit(output, routine);
+    if (prematureError) {
+      exitCode = 1;
+    }
+  }
+
   if (!reportContent) {
     reportContent = formatFallbackRunReport({
       routine,
@@ -985,7 +1055,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
       targetLabel,
       durationSec,
       output,
-      stderr: accumulatedStderr,
+      stderr: [accumulatedStderr, prematureError].filter(Boolean).join('\n'),
     });
   }
 

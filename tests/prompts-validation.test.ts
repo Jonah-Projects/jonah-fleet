@@ -233,6 +233,37 @@ describe("Prompt Validation & Invariants", () => {
     );
   });
 
+  it("validates ORCHESTRATION.md, autowork.md, and peer-review.md define the Headless Execution & Asynchronous Non-Yielding Guardrail", () => {
+    const orchestrationPath = path.join(
+      templatesDir,
+      "prompts",
+      "ORCHESTRATION.md",
+    );
+    const autoworkPath = path.join(templatesDir, "prompts", "autowork.md");
+    const peerReviewPath = path.join(templatesDir, "prompts", "peer-review.md");
+
+    const orchestrationContent = fs.readFileSync(orchestrationPath, "utf8");
+    const autoworkContent = fs.readFileSync(autoworkPath, "utf8");
+    const peerReviewContent = fs.readFileSync(peerReviewPath, "utf8");
+
+    expect(orchestrationContent).toContain(
+      "## Headless Execution & Asynchronous Non-Yielding Guardrail",
+    );
+    expect(orchestrationContent).toContain("Zero-Yield Waiting Invariant");
+    expect(orchestrationContent).toContain("CI Trust Bar & Test Discipline");
+
+    expect(autoworkContent).toContain(
+      "Headless Execution & Asynchronous Non-Yielding Guardrail",
+    );
+    expect(autoworkContent).toContain("NEVER call `schedule` or yield the turn");
+
+    expect(peerReviewContent).toContain(
+      "Headless Execution & Asynchronous Non-Yielding Guardrail",
+    );
+    expect(peerReviewContent).toContain("Verification Command & CI Discipline");
+    expect(peerReviewContent).toContain("NEVER call `schedule` or yield the turn");
+  });
+
   it("validates analytics-review.md defines mandatory post-measurement action directives and product planning bridge", () => {
     const templatePath = path.join(promptsDir, "analytics-review.md");
     expect(fs.existsSync(templatePath)).toBe(true);

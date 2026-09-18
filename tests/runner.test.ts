@@ -21,6 +21,7 @@ import {
   extractFreshRunReport,
   resolveExitCode,
   formatFallbackRunReport,
+  detectPrematureRoutineExit,
 } from '../src/lib/runner.js';
 
 describe('Local Routine Runner', () => {
@@ -72,6 +73,12 @@ describe('Local Routine Runner', () => {
     const prompt = buildRoutinePrompt(tmpRepo, 'peer-review', { pr: 105, routineIssueNumber: 848 });
     expect(prompt).toContain('Targeted mode: review PR #105 directly.');
     expect(prompt).toContain('Tracking run log issue: #848.');
+  });
+
+  it('enforces headless execution guardrail in routine prompts', () => {
+    const prompt = buildRoutinePrompt(tmpRepo, 'peer-review', { pr: 105 });
+    expect(prompt).toContain('Execution Guardrail: You are executing in a headless autonomous session');
+    expect(prompt).toContain('NEVER call schedule or yield your turn with plain text');
   });
 
   it('builds agy invocation args with stream-json output format', () => {
@@ -530,6 +537,51 @@ describe('Local Routine Runner', () => {
       expect(report).toContain('| Result | `FAILURE` |');
       expect(report).toContain('| Exit Code | `1` |');
       expect(report).not.toContain('### Error Output');
+    });
+  });
+
+  describe('detectPrematureRoutineExit', () => {
+    it('detects premature turn yield when agent output indicates verification in progress', () => {
+      const output = 'Verification is in progress. Once TypeScript checks finish, the test suite and subagent review passes will execute.';
+      const result = detectPrematureRoutineExit(output, 'peer-review');
+      expect(result).toContain('Premature session termination');
+      expect(result).toContain('Agent yielded turn on background task');
+    });
+
+    it('detects premature turn yield when agent output indicates waiting for test run to finish', () => {
+      const output = 'I have started running the test suite on the base repository.\nWaiting for test run to finish.';
+      const result = detectPrematureRoutineExit(output, 'peer-review');
+      expect(result).toContain('Premature session termination');
+    });
+
+    it('detects premature exit when peer-review claimed a PR but took no terminal action', () => {
+      const output = 'Starting review (round 1) · Run Log #4292\nInspected diff and files.';
+      const result = detectPrematureRoutineExit(output, 'peer-review');
+      expect(result).toContain('Premature peer-review termination');
+      expect(result).toContain('without executing terminal action');
+    });
+
+    it('returns null when peer-review executed a squash-merge', () => {
+      const output = 'Starting review (round 1)\nRan verification checks.\nSquash-merged PR #105 into main.';
+      const result = detectPrematureRoutineExit(output, 'peer-review');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when peer-review converted PR back to draft with findings', () => {
+      const output = 'Starting review (round 1)\nFound blocking security flaw.\ngh pr ready 105 --undo\nConverted PR #105 back to draft.';
+      const result = detectPrematureRoutineExit(output, 'peer-review');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when peer-review completed with milestone card', () => {
+      const output = 'Starting review (round 1)\n### 🏁 Milestone: Run Completed\n- **Status**: ✅ SUCCESS\n- **Key Decision / Finding**: Review completed with decision `MERGE`.';
+      const result = detectPrematureRoutineExit(output, 'peer-review');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when output is empty or routine has no premature patterns', () => {
+      expect(detectPrematureRoutineExit('', 'peer-review')).toBeNull();
+      expect(detectPrematureRoutineExit('Clean autowork run completed.', 'autowork')).toBeNull();
     });
   });
 });
