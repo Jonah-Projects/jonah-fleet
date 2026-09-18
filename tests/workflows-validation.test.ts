@@ -132,9 +132,10 @@ describe('Workflow Validation & Invariants', () => {
     expect(noticeContent).toContain('Single-flight issue claiming');
 
     const orchestrationDoc = fs.readFileSync(path.join(templatesDir, 'prompts/ORCHESTRATION.md'), 'utf8');
-    expect(orchestrationDoc).toContain('Upstream Symphony & Funes Intel & Architectural Evaluation Framework');
+    expect(orchestrationDoc).toContain('Upstream Symphony, Funes & Orbital Intel & Architectural Evaluation Framework');
     expect(orchestrationDoc).toContain('Layer 1 (Zero-Daemon Invariant)');
     expect(orchestrationDoc).toContain('Agent Memory & Session Indexing Evaluation Dimensions');
+    expect(orchestrationDoc).toContain('Project Agent & Worker Transports Evaluation Dimensions');
   });
 
   it('ensures trigger workflows define concurrency at the job level to prevent self-cancellation on skipped triggers', () => {

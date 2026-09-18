@@ -210,11 +210,11 @@ How the fleet guarantees continuous review throughput, recovers from transient A
 
 ---
 
-## Upstream Symphony & Funes Intel & Architectural Evaluation Framework
+## Upstream Symphony, Funes & Orbital Intel & Architectural Evaluation Framework
 
-How changes and innovations from upstream ecosystems—[openai/symphony](https://github.com/openai/symphony) for issue-tracker orchestration and [huggingface/funes](https://github.com/huggingface/funes) for agent memory & session indexing—are systematically audited and evaluated for incorporation into Jonah Fleet:
+How changes and innovations from upstream ecosystems—[openai/symphony](https://github.com/openai/symphony) for issue-tracker orchestration, [huggingface/funes](https://github.com/huggingface/funes) for agent memory & session indexing, and [zqiren/Orbital](https://github.com/zqiren/Orbital) for project agents & worker transports—are systematically audited and evaluated for incorporation into Jonah Fleet:
 
-1. **Automated Ecosystem Radar (`symphony-radar.yml`)**: A weekly scheduled workflow runs `.github/scripts/fetch-symphony-radar.js` to inspect upstream commits, specification updates (`SPEC.md`), and releases across `openai/symphony` (orchestration) and `huggingface/funes` (memory tooling), generating an actionable digest issue in Jonah Fleet.
+1. **Automated Ecosystem Radar (`symphony-radar.yml`)**: A weekly scheduled workflow runs `.github/scripts/fetch-symphony-radar.js` to inspect upstream commits, specification updates (`SPEC.md`), releases, and pull requests across `openai/symphony` (orchestration), `huggingface/funes` (memory tooling), and `zqiren/Orbital` (project agents & worker transports), generating an actionable digest issue in Jonah Fleet.
 2. **The 4 Evaluation Layers**:
    - **Layer 1 (Zero-Daemon Invariant)**: Can the enhancement execute in ephemeral GitHub Actions and `agy` CLI sessions without requiring a 24/7 background server or persistent WebSocket?
    - **Layer 2 (Issue Tracker Abstraction)**: Does the pattern map cleanly to native GitHub Issues, labels, and PR checks without proprietary tracker dependencies?
@@ -225,9 +225,14 @@ How changes and innovations from upstream ecosystems—[openai/symphony](https:/
    - **Pull-Based Memory Delivery**: Memory served strictly on demand via MCP (`recall`, `get`) to prevent prompt context bloat.
    - **Cross-Session Provenance**: Verbatim turns and provenance retention instead of lossy summary drift.
    - **Multi-Agent Portability**: Standardized trace ingestion across Antigravity CLI (`agy`), Claude Code, and Codex.
-4. **Classification & Action Protocol**:
-   - **🟢 Category A (Adopt Directly)**: Security guardrails, claim lock invariants, reader/writer rules, prompt engineering optimizations, deterministic zero-LLM indexing.
-   - **🟡 Category B (Adapt to Actions/CLI)**: Dynamic orchestrator pacing, backpressure controls, multi-stage review checks, pull-based memory MCP integrations.
+4. **Project Agent & Worker Transports Evaluation Dimensions (Orbital Watch)**:
+   - **Layer-1 Context Memory Files**: In-repo memory files (`LESSONS.md`, `CONTEXT.md`) maintained directly by agents on PR branches to avoid uncommitted disk drift or git merge collisions.
+   - **ACP/PTY Worker Transports**: Agent Client Protocol (ACP) and pseudo-terminal delegation to sub-agents, adaptable for local CLI runner execution.
+   - **Prompt Prefix Caching Benchmarks**: Partitioning prompt structures into Static $\rightarrow$ Semi-Stable $\rightarrow$ Dynamic tiers to maximize prefix cache hit rates (~95%).
+   - **Fail-Closed Safety Guards**: Deterministic action-hash repetition guards, cycle detection, and circuit breakers that halt runaway execution loops before token budgets are breached.
+5. **Classification & Action Protocol**:
+   - **🟢 Category A (Adopt Directly)**: Security guardrails, claim lock invariants, reader/writer rules, prompt engineering & prefix caching optimizations, fail-closed safety guards, deterministic zero-LLM indexing.
+   - **🟡 Category B (Adapt to Actions/CLI)**: Dynamic orchestrator pacing, backpressure controls, multi-stage review checks, pull-based memory MCP integrations, ACP/PTY worker transports.
    - **🔴 Category C (Skip)**: Elixir/OTP supervision trees, BEAM memory tuning, proprietary runtime internals, always-loaded memory context dumps.
 
 ---

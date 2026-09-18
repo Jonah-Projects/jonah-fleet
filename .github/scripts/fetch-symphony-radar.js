@@ -60,7 +60,15 @@ export async function fetchRepoData(repo, options = {}) {
   };
 }
 
-export function evaluateActivity(symphonyData, funesData, options = {}) {
+export function evaluateActivity(symphonyData, funesData, orbitalDataOrOptions = {}, maybeOptions = {}) {
+  const isOrbitalData = orbitalDataOrOptions && (
+    'commits' in orbitalDataOrOptions ||
+    'releases' in orbitalDataOrOptions ||
+    'pullRequests' in orbitalDataOrOptions
+  );
+  const orbitalData = isOrbitalData ? orbitalDataOrOptions : null;
+  const options = (isOrbitalData ? maybeOptions : orbitalDataOrOptions) || {};
+
   const lookbackDays = options.lookbackDays ?? LOOKBACK_DAYS;
   const forceReport = options.forceReport ?? FORCE_REPORT;
   const cutoffDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
@@ -74,10 +82,15 @@ export function evaluateActivity(symphonyData, funesData, options = {}) {
   const funesReleases = (funesData?.releases || []).filter(r => new Date(r.published_at || r.created_at) >= cutoffDate);
   const funesPRs = (funesData?.pullRequests || []).filter(p => p.merged_at && new Date(p.merged_at) >= cutoffDate);
 
+  const orbCommits = (orbitalData?.commits || []).filter(c => new Date(c.commit.author.date) >= cutoffDate);
+  const orbReleases = (orbitalData?.releases || []).filter(r => new Date(r.published_at || r.created_at) >= cutoffDate);
+  const orbPRs = (orbitalData?.pullRequests || []).filter(p => p.merged_at && new Date(p.merged_at) >= cutoffDate);
+
   const symphonyActivity = symCommits.length > 0 || symSpecCommits.length > 0 || symReleases.length > 0 || symPRs.length > 0;
   const funesActivity = funesCommits.length > 0 || funesReleases.length > 0 || funesPRs.length > 0;
+  const orbitalActivity = orbCommits.length > 0 || orbReleases.length > 0 || orbPRs.length > 0;
 
-  const hasNewActivity = symphonyActivity || funesActivity;
+  const hasNewActivity = symphonyActivity || funesActivity || orbitalActivity;
   const shouldCreateIssue = hasNewActivity || forceReport;
 
   return {
@@ -85,10 +98,12 @@ export function evaluateActivity(symphonyData, funesData, options = {}) {
     shouldCreateIssue,
     symphonyActivity,
     funesActivity,
+    orbitalActivity,
     cutoffDate,
     recent: {
       symphony: { commits: symCommits, specCommits: symSpecCommits, releases: symReleases, pullRequests: symPRs },
-      funes: { commits: funesCommits, releases: funesReleases, pullRequests: funesPRs }
+      funes: { commits: funesCommits, releases: funesReleases, pullRequests: funesPRs },
+      orbital: { commits: orbCommits, releases: orbReleases, pullRequests: orbPRs }
     }
   };
 }
@@ -105,7 +120,7 @@ export function evaluateActivity(symphonyData, funesData, options = {}) {
  */
 export function classifyUpstreamItem(item, options = {}) {
   const isSpec = options.isSpec || item.isSpec || false;
-  const repo = options.repo || item.repo || '';
+  const repo = (options.repo || item.repo || '').toLowerCase();
   const title = (item.title || item.summary || item.name || item.tag_name || item.commit?.message?.split('\n')[0] || '').trim();
   const body = item.body || item.commit?.message || '';
   const text = `${title} ${body}`.toLowerCase();
@@ -120,13 +135,14 @@ export function classifyUpstreamItem(item, options = {}) {
     };
   }
 
-  // 2. Category A: Core claim protocols, invariants, security, budget, prompt engineering
+  // 2. Category A: Core claim protocols, invariants, security, budget, prompt engineering, safety guards
   // Precedence: Category A invariant and prompt engineering keywords take precedence over general platform/runtime keywords
   const isClaimOrInvariant = /\b(claim|single-flight|claim lock|claim invariant|invariants?|reader[/-]writer|state machine)\b/i.test(text);
   const isSecurityOrToken = /\b(security|token scrub|token alias|least privilege|sanitiz)\b/i.test(text);
   const isTokenEconomyOrBudget = /\b(token budget|budget ceiling|loop stagnation|retry limit|token limit)\b/i.test(text);
   const isZeroLlmIngest = /\b(zero-llm|deterministic indexing|provenance retention)\b/i.test(text);
-  const isPromptEngineering = /\b(prompt engineering|prompt optimiz|system prompt)\b/i.test(text);
+  const isPromptEngineering = /\b(prompt engineering|prompt optimiz|system prompt|prefix[- ]cach(?:e|ing)?|prompt cach(?:e|ing)?)\b/i.test(text);
+  const isSafetyOrGuard = /\b(fail-closed|circuit breaker|loop guard|action hash|repetition guard)\b/i.test(text);
 
   if (isClaimOrInvariant) {
     return {
@@ -134,6 +150,15 @@ export function classifyUpstreamItem(item, options = {}) {
       badge: '🟢 **Category A** (Adopt Directly)',
       isOpportunity: true,
       rationale: 'Touches core claim protocols, reader/writer locks, or orchestration state machine invariants.'
+    };
+  }
+
+  if (isSafetyOrGuard) {
+    return {
+      category: 'A',
+      badge: '🟢 **Category A** (Adopt Directly)',
+      isOpportunity: true,
+      rationale: 'Fail-closed safety guard, repetition guard, or circuit breaker invariant.'
     };
   }
 
@@ -224,11 +249,21 @@ export function classifyUpstreamItem(item, options = {}) {
     };
   }
 
-  // 4. Category B: Adaptable patterns (MCP, memory retrieval, backpressure, review loops)
+  // 4. Category B: Adaptable patterns (MCP, memory retrieval, backpressure, review loops, worker transports)
+  const isWorkerOrTransport = /\b(acp|pty|worker transport|worker delegation|process transport)\b/i.test(text);
   const isMcpOrTools = /\b(mcp|model context protocol|tool|skill)\b/i.test(text);
-  const isMemoryOrSearch = /\b(recall|hybrid search|bm25|vector search|rrf|rerank|lance)\b/i.test(text);
+  const isMemoryOrSearch = /\b(recall|hybrid search|bm25|vector search|rrf|rerank|lance|operational memory|lessons)\b/i.test(text);
   const isPacingOrReview = /\b(pacing|backpressure|rate limit|review loop|multi-stage review|concurrency)\b/i.test(text);
   const isSessionOrTrace = /\b(session|trace|transcript|tracesource)\b/i.test(text);
+
+  if (isWorkerOrTransport) {
+    return {
+      category: 'B',
+      badge: '🟡 **Category B** (Adapt)',
+      isOpportunity: true,
+      rationale: 'Project agent worker transport or ACP/PTY delegation pattern adaptable to Jonah Fleet.'
+    };
+  }
 
   if (isMcpOrTools || isMemoryOrSearch) {
     return {
@@ -258,6 +293,15 @@ export function classifyUpstreamItem(item, options = {}) {
     };
   }
 
+  if (repo.includes('orbital')) {
+    return {
+      category: 'C',
+      badge: '🔴 **Category C** (Skip)',
+      isOpportunity: false,
+      rationale: 'Upstream Orbital internal implementation detail; no immediate action required.'
+    };
+  }
+
   return {
     category: 'C',
     badge: '🔴 **Category C** (Skip)',
@@ -269,7 +313,7 @@ export function classifyUpstreamItem(item, options = {}) {
 /**
  * Classifies all recent upstream activity and surfaces actionable opportunities.
  */
-export function classifyAllActivity(symRecent = {}, funesRecent = {}) {
+export function classifyAllActivity(symRecent = {}, funesRecent = {}, orbRecent = {}) {
   const items = [];
 
   const getPrNumber = (msg) => {
@@ -279,6 +323,7 @@ export function classifyAllActivity(symRecent = {}, funesRecent = {}) {
 
   const symPRNumbers = new Set((symRecent.pullRequests || []).map(p => p.number));
   const funesPRNumbers = new Set((funesRecent.pullRequests || []).map(p => p.number));
+  const orbPRNumbers = new Set((orbRecent.pullRequests || []).map(p => p.number));
 
   // 1. SPEC commits (Symphony only)
   for (const sc of (symRecent.specCommits || [])) {
@@ -319,6 +364,18 @@ export function classifyAllActivity(symRecent = {}, funesRecent = {}) {
     });
   }
 
+  for (const pr of (orbRecent.pullRequests || [])) {
+    const classification = classifyUpstreamItem(pr, { repo: 'zqiren/Orbital' });
+    items.push({
+      repo: 'zqiren/Orbital',
+      type: 'pr',
+      ref: `[#${pr.number}](${pr.html_url})`,
+      title: pr.title,
+      url: pr.html_url,
+      ...classification
+    });
+  }
+
   // 3. Releases
   for (const rel of (symRecent.releases || [])) {
     const classification = classifyUpstreamItem(rel, { repo: 'openai/symphony' });
@@ -336,6 +393,18 @@ export function classifyAllActivity(symRecent = {}, funesRecent = {}) {
     const classification = classifyUpstreamItem(rel, { repo: 'huggingface/funes' });
     items.push({
       repo: 'huggingface/funes',
+      type: 'release',
+      ref: `**[${rel.name || rel.tag_name}](${rel.html_url})**`,
+      title: rel.name || rel.tag_name,
+      url: rel.html_url,
+      ...classification
+    });
+  }
+
+  for (const rel of (orbRecent.releases || [])) {
+    const classification = classifyUpstreamItem(rel, { repo: 'zqiren/Orbital' });
+    items.push({
+      repo: 'zqiren/Orbital',
       type: 'release',
       ref: `**[${rel.name || rel.tag_name}](${rel.html_url})**`,
       title: rel.name || rel.tag_name,
@@ -378,6 +447,22 @@ export function classifyAllActivity(symRecent = {}, funesRecent = {}) {
     });
   }
 
+  for (const c of (orbRecent.commits || [])) {
+    const summary = c.commit.message.split('\n')[0];
+    const prNum = getPrNumber(summary);
+    if (prNum && orbPRNumbers.has(prNum)) continue;
+
+    const classification = classifyUpstreamItem(c, { repo: 'zqiren/Orbital' });
+    items.push({
+      repo: 'zqiren/Orbital',
+      type: 'commit',
+      ref: `[\`${c.sha.slice(0, 7)}\`](${c.html_url})`,
+      title: summary,
+      url: c.html_url,
+      ...classification
+    });
+  }
+
   const categoryA = items.filter(i => i.category === 'A');
   const categoryB = items.filter(i => i.category === 'B');
   const categoryC = items.filter(i => i.category === 'C');
@@ -400,20 +485,22 @@ export function classifyAllActivity(symRecent = {}, funesRecent = {}) {
 export function generateRadarReport(params = {}) {
   const symphony = params.symphony || { commits: [], specCommits: [], releases: [], pullRequests: [] };
   const funes = params.funes || { commits: [], releases: [], pullRequests: [] };
+  const orbital = params.orbital || { commits: [], releases: [], pullRequests: [] };
   const lookbackDays = params.lookbackDays ?? LOOKBACK_DAYS;
   const serverUrl = params.serverUrl || GITHUB_SERVER_URL;
   const repository = params.repository || GITHUB_REPOSITORY;
   const runId = params.runId || GITHUB_RUN_ID;
   const dateStr = params.dateStr || new Date().toISOString().split('T')[0];
 
-  const evalResult = evaluateActivity(symphony, funes, { lookbackDays, forceReport: true });
-  const { symphony: symRecent, funes: funesRecent } = evalResult.recent;
-  const analysis = classifyAllActivity(symRecent, funesRecent);
+  const evalResult = evaluateActivity(symphony, funes, orbital, { lookbackDays, forceReport: true });
+  const { symphony: symRecent, funes: funesRecent, orbital: orbRecent } = evalResult.recent;
+  const analysis = classifyAllActivity(symRecent, funesRecent, orbRecent);
 
   let report = `# 📡 Upstream Ecosystem Radar: Intel Digest (${dateStr})\n\n`;
   report += `> Tracking upstream architectural changes, specification updates, and feature additions across:\n`;
   report += `> - [openai/symphony](https://github.com/openai/symphony) (Orchestration & Claim Invariants)\n`;
-  report += `> - [huggingface/funes](https://github.com/huggingface/funes) (Agent Memory & Session Indexing)\n\n`;
+  report += `> - [huggingface/funes](https://github.com/huggingface/funes) (Agent Memory & Session Indexing)\n`;
+  report += `> - [zqiren/Orbital](https://github.com/zqiren/Orbital) (Project Agents & Worker Transports)\n\n`;
 
   // Top Section: Opportunities & Triage Summary
   report += `## 🎯 Upstream Opportunities & Triage Summary\n\n`;
@@ -541,9 +628,49 @@ export function generateRadarReport(params = {}) {
     report += `\n`;
   }
 
-  // Section 3: Evaluation Matrix
+  // Section 3: Orbital
+  report += `## 🪐 Project Agent & Worker Transports Watch (\`zqiren/Orbital\`)\n\n`;
+
+  if (orbRecent.releases.length > 0) {
+    report += `### 🏷️ New Releases\n\n`;
+    for (const rel of orbRecent.releases) {
+      report += `- **[${rel.name || rel.tag_name}](${rel.html_url})** (published ${rel.published_at?.split('T')[0]})\n`;
+      if (rel.body) {
+        report += `  > ${rel.body.split('\n')[0]}\n`;
+      }
+    }
+    report += `\n`;
+  }
+
+  report += `### 🔨 Recent Commits (Past ${lookbackDays} Days: ${orbRecent.commits.length})\n\n`;
+  if (orbRecent.commits.length > 0) {
+    for (const c of orbRecent.commits) {
+      const summary = c.commit.message.split('\n')[0];
+      const author = c.author?.login ? `@${c.author.login}` : c.commit.author.name;
+      report += `- [\`${c.sha.slice(0, 7)}\`](${c.html_url}) ${summary} (${author}, ${c.commit.author.date.split('T')[0]})\n`;
+    }
+  } else {
+    report += `_No new commits in the past ${lookbackDays} days._\n\n`;
+    if (orbital.commits && orbital.commits.length > 0) {
+      const latest = orbital.commits[0];
+      report += `**Latest repository commit:**\n`;
+      report += `- [\`${latest.sha.slice(0, 7)}\`](${latest.html_url}) ${latest.commit.message.split('\n')[0]} (${latest.commit.author.date.split('T')[0]})\n`;
+    }
+  }
+  report += `\n`;
+
+  if (orbRecent.pullRequests.length > 0) {
+    report += `### 🔀 Merged Pull Requests\n\n`;
+    for (const pr of orbRecent.pullRequests) {
+      const author = pr.user?.login ? `@${pr.user.login}` : 'contributor';
+      report += `- [#${pr.number}](${pr.html_url}) **${pr.title}** by ${author} (merged ${pr.merged_at.split('T')[0]})\n`;
+    }
+    report += `\n`;
+  }
+
+  // Section 4: Evaluation Matrix
   report += `## ⚖️ Upstream Architectural Evaluation Matrix\n\n`;
-  report += `Before adopting concepts from \`openai/symphony\` or \`huggingface/funes\`, evaluate them against Jonah Fleet's operational model:\n\n`;
+  report += `Before adopting concepts from \`openai/symphony\`, \`huggingface/funes\`, or \`zqiren/Orbital\`, evaluate them against Jonah Fleet's operational model:\n\n`;
   report += `| Evaluation Layer | Key Question | Invariant Check |\n`;
   report += `|---|---|---|\n`;
   report += `| **1. Zero-Daemon Invariant** | Can this run within ephemeral GitHub Actions + \`agy\` CLI sessions? | Must require zero 24/7 background servers/sockets |\n`;
@@ -558,6 +685,14 @@ export function generateRadarReport(params = {}) {
   report += `| **Pull-Based Memory Delivery** | Delivered on demand via MCP (\`recall\`, \`get\`) | Prevents context window bloat; memory is queried only when explicitly referenced |\n`;
   report += `| **Cross-Session Provenance** | Verbatim turns and provenance retention | Avoids lossy LLM summarization drift across multi-session debugging tasks |\n`;
   report += `| **Multi-Agent Portability** | Agent-agnostic \`TraceSource\` trait (Claude Code, Codex, pi) | Allows Jonah Fleet to analyze sessions across different agent harnesses |\n\n`;
+
+  report += `### 🪐 Project Agent & Worker Transports Evaluation (Orbital Integration)\n\n`;
+  report += `| Evaluation Dimension | Orbital Pattern | Jonah Fleet Applicability & Guardrails |\n`;
+  report += `|---|---|---|\n`;
+  report += `| **Layer-1 Context Memory Files** | In-repo memory files (\`LESSONS.md\`, \`CONTEXT.md\`) maintained directly by agents | Must be authored on PR branches and validated by review; avoids uncommitted disk drift or git merge collisions |\n`;
+  report += `| **ACP/PTY Worker Transports** | Agent Client Protocol (ACP) and pseudo-terminal (PTY) delegation to sub-agents | Adaptable for local daemon CLI runner execution; Actions runners remain ephemeral CLI invocations |\n`;
+  report += `| **Prompt Prefix Caching Benchmarks** | Partitioning prompt structures into Static $\\rightarrow$ Semi-Stable $\\rightarrow$ Dynamic tiers | Maximizes prefix cache hit rates (~95%) to minimize token spend under the 70% weekly budget ceiling |\n`;
+  report += `| **Fail-Closed Safety Guards** | Repetition guards, action-hash cycle detection, and circuit breakers | Enforces hard aborts on repetitive tool error loops to halt runaway token consumption |\n\n`;
 
   report += `#### 🧭 Classification Guide:\n`;
   report += `- **🟢 Category A (Adopt Directly)**: Security guardrails, claim lock invariants, reader/writer rules, prompt engineering optimizations, deterministic zero-LLM indexing.\n`;
@@ -603,20 +738,22 @@ export async function runRadar(options = {}) {
   const runId = options.runId ?? GITHUB_RUN_ID;
 
   const cutoffDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
-  console.log(`Checking upstream activity (openai/symphony & huggingface/funes) since ${cutoffDate.toISOString()} (${lookbackDays} days window)...`);
+  console.log(`Checking upstream activity (openai/symphony, huggingface/funes & zqiren/Orbital) since ${cutoffDate.toISOString()} (${lookbackDays} days window)...`);
 
-  const [symphony, funes] = await Promise.all([
+  const [symphony, funes, orbital] = await Promise.all([
     fetchRepoData('openai/symphony', { lookbackDays, token, isSymphony: true }),
-    fetchRepoData('huggingface/funes', { lookbackDays, token, isSymphony: false })
+    fetchRepoData('huggingface/funes', { lookbackDays, token, isSymphony: false }),
+    fetchRepoData('zqiren/Orbital', { lookbackDays, token, isSymphony: false })
   ]);
 
-  const { hasNewActivity, shouldCreateIssue } = evaluateActivity(symphony, funes, { lookbackDays, forceReport });
+  const { hasNewActivity, shouldCreateIssue } = evaluateActivity(symphony, funes, orbital, { lookbackDays, forceReport });
   const todayStr = new Date().toISOString().split('T')[0];
   const issueTitle = `📡 Upstream Ecosystem Radar: Intel Digest (${todayStr})`;
 
   const report = generateRadarReport({
     symphony,
     funes,
+    orbital,
     lookbackDays,
     serverUrl,
     repository,
