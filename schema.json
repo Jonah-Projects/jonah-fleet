@@ -163,6 +163,32 @@
       },
       "additionalProperties": false,
       "description": "Configuration for label management and protection shields"
+    },
+    "lessons": {
+      "oneOf": [
+        {
+          "type": "boolean",
+          "description": "Enable or disable opt-in LESSONS.md operational memory tier"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable opt-in LESSONS.md operational memory tier"
+            },
+            "maxEntries": {
+              "type": "number",
+              "default": 25,
+              "description": "Maximum number of active operational lesson entries (hard cap: 25)"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Configuration for opt-in operational memory tier (LESSONS.md)"
+        }
+      ],
+      "description": "Configuration for opt-in operational memory tier (LESSONS.md)"
     }
   },
   "required": ["version", "preset", "routines", "skills"],

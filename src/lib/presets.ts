@@ -83,6 +83,12 @@ export interface FleetManifest {
   labels?: {
     protected?: string[];
   };
+  lessons?: boolean | LessonsConfig;
+}
+
+export interface LessonsConfig {
+  enabled?: boolean;
+  maxEntries?: number;
 }
 
 export const DEFAULT_ROUTINE_MODELS: Record<string, string> = {

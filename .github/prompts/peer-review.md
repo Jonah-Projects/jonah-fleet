@@ -101,6 +101,7 @@ Check if `$PR_NUMBER` is set:
 1. Run `/code-review` over the diff (or delta commits if re-review) evaluating:
    - **Standards**: Conformance to `AGENTS.md` (or `CLAUDE.md`/`GEMINI.md`), conventions, and architecture.
    - **Spec Compliance**: Verification against the linked issue's deliverables (`## Tasks`), or against the PR description's summary/changes if no tracking issue is linked.
+   - **Operational Memory & Lessons Invariant**: Inspect `LESSONS.md` diffs in PRs to verify the lesson is accurate, non-trivial, follows the 3-line structured schema, and the file adheres to the 25-entry hard cap.
 2. Run Security Pass: auth gates, permission checks, injection risks, sensitive credentials.
 3. **Design System & Viewport Density Pass** (if PR modifies frontend/rendered UI):
    - **Token Purity**: Check for arbitrary CSS/Tailwind sizing overrides (e.g. `text-[...px]`, `w-[...px]`) or bespoke button styling bypassing standard design system tokens.
