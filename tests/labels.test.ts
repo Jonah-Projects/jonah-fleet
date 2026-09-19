@@ -406,6 +406,7 @@ describe('CLI Labels Command Execution', () => {
     expect(res.alreadyExists).toContain('routine-log');
     expect(res.created).toContain('status:running');
     expect(res.created).toContain('status:success');
+    expect(res.created).toContain('status:quota-paused');
     expect(res.created).toContain('routine:autowork');
     expect(res.errors).toHaveLength(0);
 

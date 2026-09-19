@@ -250,7 +250,7 @@ export const ROUTINE_TO_WORKFLOW_MAP: Record<keyof FleetManifest['routines'], st
   'issues-housekeeping': ['issues-housekeeping-cron.yml'],
   'dependency-update-security-check': ['dependency-check-cron.yml'],
   'product-planning': [],
-  'analytics-review': [],
+  'analytics-review': ['analytics-review-cron.yml'],
   'design-review': ['design-review-cron.yml'],
 };
 
@@ -260,6 +260,7 @@ export const WORKFLOW_TO_ROUTINE_MAP: Record<string, keyof FleetManifest['routin
   'prompt-optimizer-cron.yml': 'optimizer',
   'issues-housekeeping-cron.yml': 'issues-housekeeping',
   'dependency-check-cron.yml': 'dependency-update-security-check',
+  'analytics-review-cron.yml': 'analytics-review',
   'design-review-cron.yml': 'design-review',
   'sync-fleet.yml': 'sync-fleet',
 };
