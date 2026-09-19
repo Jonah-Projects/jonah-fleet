@@ -63,6 +63,21 @@ describe('Workflow Validation & Invariants', () => {
     }
   });
 
+  it('ensures analytics-review-cron.yml includes two-phase issue lifecycle reconciliation in templates', () => {
+    expect(ROUTINE_TO_WORKFLOW_MAP['analytics-review']).toContain('analytics-review-cron.yml');
+    const templatePath = path.join(workflowsDir, 'analytics-review-cron.yml');
+    expect(fs.existsSync(templatePath)).toBe(true);
+    const content = fs.readFileSync(templatePath, 'utf8');
+    expect(content).toContain('Initialize Routine Run Issue');
+    expect(content).toContain('Reconcile Routine Run Issue');
+    expect(content).toContain('routine-log');
+    expect(content).toContain('routine:analytics-review');
+    expect(content).toContain('status:running');
+    expect(content).toContain('status:success');
+    expect(content).toContain('Milestone: Run Interrupted / Failed');
+    expect(content).toContain('gh issue comment "$ISSUE_NUMBER"');
+  });
+
   it('ensures all workflow templates exist in the templates directory', () => {
     for (const workflows of Object.values(ROUTINE_TO_WORKFLOW_MAP)) {
       for (const workflowFile of workflows) {
@@ -195,6 +210,50 @@ describe('Workflow Validation & Invariants', () => {
     expect(githubScriptContent).toContain('pingPongThreshold');
     expect(githubScriptContent).toContain('consecutiveErrorThreshold');
     expect(githubScriptContent).toContain('loop_circuit_breaker');
+  });
+
+  it('ensures all routine workflows implement graceful quota-pause handling', () => {
+    const routineWorkflows = [
+      'autowork-cron.yml',
+      'dependency-check-cron.yml',
+      'issues-housekeeping-cron.yml',
+      'prompt-optimizer-cron.yml',
+      'trigger-autowork-manual.yml',
+      'trigger-autowork-on-bug.yml',
+      'trigger-autowork-on-merge.yml',
+      'trigger-review-routine.yml',
+      'analytics-review-cron.yml',
+      'design-review-cron.yml',
+    ];
+
+    for (const file of routineWorkflows) {
+      const templatePath = path.join(workflowsDir, file);
+      expect(fs.existsSync(templatePath), `Template ${file} should exist`).toBe(true);
+      const content = fs.readFileSync(templatePath, 'utf8');
+
+      expect(content).toContain('Individual quota reached|quota reached');
+      expect(content).toContain('QUOTA_PAUSED=true');
+      expect(content).toContain('status:quota-paused');
+      expect(content).toContain('Milestone: Routine Execution Quota-Paused');
+    }
+  });
+
+  it('verifies detectQuotaExceeded parses reset timeline correctly', async () => {
+    const { detectQuotaExceeded } = await import('../src/lib/runner.js');
+
+    const quotaError = 'Error: Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 33m45s.';
+    const res1 = detectQuotaExceeded('', quotaError);
+    expect(res1.isQuota).toBe(true);
+    expect(res1.resetInfo).toBe('Resets in 33m45s');
+
+    const res2 = detectQuotaExceeded(quotaError, '');
+    expect(res2.isQuota).toBe(true);
+    expect(res2.resetInfo).toBe('Resets in 33m45s');
+
+    const normalError = 'Error: Command failed with exit code 1';
+    const res3 = detectQuotaExceeded('', normalError);
+    expect(res3.isQuota).toBe(false);
+    expect(res3.resetInfo).toBeUndefined();
   });
 });
 

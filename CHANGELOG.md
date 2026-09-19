@@ -5,6 +5,14 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.13.0...v1.14.0) (2026-09-19)
+
+
+### Features
+
+* **prompts:** restructure routine templates for 3-tier prompt prefix caching ([#210](https://github.com/juliendurandeu/jonah-fleet/issues/210))
+* **workflows:** handle LLM quota limits with graceful pause (status:quota-paused) ([#240](https://github.com/juliendurandeu/jonah-fleet/issues/240)) ([98bb176](https://github.com/juliendurandeu/jonah-fleet/commit/98bb176f0b29462ab9de6baf5d0f102fee78b0ba))
+
 ## [1.13.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.12.0...v1.13.0) (2026-09-19)
 
 
@@ -25,21 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
 * **runner:** prevent premature routine termination on async background tasks in headless mode ([6641b2b](https://github.com/juliendurandeu/jonah-fleet/commit/6641b2b2e46ab363b73d490aac1144a33a1c69f9))
-
-## [Unreleased] - 2026-09-19
-
-### Features
-
-* **prompts:** restructure routine templates for 3-tier prompt prefix caching ([#210](https://github.com/juliendurandeu/jonah-fleet/issues/210))
-
-* **orchestration:** standardize 'Why I believe this' structured human escalation card across autowork, triage, and housekeeping routines ([#209](https://github.com/juliendurandeu/jonah-fleet/issues/209))
-* **guard:** implement CLI runner loop-guard and circuit-breaker wrapper ([#208](https://github.com/juliendurandeu/jonah-fleet/issues/208))
-* **memory:** introduce opt-in LESSONS.md operational memory tier with 25-entry hard cap, schema configuration, and routine prompt gates ([#207](https://github.com/juliendurandeu/jonah-fleet/issues/207)).
-
-### Bug Fixes
-
-* **runner:** detect premature routine termination caused by async background task turn yielding in headless CLI mode (`agy -p`), preventing false-positive success logging on uncompleted runs.
-* **prompts:** add Headless Execution & Asynchronous Non-Yielding Guardrail across `peer-review.md`, `autowork.md`, and `ORCHESTRATION.md` with explicit remote CI trust bar to eliminate redundant verification stalling.
 
 ## [1.11.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.10.0...v1.11.0) (2026-09-17)
 
