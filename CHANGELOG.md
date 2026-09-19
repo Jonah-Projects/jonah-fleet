@@ -15,7 +15,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **prompts:** add resolution-triggered auto-closure to `autowork.md` and `peer-review.md`, automatically commenting on and closing past failed routine issues for a target once work is marked ready or merged.
 * **housekeeping:** expand `issues-housekeeping.md` to sweep and close stale untargeted `status:failure` routine issues older than 48 hours or whose targets are resolved, eliminating backlog clutter.
 
+## [1.15.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.14.0...v1.15.0) (2026-09-19)
+
+
+### Features
+
+* **prompts:** restructure routine templates for 3-tier prompt prefix caching ([#239](https://github.com/juliendurandeu/jonah-fleet/issues/239)) ([a72ecc2](https://github.com/juliendurandeu/jonah-fleet/commit/a72ecc284e17f6311b52436a9e94f86d0ba9ab3a))
+
+## [1.14.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.13.0...v1.14.0) (2026-09-19)
+
+
+### Features
+
+* **prompts:** restructure routine templates for 3-tier prompt prefix caching ([#210](https://github.com/juliendurandeu/jonah-fleet/issues/210))
+* **workflows:** handle LLM quota limits with graceful pause (status:quota-paused) ([#240](https://github.com/juliendurandeu/jonah-fleet/issues/240)) ([98bb176](https://github.com/juliendurandeu/jonah-fleet/commit/98bb176f0b29462ab9de6baf5d0f102fee78b0ba))
+
 ## [1.13.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.12.0...v1.13.0) (2026-09-19)
+
 
 ### Features
 
@@ -23,16 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **memory:** introduce opt-in LESSONS.md operational memory tier ([#207](https://github.com/juliendurandeu/jonah-fleet/issues/207)) ([#219](https://github.com/juliendurandeu/jonah-fleet/issues/219)) ([13f74fa](https://github.com/juliendurandeu/jonah-fleet/commit/13f74fa2acc78554bba486b2bf77521106265f03))
 * **orchestration:** standardize 'Why I believe this' structured human escalation card ([#229](https://github.com/juliendurandeu/jonah-fleet/issues/229)) ([997e1d2](https://github.com/juliendurandeu/jonah-fleet/commit/997e1d20d7d0a3970ecca9f209841db745f99979))
 
+## [1.12.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.11.0...v1.12.0) (2026-09-18)
+
+
 ### Features
 
-* **orchestration:** standardize 'Why I believe this' structured human escalation card across autowork, triage, and housekeeping routines ([#209](https://github.com/juliendurandeu/jonah-fleet/issues/209))
-* **guard:** implement CLI runner loop-guard and circuit-breaker wrapper ([#208](https://github.com/juliendurandeu/jonah-fleet/issues/208))
-* **memory:** introduce opt-in LESSONS.md operational memory tier with 25-entry hard cap, schema configuration, and routine prompt gates ([#207](https://github.com/juliendurandeu/jonah-fleet/issues/207)).
+* **radar:** add zqiren/Orbital to ecosystem radar and evaluation matrix ([#212](https://github.com/juliendurandeu/jonah-fleet/issues/212)) ([910febb](https://github.com/juliendurandeu/jonah-fleet/commit/910febbbc8196d53c20f05730770aae231a6b8ea)), closes [#206](https://github.com/juliendurandeu/jonah-fleet/issues/206)
+
 
 ### Bug Fixes
 
-* **runner:** detect premature routine termination caused by async background task turn yielding in headless CLI mode (`agy -p`), preventing false-positive success logging on uncompleted runs.
-* **prompts:** add Headless Execution & Asynchronous Non-Yielding Guardrail across `peer-review.md`, `autowork.md`, and `ORCHESTRATION.md` with explicit remote CI trust bar to eliminate redundant verification stalling.
+* **runner:** prevent premature routine termination on async background tasks in headless mode ([6641b2b](https://github.com/juliendurandeu/jonah-fleet/commit/6641b2b2e46ab363b73d490aac1144a33a1c69f9))
 
 ## [1.11.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.10.0...v1.11.0) (2026-09-17)
 

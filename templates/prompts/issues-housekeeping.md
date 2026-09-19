@@ -1,5 +1,13 @@
 # Issues Housekeeping
 
+<!--
+================================================================================
+TIER 1: STATIC INVARIANT PREFIX
+Routine objective, Definition of Done, constraints, instructions, and logging.
+100% cacheable across all runs and repositories.
+================================================================================
+-->
+
 ## Objective
 
 Sweep all open issues for staleness, duplicates, batch-consolidation opportunities (sets of small related issues addressable together), label drift, priority accuracy, dependency status, and orphaned autowork claims, and land any accumulated draft log-only PRs. Fix what can be fixed and post a summary of changes made.
@@ -68,3 +76,37 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
 **Issue Logging Protocol**:
 - Record run execution details to `.jonah-fleet/run-report.md` (or update `$ROUTINE_ISSUE_NUMBER`).
 - Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.
+
+<!--
+================================================================================
+TIER 2: SEMI-STABLE PROJECT RULES
+Repository rules from AGENTS.md, manifest configurations, and LESSONS.md.
+Cacheable across consecutive runs within the same repository.
+================================================================================
+-->
+
+## Repository Rules & Project Context (Tier 2)
+
+In this tier, Issues Housekeeping ingests semi-stable repository conventions, operational memory, and configuration rules that change infrequently across consecutive runs in the same repository:
+
+1. **Repository Conventions (`AGENTS.md`)**: Read `AGENTS.md` (or `CLAUDE.md` / `GEMINI.md`) for issue taxonomy, allowed labels, and escalation rules.
+2. **Operational Memory (`LESSONS.md`)**: Ingest active operational gotchas to ensure issue triage preserves known project constraints.
+3. **Fleet Manifest (`agents-manifest.json`)**: Ingest enabled routines and presets to audit active routine log issues.
+4. **Engineering Skills (`.agents/skills/`)**: Leverage `triage` and `grill-me` when clarifying or categorizing ambiguous issues.
+
+<!--
+================================================================================
+TIER 3: DYNAMIC TAIL PAYLOAD
+Target issue / PR data, git diff, active branch, timestamps, and runtime vars.
+Appended strictly at the tail of the prompt to preserve prefix cache validity.
+================================================================================
+-->
+
+## Dynamic Context & Execution Payload (Tier 3)
+
+The dynamic execution context for this housekeeping sweep is injected strictly at the tail of the prompt:
+
+- **Open Issues Snapshot**: List of open issues, labels, assignees, and timestamps.
+- **Runtime Metadata**: `$ROUTINE_ISSUE_NUMBER`, `$GITHUB_RUN_ID`, and runner timestamp.
+- **Prefix Caching Invariant**: Harnesses and runners MUST NEVER interpolate dynamic timestamps, run IDs, or target identifiers into Tier 1 or Tier 2 prefix blocks.
+

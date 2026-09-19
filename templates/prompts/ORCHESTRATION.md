@@ -315,3 +315,24 @@ How autonomous routines escalate decisions, ambiguities, and blockers to human m
    - `autowork.md`: Required when tripping the Ambiguity Gate (Step 12), encountering a 2nd-strike permanent blocker (`needs-human`), or hitting the review Ping-Pong Cap (Step 3b).
    - `triage/SKILL.md`: Required when transitioning issues or PRs to `needs-info` or `ready-for-human`.
    - `issues-housekeeping.md`: Required when auditing and escalating ambiguous, stale, or infeasible issues with `needs-human` or `needs-info`.
+
+---
+
+## 3-Tier Prompt Prefix Caching Architecture
+
+How Jonah Fleet partitions prompt structures into Static $\rightarrow$ Semi-Stable $\rightarrow$ Dynamic tiers inspired by Orbital v0.4.2's prefix-caching architecture to achieve $>90\%$ cache hit rates on modern LLMs (Gemini, Anthropic, OpenAI), drastically reducing invocation latency and safeguarding the 70% weekly token budget ceiling:
+
+1. **Tier 1 (Static Invariant Prefix)**:
+   - Contains routine objectives, Definitions of Done, hard constraints, negative examples, tool schemas, claim protocols, and core step-by-step instructions.
+   - Remains 100% immutable across all runs, workflows, and consumer repositories.
+   - Fully cached across all executions in the model's prefix cache.
+2. **Tier 2 (Semi-Stable Project Rules)**:
+   - Contains repository conventions from `AGENTS.md` (or `CLAUDE.md`/`GEMINI.md`), active operational memory lessons from `LESSONS.md` (bounded by the 25-entry hard cap), enabled routines and budgets from `agents-manifest.json`, and project-specific skills in `.agents/skills/`.
+   - Semi-stable: changes only when repository documentation or operational gotchas evolve.
+   - Cached across consecutive runs within the same repository.
+3. **Tier 3 (Dynamic Tail Payload)**:
+   - Contains run-specific targets (`$TARGET_ISSUE`, `$PR_NUMBER`), issue descriptions, git diffs, active branch names, timestamps, and execution metadata (`$ROUTINE_ISSUE_NUMBER`, `$GITHUB_RUN_ID`).
+   - Appended strictly at the tail of the prompt.
+4. **Prefix Caching Invariants**:
+   - **Zero Dynamic Interpolation in Static Tiers**: Harnesses, workflows, and runners MUST NEVER interpolate dynamic timestamps, run IDs, random tokens, or target issue numbers into Tier 1 or Tier 2 prefix blocks. Any variation in the prompt prefix destroys cache reuse for subsequent tokens.
+   - **Tail Appending Only**: All dynamic context and runtime parameters must be injected exclusively at Tier 3 at the bottom of the prompt.
