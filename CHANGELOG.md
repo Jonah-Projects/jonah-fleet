@@ -5,22 +5,23 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Features
+
+* **orchestration:** adopt 4-part human escalation card in peer-review routine on round-5 escalation ([#235](https://github.com/juliendurandeu/jonah-fleet/issues/235))
+* **orchestration:** add Routine Run Failure Ingestion & Auto-Closure Protocol to `ORCHESTRATION.md`, unifying prior failure memory and resolution lifecycle across `autowork` and `peer-review`.
+* **prompts:** add Dynamic Target Binding in Scan mode to `autowork.md` and `peer-review.md`, dynamically updating `$ROUTINE_ISSUE_NUMBER` titles with `(Issue #N)` or `(PR #M)` upon claiming so crashed runs are never anonymous.
+* **prompts:** add Prior Failure Ingestion Protocol to `autowork.md` and `peer-review.md`, inspecting past open failed routine issues to extract error logs and crash milestones before implementation or review.
+* **prompts:** add resolution-triggered auto-closure to `autowork.md` and `peer-review.md`, automatically commenting on and closing past failed routine issues for a target once work is marked ready or merged.
+* **housekeeping:** expand `issues-housekeeping.md` to sweep and close stale untargeted `status:failure` routine issues older than 48 hours or whose targets are resolved, eliminating backlog clutter.
+
 ## [1.16.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.15.1...v1.16.0) (2026-09-19)
 
 
 ### Features
 
 * **orchestration:** routine run failure ingestion, dynamic target binding, and auto-closure ([#232](https://github.com/juliendurandeu/jonah-fleet/issues/232)) ([b76b3fc](https://github.com/juliendurandeu/jonah-fleet/commit/b76b3fccd767e5cc9517d977fd08c8979baf64b6))
-
-## [Unreleased] - 2026-09-19
-
-### Features
-
-* **orchestration:** add Routine Run Failure Ingestion & Auto-Closure Protocol to `ORCHESTRATION.md`, unifying prior failure memory and resolution lifecycle across `autowork` and `peer-review`.
-* **prompts:** add Dynamic Target Binding in Scan mode to `autowork.md` and `peer-review.md`, dynamically updating `$ROUTINE_ISSUE_NUMBER` titles with `(Issue #N)` or `(PR #M)` upon claiming so crashed runs are never anonymous.
-* **prompts:** add Prior Failure Ingestion Protocol to `autowork.md` and `peer-review.md`, inspecting past open failed routine issues to extract error logs and crash milestones before implementation or review.
-* **prompts:** add resolution-triggered auto-closure to `autowork.md` and `peer-review.md`, automatically commenting on and closing past failed routine issues for a target once work is marked ready or merged.
-* **housekeeping:** expand `issues-housekeeping.md` to sweep and close stale untargeted `status:failure` routine issues older than 48 hours or whose targets are resolved, eliminating backlog clutter.
 
 ## [1.15.1](https://github.com/juliendurandeu/jonah-fleet/compare/v1.15.0...v1.15.1) (2026-09-19)
 

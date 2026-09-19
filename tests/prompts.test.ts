@@ -107,5 +107,18 @@ describe("Structured Human Escalation Card Protocol ('Why I believe this')", () 
     expect(content).toContain("- **Evaluated Options & Trade-offs**:");
     expect(content).toContain("- **Recommended Path**:");
   });
+
+  it("validates peer-review.md mandates the 4-part escalation card on round 5 escalation (needs-human)", () => {
+    const peerReviewPath = path.join(promptsDir, "peer-review.md");
+    const content = fs.readFileSync(peerReviewPath, "utf8");
+
+    expect(content).toContain("## 🛑 Escalation: Human Decision Required");
+    expect(content).toContain("- **Decision Needed**:");
+    expect(content).toContain('- **Evidence ("Why I believe this")**:');
+    expect(content).toContain("- **Evaluated Options & Trade-offs**:");
+    expect(content).toContain("- **Recommended Path**:");
+    expect(content).toMatch(/needs-human/);
+    expect(content).toMatch(/N >= 5/);
+  });
 });
 
