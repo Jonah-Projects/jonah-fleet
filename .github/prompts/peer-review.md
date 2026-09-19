@@ -82,8 +82,18 @@ Check if `$PR_NUMBER` is set:
    - **Category A (re-review)**: PRs with prior review comments where author has pushed new fix commits.
    - **Category B (first review / unreviewed)**: Brand new PRs ready for review, or ready PRs whose previous review session failed or timed out.
 
-### Step 3: Round tracking & Starting Review marker
+### Step 3: Round tracking, Target Binding, Failure Ingestion & Starting Review marker
 
+- **Dynamic Target Binding (Scan Mode)**: If `$ROUTINE_ISSUE_NUMBER` is set and its title does not mention `(PR #${PR_NUMBER})`:
+  ```bash
+  TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+  gh issue edit "$ROUTINE_ISSUE_NUMBER" --title "[peer-review] run ${TIMESTAMP} (PR #${PR_NUMBER})" || true
+  ```
+- **Prior Review Failure Ingestion**: Query open routine run issues for `PR #${PR_NUMBER}`:
+  ```bash
+  gh issue list --label routine-log --search "PR #${PR_NUMBER}" --state open --json number,title,body
+  ```
+  If prior failed routine issues exist (carrying `status:failure` or an Interruption Card), read the Interruption Card or comments to understand what caused the previous review session to fail, crash, or timeout.
 - Post a "Starting review (round N)" comment on the target PR to claim the review window:
   - If `$ROUTINE_ISSUE_NUMBER` is set in the environment or routine prompt, include a link to the tracking log issue:
     `Starting review (round N) · [Run Log #$ROUTINE_ISSUE_NUMBER](${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/issues/${ROUTINE_ISSUE_NUMBER})`
@@ -136,8 +146,18 @@ If the PR is clean and approved for merge, but lacks a `Closes #N` tracking link
    gh pr edit <PR_NUMBER> --body "<PR Description>\n\nCloses #$ISSUE_NUMBER"
    ```
 
-### Step 6: Execute Final Action
+### Step 6: Execute Final Action & Reconcile Past Failures
 
+- **Resolve Past Failed Review Runs**: Regardless of whether the PR is merged or converted back to draft with findings, the review cycle for this round has completed successfully. Resolve and close any open past failed routine issues for `PR #${PR_NUMBER}`:
+  ```bash
+  PAST_FAILURES=$(gh issue list --label routine-log --search "PR #${PR_NUMBER}" --state open --json number --jq '.[].number' || true)
+  for past_num in $PAST_FAILURES; do
+    if [ -n "$past_num" ] && [ "$past_num" != "$ROUTINE_ISSUE_NUMBER" ]; then
+      gh issue comment "$past_num" --body "Resolved by peer-review run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID:-} (PR #${PR_NUMBER} review cycle completed)." || true
+      gh issue close "$past_num" --reason completed || true
+    fi
+  done
+  ```
 - **If Blocking findings exist**:
   - If `N < 5`: Post inline comments, submit review as `COMMENT`, and convert PR to draft (`gh pr ready <N> --undo`).
   - If `N >= 5`: Convert PR to draft, post summary comment escalating to repo maintainer, and apply `needs-human` label.

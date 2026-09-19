@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **runner:** prevent premature routine termination on async background tasks in headless mode ([6641b2b](https://github.com/juliendurandeu/jonah-fleet/commit/6641b2b2e46ab363b73d490aac1144a33a1c69f9))
 
+## [Unreleased] - 2026-09-19
+
+### Features
+
+* **orchestration:** add Routine Run Failure Ingestion & Auto-Closure Protocol to `ORCHESTRATION.md`, unifying prior failure memory and resolution lifecycle across `autowork` and `peer-review`.
+* **prompts:** add Dynamic Target Binding in Scan mode to `autowork.md` and `peer-review.md`, dynamically updating `$ROUTINE_ISSUE_NUMBER` titles with `(Issue #N)` or `(PR #M)` upon claiming so crashed runs are never anonymous.
+* **prompts:** add Prior Failure Ingestion Protocol to `autowork.md` and `peer-review.md`, inspecting past open failed routine issues to extract error logs and crash milestones before implementation or review.
+* **prompts:** add resolution-triggered auto-closure to `autowork.md` and `peer-review.md`, automatically commenting on and closing past failed routine issues for a target once work is marked ready or merged.
+* **housekeeping:** expand `issues-housekeeping.md` to sweep and close stale untargeted `status:failure` routine issues older than 48 hours or whose targets are resolved, eliminating backlog clutter.
+
 ## [Unreleased] - 2026-09-18
 
 ### Features
