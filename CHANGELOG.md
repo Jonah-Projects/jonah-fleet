@@ -5,6 +5,12 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Bug Fixes
+
+* **radar:** ensure robust options resolution in `evaluateActivity` when `orbitalData` is passed as an empty object `{}` in 4-argument invocations ([#215](https://github.com/juliendurandeu/jonah-fleet/issues/215)).
+
 ## [1.15.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.14.0...v1.15.0) (2026-09-19)
 
 
