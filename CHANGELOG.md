@@ -5,6 +5,12 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-09-19
+
+### Features
+
+* **orchestration:** adopt 4-part human escalation card in peer-review routine on round-5 escalation ([#235](https://github.com/juliendurandeu/jonah-fleet/issues/235))
+
 ## [1.15.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.14.0...v1.15.0) (2026-09-19)
 
 

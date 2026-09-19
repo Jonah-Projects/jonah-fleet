@@ -27,7 +27,7 @@ The run is SUCCESS only if ALL of these are true:
 
 - [ ] Identified the target PR: if one was named in the invocation, reviewed exactly that PR; otherwise listed open PRs and selected one by priority
 - [ ] Ran the code-review pass (`/code-review` and security pass), and posted findings as inline review comments
-- [ ] Took exactly one final action: squash-merged (if PR is good, CI green and present; executed Autonomous Issue Synthesis if unlinked; closed tracking issue explicitly if referenced) OR posted findings and **converted the PR back to draft** (`gh pr ready <N> --undo`) for author/autowork in-session fixes OR, if round cap reached at round 5 with blocking findings, converted to draft and escalated to human
+- [ ] Took exactly one final action: squash-merged (if PR is good, CI green and present; executed Autonomous Issue Synthesis if unlinked; closed tracking issue explicitly if referenced) OR posted findings and **converted the PR back to draft** (`gh pr ready <N> --undo`) for author/autowork in-session fixes OR, if round cap reached at round 5 with blocking findings, converted to draft and escalated to human via the 4-part escalation card with `needs-human`
 - [ ] If merging: captured deferred non-blocking findings per materiality bar (filed follow-up issues for material ones, batched or dropped immaterial ones)
 - [ ] If in Scan mode and no eligible PRs exist, logged SUCCESS with "No PRs to review"
 
@@ -35,7 +35,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 ## Constraints
 
-- **Max rounds per PR**: 5 — at round 5 the run must terminate in a merge (if no blocking findings remain) or human escalation, never another ordinary bounce.
+- **Max rounds per PR**: 5 — at round 5 the run must terminate in a merge (if no blocking findings remain) or human escalation (via the mandatory 4-part escalation card with `needs-human`), never another ordinary bounce.
 - **Max iterations**: 65 — after 65 tool call rounds without completing Definition of Done, STOP. Log FAILURE with category `token_limit`.
 - **Max scope**: one PR per run. Do not review a second PR after finishing the first.
 - **No speculative work**: review only the diff in the PR.
@@ -148,7 +148,16 @@ If the PR is clean and approved for merge, but lacks a `Closes #N` tracking link
 
 - **If Blocking findings exist**:
   - If `N < 5`: Post inline comments, submit review as `COMMENT`, and convert PR to draft (`gh pr ready <N> --undo`).
-  - If `N >= 5`: Convert PR to draft, post summary comment escalating to repo maintainer, and apply `needs-human` label.
+  - If `N >= 5`: Convert PR to draft, apply `needs-human` label, and post summary escalation comment to the PR formatted with the mandatory 4-part escalation card:
+    ```markdown
+    ## 🛑 Escalation: Human Decision Required
+    - **Decision Needed**: [1 focused question or choice]
+    - **Evidence ("Why I believe this")**: [Specific files, lines, test outputs, or conflicting docs]
+    - **Evaluated Options & Trade-offs**:
+      - *Option A*: [Pros / Cons]
+      - *Option B*: [Pros / Cons]
+    - **Recommended Path**: [Agent recommendation]
+    ```
 - **If Clean (or only Non-blocking findings)**:
   - If the PR branch has minor mechanical merge conflicts against `origin/main` (e.g. adjacent `CHANGELOG.md` entries from concurrent merges) while code and tests are sound, resolve the conflict mechanically via `/resolving-merge-conflicts` before squash-merging rather than bouncing the PR back to draft.
   - If PR lacks `Closes #N`, execute Autonomous Issue Synthesis (Step 5.5).

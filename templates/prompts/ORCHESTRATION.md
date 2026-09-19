@@ -296,6 +296,7 @@ How autonomous routines escalate decisions, ambiguities, and blockers to human m
    - **Recommended Path**: The agent's recommended decision and reasoning, allowing maintainers to unblock execution with a simple confirmation.
 3. **Cross-Routine Enforcement**:
    - `autowork.md`: Required when tripping the Ambiguity Gate (Step 12), encountering a 2nd-strike permanent blocker (`needs-human`), or hitting the review Ping-Pong Cap (Step 3b).
+   - `peer-review.md`: Required when round cap `N >= 5` is reached with unresolved blocking findings, applying `needs-human` and escalating to repo maintainer.
    - `triage/SKILL.md`: Required when transitioning issues or PRs to `needs-info` or `ready-for-human`.
    - `issues-housekeeping.md`: Required when auditing and escalating ambiguous, stale, or infeasible issues with `needs-human` or `needs-info`.
 
