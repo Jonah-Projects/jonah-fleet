@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.14.0...v1.15.0) (2026-09-19)
+
+
+### Features
+
+* **prompts:** restructure routine templates for 3-tier prompt prefix caching ([#239](https://github.com/juliendurandeu/jonah-fleet/issues/239)) ([a72ecc2](https://github.com/juliendurandeu/jonah-fleet/commit/a72ecc284e17f6311b52436a9e94f86d0ba9ab3a))
+
 ## [1.14.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.13.0...v1.14.0) (2026-09-19)
 
 
