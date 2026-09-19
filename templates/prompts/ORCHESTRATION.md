@@ -289,3 +289,29 @@ In headless CLI environments (`agy -p` / GitHub Actions), agent sessions termina
 1. **Zero-Yield Waiting Invariant**: Agents MUST NEVER call `schedule` or emit a terminal turn with plain text to "wait" for background commands, timers, or long-running checks. In headless mode, yielding the turn halts the process immediately with exit code 0 before reaching the Definition of Done.
 2. **Active Task Supervision**: If a verification command (`npm test`, `npm run type-check`) is sent to the background by `run_command`, the agent must actively poll `manage_task(Action='status')` or inspect code while waiting within the continuous tool-calling loop.
 3. **CI Trust Bar & Test Discipline**: Peer review routines should trust green passing remote CI checks (GitHub Actions or Vercel preview deployments) on the PR's head commit rather than initiating slow, background-prone full test runs. Run repository verification locally ONLY if CI status is unconfirmed, missing, or failing.
+
+---
+
+## Structured Human Escalation Card Protocol ("Why I believe this")
+
+How autonomous routines escalate decisions, ambiguities, and blockers to human maintainers without unbounded back-and-forth or vague questions:
+
+1. **Mandatory 4-Part Escalation Schema**: Whenever a routine cannot proceed autonomously due to ambiguity, conflicting requirements, unobservable acceptance criteria, or repeated review ping-pong—and applies `needs-human` or `needs-info`—it MUST post a comment structured as the mandatory 4-part escalation card (inspired by Orbital's Workbench Provenance format):
+   ```markdown
+   ## 🛑 Escalation: Human Decision Required
+   - **Decision Needed**: [1 focused question or choice]
+   - **Evidence ("Why I believe this")**: [Specific files, lines, test outputs, or conflicting docs]
+   - **Evaluated Options & Trade-offs**:
+     - *Option A*: [Pros / Cons]
+     - *Option B*: [Pros / Cons]
+   - **Recommended Path**: [Agent recommendation]
+   ```
+2. **Card Invariants**:
+   - **Decision Needed**: Exactly 1 high-leverage question or choice required from the maintainer or reporter. Prohibit question dumps or vague "please provide more details".
+   - **Evidence ("Why I believe this")**: Concrete artifacts, specific file paths, line numbers, test outputs, or contradicting specification documents justifying why the routine cannot proceed without human guidance.
+   - **Evaluated Options & Trade-offs**: At least two distinct, viable options with concrete pros and cons. Never ask maintainers to solve problems from scratch without agent-evaluated trade-offs.
+   - **Recommended Path**: The agent's recommended decision and reasoning, allowing maintainers to unblock execution with a simple confirmation.
+3. **Cross-Routine Enforcement**:
+   - `autowork.md`: Required when tripping the Ambiguity Gate (Step 12), encountering a 2nd-strike permanent blocker (`needs-human`), or hitting the review Ping-Pong Cap (Step 3b).
+   - `triage/SKILL.md`: Required when transitioning issues or PRs to `needs-info` or `ready-for-human`.
+   - `issues-housekeeping.md`: Required when auditing and escalating ambiguous, stale, or infeasible issues with `needs-human` or `needs-info`.

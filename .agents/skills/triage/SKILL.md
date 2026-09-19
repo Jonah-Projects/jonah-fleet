@@ -77,8 +77,17 @@ Show counts and a one-line summary per item. Let the maintainer pick.
 
 5. **Apply the outcome:**
    - `ready-for-agent`: post an agent brief comment ([AGENT-BRIEF.md](AGENT-BRIEF.md)).
-   - `ready-for-human`: same structure as an agent brief, but note why it can't be delegated (judgment calls, external access, design decisions, manual testing).
-   - `needs-info`: post triage notes (template below).
+   - `ready-for-human`: same structure as an agent brief, but note why it can't be delegated (judgment calls, external access, design decisions, manual testing) and format the maintainer escalation using the mandatory 4-part escalation card:
+     ```markdown
+     ## 🛑 Escalation: Human Decision Required
+     - **Decision Needed**: [1 focused question or choice]
+     - **Evidence ("Why I believe this")**: [Specific files, lines, test outputs, or conflicting docs]
+     - **Evaluated Options & Trade-offs**:
+       - *Option A*: [Pros / Cons]
+       - *Option B*: [Pros / Cons]
+     - **Recommended Path**: [Agent recommendation]
+     ```
+   - `needs-info`: post triage notes formatted with the mandatory 4-part escalation card (template below).
    - For `wontfix`, close the issue, with the comment depending on *why*:
      - **Already implemented**: the change already exists in the codebase. Point to where it lives; do **not** write to `.out-of-scope/` (that KB is for *rejected* requests, not built ones).
      - **Rejected (bug)**: give a polite explanation, then close.
@@ -92,20 +101,16 @@ If the maintainer says "move #42 to ready-for-agent", trust them and apply the r
 ## Needs-info template
 
 ```markdown
-## Triage Notes
-
-**What we've established so far:**
-
-- point 1
-- point 2
-
-**What we still need from you (@reporter):**
-
-- question 1
-- question 2
+## 🛑 Escalation: Human Decision Required
+- **Decision Needed**: [1 focused question or choice]
+- **Evidence ("Why I believe this")**: [Specific files, lines, test outputs, or conflicting docs]
+- **Evaluated Options & Trade-offs**:
+  - *Option A*: [Pros / Cons]
+  - *Option B*: [Pros / Cons]
+- **Recommended Path**: [Agent recommendation]
 ```
 
-Capture everything resolved during grilling under "established so far" so the work isn't lost. Questions must be specific and actionable, not "please provide more info".
+Capture everything resolved during grilling under the evidence and options sections so the work isn't lost. Questions must be specific and actionable, not "please provide more info".
 
 ## Resuming a previous session
 
