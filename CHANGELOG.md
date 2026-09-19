@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.13.0...v1.14.0) (2026-09-19)
+
+
+### Features
+
+* **workflows:** handle LLM quota limits with graceful pause (status:quota-paused) ([#240](https://github.com/juliendurandeu/jonah-fleet/issues/240)) ([98bb176](https://github.com/juliendurandeu/jonah-fleet/commit/98bb176f0b29462ab9de6baf5d0f102fee78b0ba))
+
 ## [Unreleased] - 2026-09-19
 
 ### Features
