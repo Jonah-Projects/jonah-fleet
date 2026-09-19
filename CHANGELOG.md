@@ -17,10 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **runner:** prevent premature routine termination on async background tasks in headless mode ([6641b2b](https://github.com/juliendurandeu/jonah-fleet/commit/6641b2b2e46ab363b73d490aac1144a33a1c69f9))
 
-## [Unreleased] - 2026-09-18
+## [Unreleased] - 2026-09-19
 
 ### Features
 
+* **orchestration:** standardize 'Why I believe this' structured human escalation card across autowork, triage, and housekeeping routines ([#209](https://github.com/juliendurandeu/jonah-fleet/issues/209))
 * **guard:** implement CLI runner loop-guard and circuit-breaker wrapper ([#208](https://github.com/juliendurandeu/jonah-fleet/issues/208))
 * **memory:** introduce opt-in LESSONS.md operational memory tier with 25-entry hard cap, schema configuration, and routine prompt gates ([#207](https://github.com/juliendurandeu/jonah-fleet/issues/207)).
 

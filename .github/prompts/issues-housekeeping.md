@@ -39,7 +39,17 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 3. **Priority review**: Check open P1/P2/P3 issues. Promote critical bugs or unblocked items; demote items that lack immediate priority.
 4. **Duplicate & consolidation check**: Identify duplicate issues; close duplicates with cross-references. Consolidate small, related micro-tasks into batch issues.
 5. **Premise-obsolete & stale check**: If an issue's premise was resolved by already-merged PRs or recent refactors, close as completed with evidence.
-6. **Label audit & safe prune**: Ensure open issues carry standard role labels (`needs-triage`, `ready-for-agent`, `needs-human`, etc.). Use `/triage` if classifying incoming issues. Run `npx --yes jonah-fleet labels prune --yes` (or `jonah-fleet labels prune --yes`) to safely prune strictly unused boilerplate labels (`issues: 0`, `pullRequests: 0`, non-protected taxonomy) without deleting historical or fleet taxonomy labels.
+6. **Label audit & safe prune**: Ensure open issues carry standard role labels (`needs-triage`, `ready-for-agent`, `needs-human`, etc.). Use `/triage` if classifying incoming issues. Whenever applying `needs-human` or `needs-info` to escalate an ambiguous, stale, or infeasible issue, mandate formatting the escalation comment with the 4-part card:
+   ```markdown
+   ## 🛑 Escalation: Human Decision Required
+   - **Decision Needed**: [1 focused question or choice]
+   - **Evidence ("Why I believe this")**: [Specific files, lines, test outputs, or conflicting docs]
+   - **Evaluated Options & Trade-offs**:
+     - *Option A*: [Pros / Cons]
+     - *Option B*: [Pros / Cons]
+   - **Recommended Path**: [Agent recommendation]
+   ```
+   Run `npx --yes jonah-fleet labels prune --yes` (or `jonah-fleet labels prune --yes`) to safely prune strictly unused boilerplate labels (`issues: 0`, `pullRequests: 0`, non-protected taxonomy) without deleting historical or fleet taxonomy labels.
 7. **Closed-loop verification check**: For projects running impact or verification loops, audit recently closed roadmap/feature issues against tracking issues to ensure shipped levers do not remain untracked.
 
 ### Phase 3: Summary

@@ -66,3 +66,46 @@ describe("Operational Lessons (LESSONS.md) & Prompt Integration", () => {
     expect(content).toMatch(/graduat(?:ing|e|ion)/i);
   });
 });
+
+describe("Structured Human Escalation Card Protocol ('Why I believe this')", () => {
+  const templatesDir = getTemplatesDir();
+  const promptsDir = path.join(templatesDir, "prompts");
+  const skillsDir = path.join(templatesDir, "skills");
+
+  it("validates autowork.md mandates the 4-part escalation card for needs-human and needs-info", () => {
+    const autoworkPath = path.join(promptsDir, "autowork.md");
+    const content = fs.readFileSync(autoworkPath, "utf8");
+
+    expect(content).toContain("## 🛑 Escalation: Human Decision Required");
+    expect(content).toContain("- **Decision Needed**:");
+    expect(content).toContain('- **Evidence ("Why I believe this")**:');
+    expect(content).toContain("- **Evaluated Options & Trade-offs**:");
+    expect(content).toContain("- **Recommended Path**:");
+    expect(content).toMatch(/needs-info/);
+    expect(content).toMatch(/needs-human/);
+  });
+
+  it("validates triage/SKILL.md mandates the 4-part escalation card for needs-info and human escalations", () => {
+    const triagePath = path.join(skillsDir, "triage", "SKILL.md");
+    const content = fs.readFileSync(triagePath, "utf8");
+
+    expect(content).toContain("## 🛑 Escalation: Human Decision Required");
+    expect(content).toContain("- **Decision Needed**:");
+    expect(content).toContain('- **Evidence ("Why I believe this")**:');
+    expect(content).toContain("- **Evaluated Options & Trade-offs**:");
+    expect(content).toContain("- **Recommended Path**:");
+    expect(content).toMatch(/needs-info/);
+  });
+
+  it("validates issues-housekeeping.md mandates the 4-part escalation card for human escalations", () => {
+    const housekeepingPath = path.join(promptsDir, "issues-housekeeping.md");
+    const content = fs.readFileSync(housekeepingPath, "utf8");
+
+    expect(content).toContain("## 🛑 Escalation: Human Decision Required");
+    expect(content).toContain("- **Decision Needed**:");
+    expect(content).toContain('- **Evidence ("Why I believe this")**:');
+    expect(content).toContain("- **Evaluated Options & Trade-offs**:");
+    expect(content).toContain("- **Recommended Path**:");
+  });
+});
+
