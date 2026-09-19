@@ -153,6 +153,23 @@ How live execution progress is reported during autonomous routine runs:
 6. **Harness Interruption Card**: If a routine run fails, times out, or crashes abruptly before Milestone 4, the workflow harness or local runner post-step automatically appends an Interruption Card (`### ❌ Milestone: Run Interrupted / Failed`) before marking `status:failure`.
 7. **Final State Reconciliation**: The final comment is Milestone 4 (Compact completion card). The workflow harness replaces the top-level issue body with the comprehensive telemetry & audit report (`.jonah-fleet/run-report.md`) and closes the issue on success.
 
+### Routine Run Failure Ingestion & Auto-Closure Protocol
+
+Single source of truth for handling routine run failures, context extraction, and issue tracker clutter across the fleet:
+
+1. **Dynamic Target Binding (Scan Mode)**: When `autowork` or `peer-review` starts in Scan mode, the routine tracking issue is initialized with a generic timestamp title (`[routine-name] run {timestamp}`). As soon as the runner claims an Issue or PR, it immediately updates the routine tracking issue title:
+   ```bash
+   gh issue edit "$ROUTINE_ISSUE_NUMBER" --title "[autowork] run ${TIMESTAMP} (Issue #<TARGET_ISSUE>)"
+   ```
+   (or `(PR #<PR_NUMBER>)` for PR convergence and peer review). This guarantees that even if a run is abruptly terminated, times out, or crashes midway, the resulting failure issue is explicitly tied to its target in GitHub issue lists.
+2. **Prior Failure Ingestion (Active Memory)**: Before writing code or conducting review, routines query open routine run issues for the target:
+   ```bash
+   gh issue list --label routine-log --search "Issue #<TARGET_ISSUE>" --state open --json number,title,body
+   ```
+   (or `PR #<PR_NUMBER>`). If prior failed runs exist, the runner extracts error messages, failing test names, or crash milestones from the Interruption Card and incorporates this context into Milestone 1 and its reproduction strategy, preventing repeated identical failures.
+3. **Resolution-Triggered Auto-Closure**: When a target issue or PR reaches terminal completion (a ready PR opened, review decision executed, or PR merged), the routine iterates through any open past failed routine issues for that target, posts a resolution comment referencing the successful run (including the Antigravity run footer), and closes them via `gh issue close <ISSUE> --reason completed`.
+4. **Housekeeping Garbage Collection for Untargeted Crashes**: Routine runs that fail before claiming a target (e.g. runner VM startup errors, GitHub CLI auth failures) or whose target has already been resolved are audited by `issues-housekeeping.md` and closed once older than 48 hours, keeping consumer issue lists clean and noise-free.
+
 ---
 
 ## Token Anomaly Triage & Remediation
