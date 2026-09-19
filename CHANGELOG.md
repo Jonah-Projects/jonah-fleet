@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.16.0...v1.17.0) (2026-09-19)
+
+
+### Features
+
+* **orchestration:** adopt 4-part human escalation card in peer-review routine ([#235](https://github.com/juliendurandeu/jonah-fleet/issues/235)) ([#256](https://github.com/juliendurandeu/jonah-fleet/issues/256)) ([053ef9b](https://github.com/juliendurandeu/jonah-fleet/commit/053ef9b48b7d19b1a503f59c9755b74b99624cc8))
+
 ## [Unreleased]
 
 ### Features
