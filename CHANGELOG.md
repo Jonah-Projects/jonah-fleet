@@ -12,13 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **workflows:** handle LLM quota limits with graceful pause (status:quota-paused) ([#240](https://github.com/juliendurandeu/jonah-fleet/issues/240)) ([98bb176](https://github.com/juliendurandeu/jonah-fleet/commit/98bb176f0b29462ab9de6baf5d0f102fee78b0ba))
 
-## [Unreleased] - 2026-09-19
-
-### Features
-
-* **workflows:** intercept LLM quota limit errors (`Individual quota reached`), record reset timeline, label tracking issue `status:quota-paused`, and pause routine execution gracefully with exit code 0 to prevent broken Action builds and wasted runner minutes.
-* **labels:** introduce `status:quota-paused` to core fleet label definitions.
-
 ## [1.13.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.12.0...v1.13.0) (2026-09-19)
 
 
@@ -30,10 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.12.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.11.0...v1.12.0) (2026-09-18)
 
+
+### Features
+
+* **radar:** add zqiren/Orbital to ecosystem radar and evaluation matrix ([#212](https://github.com/juliendurandeu/jonah-fleet/issues/212)) ([910febb](https://github.com/juliendurandeu/jonah-fleet/commit/910febbbc8196d53c20f05730770aae231a6b8ea)), closes [#206](https://github.com/juliendurandeu/jonah-fleet/issues/206)
+
+
 ### Bug Fixes
 
-* **runner:** detect premature routine termination caused by async background task turn yielding in headless CLI mode (`agy -p`), preventing false-positive success logging on uncompleted runs.
-* **prompts:** add Headless Execution & Asynchronous Non-Yielding Guardrail across `peer-review.md`, `autowork.md`, and `ORCHESTRATION.md` with explicit remote CI trust bar to eliminate redundant verification stalling.
+* **runner:** prevent premature routine termination on async background tasks in headless mode ([6641b2b](https://github.com/juliendurandeu/jonah-fleet/commit/6641b2b2e46ab363b73d490aac1144a33a1c69f9))
 
 ## [1.11.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.10.0...v1.11.0) (2026-09-17)
 
