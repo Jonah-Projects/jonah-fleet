@@ -61,13 +61,31 @@ export async function fetchRepoData(repo, options = {}) {
 }
 
 export function evaluateActivity(symphonyData, funesData, orbitalDataOrOptions = {}, maybeOptions = {}) {
-  const isOrbitalData = orbitalDataOrOptions && (
-    'commits' in orbitalDataOrOptions ||
-    'releases' in orbitalDataOrOptions ||
-    'pullRequests' in orbitalDataOrOptions
-  );
-  const orbitalData = isOrbitalData ? orbitalDataOrOptions : null;
-  const options = (isOrbitalData ? maybeOptions : orbitalDataOrOptions) || {};
+  let orbitalData = null;
+  let options = {};
+
+  if (arguments.length >= 4) {
+    orbitalData = orbitalDataOrOptions || null;
+    options = maybeOptions || {};
+  } else {
+    const isOptions = orbitalDataOrOptions && (
+      'lookbackDays' in orbitalDataOrOptions ||
+      'forceReport' in orbitalDataOrOptions
+    );
+    const isOrbitalData = orbitalDataOrOptions && (
+      'commits' in orbitalDataOrOptions ||
+      'releases' in orbitalDataOrOptions ||
+      'pullRequests' in orbitalDataOrOptions
+    );
+
+    if (isOptions && !isOrbitalData) {
+      orbitalData = null;
+      options = orbitalDataOrOptions || {};
+    } else {
+      orbitalData = isOrbitalData ? orbitalDataOrOptions : null;
+      options = (isOrbitalData ? maybeOptions : orbitalDataOrOptions) || {};
+    }
+  }
 
   const lookbackDays = options.lookbackDays ?? LOOKBACK_DAYS;
   const forceReport = options.forceReport ?? FORCE_REPORT;
