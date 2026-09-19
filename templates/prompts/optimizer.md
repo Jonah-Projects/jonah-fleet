@@ -71,6 +71,8 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
    - **Passive Order-Taking Anomaly ("Yes-Man Blindspot")**: The Ambiguity Gate trigger rate across intake runs in `autowork` or `triage` is <5% despite elevated PR review bounces ($\ge 2$) or high iteration usage ($\ge 35$), indicating agents are silently guessing requirements and building flawed implementations rather than interrogating underspecified issues.
    - **Speculative Runaway Waste**: An agent run consumed >50k tokens on an underspecified issue with 0 clarifying questions asked, and subsequently failed, bounced, or required post-merge rework.
 6. **Analyze resolved bugs & review comments**: Examine closed bug issues, merged bug-fix PRs, and review feedback for missing checks in authoring (`autowork.md`) or review (`peer-review.md`).
+7. **Scan & Audit Operational Lessons (`LESSONS.md`)**:
+   - Scan `LESSONS.md` during routine optimization sweeps, graduating stable rules to automated linter/CI checks or archiving stale entries to `LESSONS_ARCHIVE.md`.
 
 ### 2. Formulate preventative improvements
 
@@ -81,6 +83,7 @@ Translate findings into concrete preventative improvements and remediation trigg
 - **Ping-Pong Convergence**: For Review Loop Burn, tighten reviewer trust & noise filtering, enforce clean-merge gates, and apply ping-pong caps to prevent endless bounce cycles.
 - **Loop Discovery Mechanical Audits**: For Feedback Loop Stagnation, tighten discovery sweeps by mandating deterministic per-issue matching tables and itemized reconciliation against upstream closed issues/PRs rather than allowing un-itemized generic summary assertions.
 - **Ambiguity Gate & Benchmark Eval Feeding**: For Passive Order-Taking and Speculative Runaway Waste, tighten Step 12 criteria in `autowork.md` and `triage.md` to mandate clarifying questions, and automatically extract the problem issue into a `BenchmarkIssue` test case to feed the automated ambiguity benchmark eval suite (`tests/evals.test.ts`), ensuring future agent prompts are continuously tested against real failure cases.
+- **Operational Memory Graduation & Archiving**: Scan `LESSONS.md` to identify recurring, stable rules for graduation into automated linter rules or CI workflow checks. Move obsolete or overflow entries (>25 cap) to `LESSONS_ARCHIVE.md`.
 - **Verification & Invariant Tests**: Add automated test cases in `tests/` verifying prompt invariant preservation and schema conformity.
 
 ### 3. Open Fix PR (Local or Upstream Bridge)

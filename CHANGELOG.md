@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 * **guard:** implement CLI runner loop-guard and circuit-breaker wrapper ([#208](https://github.com/juliendurandeu/jonah-fleet/issues/208))
+* **memory:** introduce opt-in LESSONS.md operational memory tier with 25-entry hard cap, schema configuration, and routine prompt gates ([#207](https://github.com/juliendurandeu/jonah-fleet/issues/207)).
 
 ### Bug Fixes
 

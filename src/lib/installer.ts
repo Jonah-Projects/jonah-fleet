@@ -201,5 +201,18 @@ export function installFleet(targetDir: string, manifest: FleetManifest, options
     }
   }
 
+  // 6. Install LESSONS.md template if enabled in manifest and LESSONS.md does not exist
+  const lessonsEnabled = manifest.lessons === true || (typeof manifest.lessons === 'object' && manifest.lessons?.enabled);
+  if (lessonsEnabled) {
+    const lessonsPath = path.join(targetDir, 'LESSONS.md');
+    if (!fs.existsSync(lessonsPath) || options.force) {
+      const lessonsSrc = path.join(templatesDir, 'docs/LESSONS.template.md');
+      if (fs.existsSync(lessonsSrc)) {
+        fs.copyFileSync(lessonsSrc, lessonsPath);
+        result.docsInstalled.push('LESSONS.md');
+      }
+    }
+  }
+
   return result;
 }
