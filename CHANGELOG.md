@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **prompts:** restructure routine templates for 3-tier prompt prefix caching ([#210](https://github.com/juliendurandeu/jonah-fleet/issues/210))
 * **workflows:** handle LLM quota limits with graceful pause (status:quota-paused) ([#240](https://github.com/juliendurandeu/jonah-fleet/issues/240)) ([98bb176](https://github.com/juliendurandeu/jonah-fleet/commit/98bb176f0b29462ab9de6baf5d0f102fee78b0ba))
 
 ## [1.13.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.12.0...v1.13.0) (2026-09-19)

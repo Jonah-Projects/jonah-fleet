@@ -1,5 +1,13 @@
 # Product Planning
 
+<!--
+================================================================================
+TIER 1: STATIC INVARIANT PREFIX
+Routine objective, Definition of Done, constraints, instructions, and logging.
+100% cacheable across all runs and repositories.
+================================================================================
+-->
+
 ## Objective
 
 Turn strategy and evidence into **well-scoped, ready-to-build work** and a **current roadmap** — the "plan" between analytics/measurement and autowork's build phase. Each run reads roadmap priorities, closed measurement trackers (`RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]`), analytics signals, and user feedback to **propose** the next units of product work: new feature issues, feature pruning and deprecations, formal specs/PRDs for larger epics, backlog re-ranking recommendations, and roadmap updates.
@@ -79,4 +87,39 @@ Follow the Routine Issue Logging Protocol in `ORCHESTRATION.md`:
    - Prompt SHA: (run `git rev-parse --short HEAD:.github/prompts/product-planning.md` or template)
    - Staged or promoted proposals tally
 3. The surrounding execution harness will reconcile the corresponding GitHub issue.
+
+<!--
+================================================================================
+TIER 2: SEMI-STABLE PROJECT RULES
+Repository rules from AGENTS.md, manifest configurations, and LESSONS.md.
+Cacheable across consecutive runs within the same repository.
+================================================================================
+-->
+
+## Repository Rules & Project Context (Tier 2)
+
+In this tier, Product Planning ingests semi-stable repository conventions and strategic guidance:
+
+1. **Repository Conventions & Product Strategy (`AGENTS.md`, `ROADMAP.md`)**: Read `AGENTS.md` (or `CLAUDE.md` / `GEMINI.md`) and `ROADMAP.md` for current feature priorities, milestones, and architectural constraints.
+2. **Operational Memory (`LESSONS.md`)**: Ingest active operational gotchas to avoid proposing infeasible or recurring architectural patterns.
+3. **Fleet Manifest (`agents-manifest.json`)**: Ingest configured routine presets and budgets.
+4. **Engineering Skills (`.agents/skills/`)**: Leverage `domain-modeling` and `grill-me` when scoping epics and drafting specifications.
+
+<!--
+================================================================================
+TIER 3: DYNAMIC TAIL PAYLOAD
+Target issue / PR data, git diff, active branch, timestamps, and runtime vars.
+Appended strictly at the tail of the prompt to preserve prefix cache validity.
+================================================================================
+-->
+
+## Dynamic Context & Execution Payload (Tier 3)
+
+The dynamic execution context for this planning sweep is injected strictly at the tail of the prompt:
+
+- **Planning Mode & Directives**: Mode indicator (`Propose` vs `Promote`) and operator approval tokens.
+- **Input Artifacts**: Closed measurement trackers with `RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]`, open `🎨 Design Review` issues, and maintainer feedback.
+- **Runtime Metadata**: `$ROUTINE_ISSUE_NUMBER`, `$GITHUB_RUN_ID`, and runner timestamp.
+- **Prefix Caching Invariant**: Harnesses and runners MUST NEVER interpolate dynamic timestamps, run IDs, or target identifiers into Tier 1 or Tier 2 prefix blocks.
+
 

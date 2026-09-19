@@ -1,5 +1,13 @@
 # Autowork
 
+<!--
+================================================================================
+TIER 1: STATIC INVARIANT PREFIX
+Routine objective, Definition of Done, constraints, instructions, and logging.
+100% cacheable across all runs and repositories.
+================================================================================
+-->
+
 ## Objective
 
 This routine runs in two modes, decided in Step 0. In **Scan mode** (a scheduled run, no issue named): converge on existing open work before starting anything new — priority order (1) address review comments on open PRs, (2) close issues whose PRs are merged, (3) only then pick a new issue. In **Targeted mode** (fired with a specific issue in the payload): work _that_ issue as the run's objective, **ahead of** the convergence steps above — the fire exists to start its issue immediately, so an unrelated pending PR does not preempt it (Step 0.5); fall back to the Scan flow only if the target is ineligible. Either way, at most one issue may be **implemented** (code written, branch pushed) per run — the sole exception is batching up to 3 same-recipe slices of a single _umbrella_ issue into one child issue + PR (step 12a); that batch is still one concern, not a second issue. Evaluating a candidate and finding it infeasible does not count as "working" it: in Scan mode, step 12's infeasible-continuation cap lets a run evaluate up to 3 candidates for feasibility before it must stop, so a single blocked issue can't consume an entire run without any other progress being attempted.
@@ -233,3 +241,38 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
   - On **FAILURE**: If interrupted or failed, the harness posts the Interruption Card, edits the body, and marks `status:failure,needs-attention`.
   - On clean local runs outside a harness, write `.jonah-fleet/runs/{timestamp}.json`.
 - Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`.
+
+<!--
+================================================================================
+TIER 2: SEMI-STABLE PROJECT RULES
+Repository rules from AGENTS.md, manifest configurations, and LESSONS.md.
+Cacheable across consecutive runs within the same repository.
+================================================================================
+-->
+
+## Repository Rules & Project Context (Tier 2)
+
+In this tier, Autowork ingests semi-stable repository conventions, operational memory, and configuration rules that change infrequently across consecutive runs in the same repository:
+
+1. **Repository Conventions (`AGENTS.md`)**: Read `AGENTS.md` (or `CLAUDE.md` / `GEMINI.md`) for build/test/lint commands, code formatting rules, architectural guidelines, and design system tokens.
+2. **Operational Memory (`LESSONS.md`)**: If `LESSONS.md` exists, ingest active operational gotchas (`grep -E "^### \[(subsystem)\]" LESSONS.md -A 4`) to avoid known pitfalls and regression patterns (enforcing the 25-entry hard cap).
+3. **Fleet Manifest (`agents-manifest.json`)**: Ingest configured presets, model family assignments, and timeout/iteration ceilings.
+4. **Engineering Skills (`.agents/skills/`)**: Leverage domain skills (`code-review`, `codebase-design`, `diagnosing-bugs`, `domain-modeling`, `grill-me`, `resolving-merge-conflicts`, `tdd`, `triage`, `writing-for-agents`).
+
+<!--
+================================================================================
+TIER 3: DYNAMIC TAIL PAYLOAD
+Target issue / PR data, git diff, active branch, timestamps, and runtime vars.
+Appended strictly at the tail of the prompt to preserve prefix cache validity.
+================================================================================
+-->
+
+## Dynamic Context & Execution Payload (Tier 3)
+
+The dynamic execution context for this specific run is injected strictly at the tail of the prompt:
+
+- **Target Issue**: In Targeted mode, `$TARGET_ISSUE` (or `$ISSUE_NUMBER`), issue title, description, and task checklist. In Scan mode, dynamic priority selection applies.
+- **Runtime Metadata**: `$ROUTINE_ISSUE_NUMBER`, `$GITHUB_RUN_ID`, runner timestamp, and trigger event name.
+- **Active Workspace Context**: Branch name (`feat/...` or `fix/...`), git merge-base diff against `origin/main`, and test output.
+- **Prefix Caching Invariant**: Harnesses and runners MUST NEVER interpolate dynamic timestamps, run IDs, or target identifiers into Tier 1 or Tier 2 prefix blocks.
+
