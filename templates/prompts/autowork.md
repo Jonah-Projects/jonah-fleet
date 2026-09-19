@@ -45,7 +45,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 - Do not start implementing an issue before claiming it (both assignment AND claim comment).
 - Do not mark a PR ready while its `mergeable_state` is `dirty` — resolve merge conflicts first.
 - Do not fall into the **Telemetry Rabbit Hole**: do not spend cycles instrumenting elaborate fallback telemetry or defensive error handling for features that suffer from lack of user intent rather than software bugs.
-- Do not guess or invent arbitrary specifications for ambiguous issues — post clarifying questions, label `needs-info`, and release the claim instead of blindly writing code.
+- Do not guess or invent arbitrary specifications for ambiguous issues — post the 4-part escalation card ('Why I believe this'), label `needs-info`, and release the claim instead of blindly writing code.
 - Do not call `schedule` or yield the turn with plain text while waiting for background verification tasks — stay in the tool loop until the Definition of Done is met.
 
 ## Instructions
@@ -90,8 +90,17 @@ a. **Read the target issue and check eligibility.** Eligible = open, unassigned 
    - **Build & type-check verification**: run the repository's test, type-check, and lint commands from `AGENTS.md` (e.g. `npm test`, `npm run type-check`, `npm run lint`, `pytest`, `cargo test`). Confirm zero errors and zero test failures.
    - **Active Origin Sync & Clean-Merge Gate**: Run `git fetch origin main && git merge origin/main --no-edit` to absorb any newly merged pull requests and resolve any conflicts locally. Verify `git merge-tree origin/main HEAD` reports no conflicts before marking ready.
    - **Release claim on ready**: mark the PR ready (`gh pr ready <PR>`) and unassign yourself (`gh pr edit <PR> --remove-assignee <login>`) so Peer Review can evaluate without holding stale agent reservation locks.
-     Only mark the PR ready after passing every check above.
-     3b. **Ping-pong cap**: If this same PR has bounced between draft and ready 3 or more times over the same substantive finding, stop re-marking it ready. Post a comment summarizing the disagreement for human resolution and leave the PR in draft.
+      Only mark the PR ready after passing every check above.
+      3b. **Ping-pong cap**: If this same PR has bounced between draft and ready 3 or more times over the same substantive finding, stop re-marking it ready. Post the mandatory 4-part escalation card summarizing the disagreement for human resolution and leave the PR in draft:
+        ```markdown
+        ## 🛑 Escalation: Human Decision Required
+        - **Decision Needed**: [1 focused question or choice]
+        - **Evidence ("Why I believe this")**: [Specific files, lines, test outputs, or conflicting docs]
+        - **Evaluated Options & Trade-offs**:
+          - *Option A*: [Pros / Cons]
+          - *Option B*: [Pros / Cons]
+        - **Recommended Path**: [Agent recommendation]
+        ```
      3c. **Orphaned Ready PR Recovery**: If an open PR authored by this routine is `ready_for_review`, has passing CI, no unaddressed review comments, and has received no review activity for over 2 hours (e.g. because peer review crashed or encountered quota limits), kickstart the review routine by posting `/review` comment or toggling draft and ready (`gh pr ready <PR> --undo && gh pr ready <PR>`).
    - **Passing CI Verification Gate**: Verify via `gh pr view <PR> --json statusCheckRollup,mergeStateStatus` that all required and existing checks have completed with `conclusion: "SUCCESS"` and `mergeStateStatus` is `CLEAN` (neither `UNSTABLE`, `BLOCKED`, nor `DIRTY`).
    - **Unapproved/Pending Workflow Invariant**: NEVER post `/review` or toggle draft state if checks are in-progress, failing, or awaiting approval (`conclusion: "ACTION_REQUIRED"`). Doing so creates an infinite comment storm while workflows remain paused awaiting human permissions.
@@ -133,11 +142,20 @@ a. **Read the target issue and check eligibility.** Eligible = open, unassigned 
     - **Pre-Flight Memory Scan**: If `LESSONS.md` exists, grep matching subsystem tags (`grep -E "^### \[(subsystem)\]" LESSONS.md -A 4`) to incorporate known landmines into implementation plans before writing code.
     - **Ambiguity & Missing Acceptance Criteria Gate**: Challenge underspecified or incomplete requests before writing any code. If the issue lacks observable acceptance criteria, relies on unverified assumptions, or leaves critical technical/UX decisions ambiguous:
       - Do NOT guess or invent arbitrary requirements to force completion.
-      - Post a comment on the issue posing 1–3 focused clarifying questions that identify the exact decisions or trade-offs needed.
+      - Post the mandatory 4-part escalation card on the issue:
+        ```markdown
+        ## 🛑 Escalation: Human Decision Required
+        - **Decision Needed**: [1 focused question or choice]
+        - **Evidence ("Why I believe this")**: [Specific files, lines, test outputs, or conflicting docs]
+        - **Evaluated Options & Trade-offs**:
+          - *Option A*: [Pros / Cons]
+          - *Option B*: [Pros / Cons]
+        - **Recommended Path**: [Agent recommendation]
+        ```
       - Apply the `needs-info` label and release the claim (unassign).
       - Select the next candidate (evaluating ambiguous issues counts toward step 12's infeasible-continuation cap).
     - **Intent vs. Defect Guardrail**: When investigating issues related to low conversion, zero-click events, or underperforming features: verify whether the issue is a software defect or a lack of user intent. If data indicates the root cause is **lack of user intent** (e.g. button is rendered above fold and functions correctly when clicked, but user interaction rate is <2%) rather than a software defect, do NOT fall into the **telemetry rabbit hole** (adding elaborate fallback telemetry, downstream error handling, or defensive rendering). Categorize the issue as a **product/UX question** (`needs-design` / `roadmap/*`), comment explaining the lack of user intent, release the claim (unassign), and select the next candidate.
-    - If infeasible: comment explaining blocker, release claim (unassign), and select next candidate (up to 3 infeasible evaluations per run). If permanent blocker on 2nd strike, apply `needs-human` label and tag repo owner.
+    - If infeasible: comment explaining blocker, release claim (unassign), and select next candidate (up to 3 infeasible evaluations per run). If permanent blocker on 2nd strike, post the mandatory 4-part escalation card (`## 🛑 Escalation: Human Decision Required`), apply `needs-human` label, and tag repo owner.
       12a. **Umbrella-issue handoff + batching:** If candidate is an umbrella epic:
     - Read `🧭 Decomposition plan` comment (or create if first run).
     - Pick next slice(s), batching up to 3 same-recipe slices into one child issue + PR.
