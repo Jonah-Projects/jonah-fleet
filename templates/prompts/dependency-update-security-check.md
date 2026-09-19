@@ -1,5 +1,13 @@
 # Dependency Update & Security Check
 
+<!--
+================================================================================
+TIER 1: STATIC INVARIANT PREFIX
+Routine objective, Definition of Done, constraints, instructions, and logging.
+100% cacheable across all runs and repositories.
+================================================================================
+-->
+
 ## Objective
 
 Check all dependencies for available updates and known security vulnerabilities, report findings grouped by severity, and create or update GitHub issues for actionable items. Security vulnerabilities are highest priority — a vulnerability is actionable even when the affected dependency is not outdated (e.g. a transitive dependency, or an advisory with no fix released yet).
@@ -44,3 +52,36 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
 **Issue Logging Protocol**:
 - Record run execution details to `.jonah-fleet/run-report.md` (or update `$ROUTINE_ISSUE_NUMBER`).
 - Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.
+
+<!--
+================================================================================
+TIER 2: SEMI-STABLE PROJECT RULES
+Repository rules from AGENTS.md, manifest configurations, and LESSONS.md.
+Cacheable across consecutive runs within the same repository.
+================================================================================
+-->
+
+## Repository Rules & Project Context (Tier 2)
+
+In this tier, Dependency Update & Security Check ingests semi-stable repository conventions and configuration rules:
+
+1. **Repository Conventions (`AGENTS.md`)**: Read `AGENTS.md` (or `CLAUDE.md` / `GEMINI.md`) for package manager specifications (`npm`, `cargo`, `pip`), manifest paths, and security policies.
+2. **Operational Memory (`LESSONS.md`)**: Ingest active operational gotchas regarding known dependency traps, version pins, or runtime conflicts.
+3. **Fleet Manifest (`agents-manifest.json`)**: Ingest configured dependency-check schedules and budget overrides.
+
+<!--
+================================================================================
+TIER 3: DYNAMIC TAIL PAYLOAD
+Target issue / PR data, git diff, active branch, timestamps, and runtime vars.
+Appended strictly at the tail of the prompt to preserve prefix cache validity.
+================================================================================
+-->
+
+## Dynamic Context & Execution Payload (Tier 3)
+
+The dynamic execution context for this dependency sweep is injected strictly at the tail of the prompt:
+
+- **Scan Context**: Audit command stdout, outdated dependency list, and CVE advisory reports.
+- **Runtime Metadata**: `$ROUTINE_ISSUE_NUMBER`, `$GITHUB_RUN_ID`, and runner timestamp.
+- **Prefix Caching Invariant**: Harnesses and runners MUST NEVER interpolate dynamic timestamps, run IDs, or target identifiers into Tier 1 or Tier 2 prefix blocks.
+

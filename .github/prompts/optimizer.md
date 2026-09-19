@@ -1,5 +1,13 @@
 # Prompt Optimizer
 
+<!--
+================================================================================
+TIER 1: STATIC INVARIANT PREFIX
+Routine objective, Definition of Done, constraints, instructions, and logging.
+100% cacheable across all runs and repositories.
+================================================================================
+-->
+
 ## Objective
 
 Scan recent agent run logs and closed issues, diagnose four classes of problem — **failures** (runs that logged FAILURE), **inefficiency** (runs burning excessive iterations or multi-loop PRs), **token consumption & cost anomalies** (runs trending toward weekly budget ceilings), and **preventable bugs & defect avoidance** (analyzing resolved bugs to determine root causes and authoring/review prevention checks) — and propose targeted prompt, template, test, and workflow fixes via pull requests.
@@ -132,4 +140,39 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
 - **Next**: Routine finished; issue closed by harness" || true
   ```
 - Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.
+
+<!--
+================================================================================
+TIER 2: SEMI-STABLE PROJECT RULES
+Repository rules from AGENTS.md, manifest configurations, and LESSONS.md.
+Cacheable across consecutive runs within the same repository.
+================================================================================
+-->
+
+## Repository Rules & Project Context (Tier 2)
+
+In this tier, Prompt Optimizer ingests semi-stable repository conventions, operational memory, and configuration rules that change infrequently across consecutive runs in the same repository:
+
+1. **Repository Conventions (`AGENTS.md`)**: Read `AGENTS.md` (or `CLAUDE.md` / `GEMINI.md`) for baseline project guidelines, prompt conventions, and test commands.
+2. **Operational Memory (`LESSONS.md`)**: Scan `LESSONS.md` to identify candidate lessons for graduation into automated linter rules or CI workflow checks, and archive stale entries to `LESSONS_ARCHIVE.md`.
+3. **Fleet Manifest (`agents-manifest.json`)**: Ingest per-routine budget overrides, enabled routines, and model assignments to evaluate against the 70% weekly token ceiling (~8.75M tokens).
+4. **Engineering Skills (`.agents/skills/`)**: Leverage `writing-for-agents` to prune prompt sprawl and apply leading words.
+
+<!--
+================================================================================
+TIER 3: DYNAMIC TAIL PAYLOAD
+Target issue / PR data, git diff, active branch, timestamps, and runtime vars.
+Appended strictly at the tail of the prompt to preserve prefix cache validity.
+================================================================================
+-->
+
+## Dynamic Context & Execution Payload (Tier 3)
+
+The dynamic execution context for this optimization sweep is injected strictly at the tail of the prompt:
+
+- **Scan Boundary**: Incremental window timestamp established in Step 0.
+- **Runtime Metadata**: `$ROUTINE_ISSUE_NUMBER`, `$GITHUB_RUN_ID`, and runner timestamp.
+- **In-Window Telemetry**: Routine log issues (`routine-log`), failure categories, and token consumption data.
+- **Prefix Caching Invariant**: Harnesses and runners MUST NEVER interpolate dynamic timestamps, run IDs, or target identifiers into Tier 1 or Tier 2 prefix blocks.
+
 

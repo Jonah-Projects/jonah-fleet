@@ -5,17 +5,25 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-19
+## [Unreleased]
 
 ### Bug Fixes
 
 * **radar:** ensure robust options resolution in `evaluateActivity` when `orbitalData` is passed as an empty object `{}` in 4-argument invocations ([#215](https://github.com/juliendurandeu/jonah-fleet/issues/215)).
+
+## [1.15.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.14.0...v1.15.0) (2026-09-19)
+
+
+### Features
+
+* **prompts:** restructure routine templates for 3-tier prompt prefix caching ([#239](https://github.com/juliendurandeu/jonah-fleet/issues/239)) ([a72ecc2](https://github.com/juliendurandeu/jonah-fleet/commit/a72ecc284e17f6311b52436a9e94f86d0ba9ab3a))
 
 ## [1.14.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.13.0...v1.14.0) (2026-09-19)
 
 
 ### Features
 
+* **prompts:** restructure routine templates for 3-tier prompt prefix caching ([#210](https://github.com/juliendurandeu/jonah-fleet/issues/210))
 * **workflows:** handle LLM quota limits with graceful pause (status:quota-paused) ([#240](https://github.com/juliendurandeu/jonah-fleet/issues/240)) ([98bb176](https://github.com/juliendurandeu/jonah-fleet/commit/98bb176f0b29462ab9de6baf5d0f102fee78b0ba))
 
 ## [1.13.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.12.0...v1.13.0) (2026-09-19)
