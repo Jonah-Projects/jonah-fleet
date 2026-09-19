@@ -238,6 +238,23 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
     expect(withForce.shouldCreateIssue).toBe(true);
   });
 
+  it('correctly resolves options when orbitalData is passed as an empty object in 4-argument call', () => {
+    const emptySymphony = { commits: [], specCommits: [], releases: [], pullRequests: [] };
+    const emptyFunes = { commits: [], releases: [], pullRequests: [] };
+
+    const result = evaluateActivity(emptySymphony, emptyFunes, {}, {
+      lookbackDays: 14,
+      forceReport: true
+    });
+
+    expect(result.hasNewActivity).toBe(false);
+    expect(result.shouldCreateIssue).toBe(true);
+    expect(result.orbitalActivity).toBe(false);
+    const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    expect(Math.abs(result.cutoffDate.getTime() - fourteenDaysAgo)).toBeLessThan(5000);
+  });
+
+
   it('handles fetch failures gracefully and returns empty arrays', async () => {
     const originalFetch = global.fetch;
     global.fetch = vi.fn().mockRejectedValue(new Error('Network error / 403 Rate limit'));
