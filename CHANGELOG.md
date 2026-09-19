@@ -5,6 +5,15 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.12.0...v1.13.0) (2026-09-19)
+
+
+### Features
+
+* **guard:** implement CLI runner loop-guard and circuit-breaker wrapper ([#222](https://github.com/juliendurandeu/jonah-fleet/issues/222)) ([bedacc0](https://github.com/juliendurandeu/jonah-fleet/commit/bedacc0d9bc2a36276f58901ffa2f2b06e797016))
+* **memory:** introduce opt-in LESSONS.md operational memory tier ([#207](https://github.com/juliendurandeu/jonah-fleet/issues/207)) ([#219](https://github.com/juliendurandeu/jonah-fleet/issues/219)) ([13f74fa](https://github.com/juliendurandeu/jonah-fleet/commit/13f74fa2acc78554bba486b2bf77521106265f03))
+* **orchestration:** standardize 'Why I believe this' structured human escalation card ([#229](https://github.com/juliendurandeu/jonah-fleet/issues/229)) ([997e1d2](https://github.com/juliendurandeu/jonah-fleet/commit/997e1d20d7d0a3970ecca9f209841db745f99979))
+
 ## [1.12.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.11.0...v1.12.0) (2026-09-18)
 
 
