@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **prompts:** restructure routine templates for 3-tier prompt prefix caching ([#210](https://github.com/juliendurandeu/jonah-fleet/issues/210))
+
 * **orchestration:** standardize 'Why I believe this' structured human escalation card across autowork, triage, and housekeeping routines ([#209](https://github.com/juliendurandeu/jonah-fleet/issues/209))
 * **guard:** implement CLI runner loop-guard and circuit-breaker wrapper ([#208](https://github.com/juliendurandeu/jonah-fleet/issues/208))
 * **memory:** introduce opt-in LESSONS.md operational memory tier with 25-entry hard cap, schema configuration, and routine prompt gates ([#207](https://github.com/juliendurandeu/jonah-fleet/issues/207)).

@@ -1,5 +1,33 @@
 # {Routine Name}
 
+<!--
+================================================================================
+3-TIER PROMPT PREFIX CACHING ARCHITECTURE
+Inspired by Orbital v0.4.2 prefix-caching architecture.
+Partitioning prompt structures into Static -> Semi-Stable -> Dynamic tiers
+maximizes LLM prefix cache hit rates (>90%) across Gemini, Anthropic, and OpenAI
+API calls, drastically reducing latency and safeguarding Jonah Fleet's 70% weekly
+token ceiling (~8.75M tokens).
+
+- Tier 1 (Static Invariant Prefix): Routine objective, Definition of Done,
+  hard constraints, negative examples, tool schemas, claim protocols, and core instructions.
+  (100% cacheable across all runs and repositories).
+- Tier 2 (Semi-Stable Project Rules): Ingested repository rules from AGENTS.md,
+  enabled routines from manifest, active lessons from LESSONS.md.
+  (Cacheable across consecutive runs within the same repository).
+- Tier 3 (Dynamic Tail Payload): Target issue / PR data, git diff, active branch
+  name, timestamps, and transient environment variables.
+  (Appended strictly at the tail of the prompt so that any dynamic variation never
+  invalidates the prefix cache).
+================================================================================
+-->
+
+<!-- ============================================================================== -->
+<!-- TIER 1: STATIC INVARIANT PREFIX                                                 -->
+<!-- Routine objective, Definition of Done, constraints, instructions, and logging.  -->
+<!-- 100% cacheable across all runs and repositories.                                -->
+<!-- ============================================================================== -->
+
 ## Objective
 
 {One paragraph describing the goal. Be specific about scope — what is IN and OUT.}
@@ -50,3 +78,32 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
   - On clean local runs outside a harness, write `.jonah-fleet/runs/{timestamp}.json`.
 - Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`.
 
+<!-- ============================================================================== -->
+<!-- TIER 2: SEMI-STABLE PROJECT RULES                                               -->
+<!-- Repository rules from AGENTS.md, manifest configurations, and LESSONS.md.       -->
+<!-- Cacheable across consecutive runs within the same repository.                   -->
+<!-- ============================================================================== -->
+
+## Repository Rules & Project Context (Tier 2)
+
+{In this tier, the routine ingests semi-stable project definitions that change rarely across consecutive runs in the same repository:}
+
+1. **Repository Conventions (`AGENTS.md`)**: Read `AGENTS.md` (or `CLAUDE.md` / `GEMINI.md`) to align with project tech stack, build/test commands, architecture patterns, and styling guardrails.
+2. **Operational Memory (`LESSONS.md`)**: If `LESSONS.md` exists, ingest relevant operational lessons and heuristics (adhering to the 25-entry hard cap).
+3. **Fleet Manifest (`agents-manifest.json`)**: Ingest configured routine presets, model families, and timeout/iteration budgets.
+4. **Engineering Skills (`.agents/skills/`)**: Ingest project-specific or fleet engineering skills matching the task domain.
+
+<!-- ============================================================================== -->
+<!-- TIER 3: DYNAMIC TAIL PAYLOAD                                                    -->
+<!-- Target issue / PR data, git diff, active branch, timestamps, and runtime vars.  -->
+<!-- Appended strictly at the tail of the prompt to preserve prefix cache validity.  -->
+<!-- ============================================================================== -->
+
+## Dynamic Context & Execution Payload (Tier 3)
+
+{The dynamic execution context is injected strictly at the tail of the prompt so that variance across individual runs never invalidates the prefix cache established by Tier 1 and Tier 2:}
+
+- **Target Identifier**: `$TARGET_ISSUE`, `$PR_NUMBER`, or scan mode directive.
+- **Target Context**: Issue description, task checklist, PR diff, or commit messages.
+- **Runtime Metadata**: `$ROUTINE_ISSUE_NUMBER`, `$GITHUB_RUN_ID`, execution timestamps, and event payload.
+- **Prefix Caching Invariant**: Harnesses and runners MUST NEVER interpolate dynamic timestamps, run IDs, or target identifiers into Tier 1 or Tier 2 prefix blocks.
