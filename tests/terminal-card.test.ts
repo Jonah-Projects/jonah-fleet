@@ -17,6 +17,7 @@ import {
   cleanTargetTitle,
   formatTargetLabel,
   fetchTargetTitleAsync,
+  isRoutineRunTitle,
   stripAnsi,
   truncateAnsi,
 } from '../src/lib/terminal-card.js';
@@ -213,8 +214,24 @@ The build is completing. Continuing shortly.
       expect(detectClaimedIssue('Issue #77 claimed atomically.')).toBe('Issue #77');
     });
 
+    it('excludes routine run tracking issue number from claimed issue detection', () => {
+      expect(detectClaimedIssue('gh issue edit 1060 --body "..."', 1060)).toBeNull();
+      expect(detectClaimedIssue('gh issue edit 1060 --body "..." and gh issue view 1053', 1060)).toBe('Issue #1053');
+      expect(detectClaimedIssue('🔒 Claimed candidate #1060', 1060)).toBeNull();
+      expect(detectClaimedIssue('Selected candidate issue #1060 for implementation', 1060)).toBeNull();
+      expect(detectClaimedIssue('Issue #1060 claimed', 1060)).toBeNull();
+    });
+
     it('returns null when no issue is referenced', () => {
       expect(detectClaimedIssue('Checking backlog for unclaimed issues...')).toBeNull();
+    });
+
+    it('identifies routine run titles vs regular issue titles', () => {
+      expect(isRoutineRunTitle('[autowork] run 2026-09-19T08-48-55-974Z (local)')).toBe(true);
+      expect(isRoutineRunTitle('[peer-review] run 2026-09-20T11-38-11-666Z')).toBe(true);
+      expect(isRoutineRunTitle('[issues-housekeeping] run 2026-09-20T11-52-47Z')).toBe(true);
+      expect(isRoutineRunTitle('feat(cards): time-based filtering in Story Magazine')).toBe(false);
+      expect(isRoutineRunTitle('support WAF-protected feeds')).toBe(false);
     });
 
     it('detects PR from starting review comment or target PR text', () => {
