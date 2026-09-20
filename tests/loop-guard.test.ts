@@ -101,6 +101,14 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       }
       expect(guard.isTripped()).toBe(false);
     });
+
+    it('exempts manage_subagents list polling from repetition trip', () => {
+      const guard = new LoopGuard({ repetitionThreshold: 5, slidingWindowSize: 20 });
+      for (let i = 0; i < 10; i++) {
+        expect(guard.recordAction('manage_subagents', { Action: 'list' })).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+    });
   });
 
   describe('Ping-Pong Guard (Threshold = 3 alternating pairs, 6 actions)', () => {
@@ -127,6 +135,18 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       const actionB = { tool: 'manage_task', args: { Action: 'status', TaskId: 'task-1' } };
 
       // Alternate 4 pairs between schedule and manage_task status
+      for (let i = 0; i < 4; i++) {
+        expect(guard.recordAction(actionA.tool, actionA.args)).toBeNull();
+        expect(guard.recordAction(actionB.tool, actionB.args)).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+    });
+
+    it('exempts manage_subagents list polling from ping-pong trip', () => {
+      const guard = new LoopGuard({ pingPongThreshold: 3 });
+      const actionA = { tool: 'manage_task', args: { Action: 'status', TaskId: 'task-1' } };
+      const actionB = { tool: 'manage_subagents', args: { Action: 'list' } };
+
       for (let i = 0; i < 4; i++) {
         expect(guard.recordAction(actionA.tool, actionA.args)).toBeNull();
         expect(guard.recordAction(actionB.tool, actionB.args)).toBeNull();

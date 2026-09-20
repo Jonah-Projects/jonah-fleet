@@ -107,11 +107,14 @@ export class LoopGuard {
     }
 
     const isStatusPolling =
-      toolName === 'manage_task' &&
-      (args?.Action === 'status' ||
-        args?.action === 'status' ||
-        args?.Action === 'list' ||
-        args?.action === 'list');
+      (toolName === 'manage_task' &&
+        (args?.Action === 'status' ||
+          args?.action === 'status' ||
+          args?.Action === 'list' ||
+          args?.action === 'list')) ||
+      (toolName === 'manage_subagents' &&
+        (args?.Action === 'list' ||
+          args?.action === 'list'));
 
     const hash = computeActionHash(toolName, args);
     const record: ActionRecord = {
@@ -179,11 +182,14 @@ export class LoopGuard {
       const pingPongSlice = this.history.slice(-requiredPingPongLength);
       const hasStatusPolling = pingPongSlice.some(
         (item) =>
-          item.toolName === 'manage_task' &&
-          (item.args?.Action === 'status' ||
-            item.args?.action === 'status' ||
-            item.args?.Action === 'list' ||
-            item.args?.action === 'list')
+          (item.toolName === 'manage_task' &&
+            (item.args?.Action === 'status' ||
+              item.args?.action === 'status' ||
+              item.args?.Action === 'list' ||
+              item.args?.action === 'list')) ||
+          (item.toolName === 'manage_subagents' &&
+            (item.args?.Action === 'list' ||
+              item.args?.action === 'list'))
       );
 
       if (!hasStatusPolling) {
