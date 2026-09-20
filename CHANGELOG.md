@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.19.0...v1.20.0) (2026-09-20)
+
+
+### Features
+
+* **orchestration:** introduce question-driven telemetry guardrails and 3-tier measurement taxonomy ([#293](https://github.com/juliendurandeu/jonah-fleet/issues/293)) ([23cd994](https://github.com/juliendurandeu/jonah-fleet/commit/23cd994c7e928e2d57b785965a507e115cda1cc7))
+
 ## [1.19.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.18.0...v1.19.0) (2026-09-20)
 
 
