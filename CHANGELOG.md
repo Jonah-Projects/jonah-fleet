@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Bug Fixes
+
+* **runner:** prevent routine tracking issues from being mistakenly claimed as target issues via `excludeIssueNumber` and `isRoutineRunTitle` guardrails.
+* **prompts:** classify circular self-referencing and routine-log targets as untargeted failures in `issues-housekeeping` and `autowork` sweeps.
+
 ### Features
 
 * **guard:** exempt `manage_subagents` list polling from action repetition and ping-pong circuit breaker trips in loop guard and runner scripts.

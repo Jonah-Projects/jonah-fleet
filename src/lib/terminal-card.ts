@@ -179,6 +179,13 @@ export async function fetchTargetTitleAsync(repoRoot: string, target: string): P
 }
 
 /**
+ * Returns true if a title represents an autonomous routine execution log rather than a target backlog issue.
+ */
+export function isRoutineRunTitle(title: string): boolean {
+  return /^\[(autowork|peer-review|optimizer|issues-housekeeping|design-review)\]\s+run\b/i.test(title.trim());
+}
+
+/**
  * Strips temporary worktree roots and converts absolute worktree paths to clean relative paths.
  */
 export function sanitizeWorktreePaths(text: string): string {
@@ -409,23 +416,37 @@ export function detectActivePhase(chunk: string, currentPhase: string = 'Executi
 
 /**
  * Detects if the agent has selected or claimed a specific issue in Scan mode.
+ * Excludes the routine's own tracking issue number if provided.
  */
-export function detectClaimedIssue(chunk: string): string | null {
+export function detectClaimedIssue(chunk: string, excludeIssueNumber?: number): string | null {
+  const isExcluded = (numStr: string): boolean => {
+    if (!excludeIssueNumber) return false;
+    return parseInt(numStr, 10) === excludeIssueNumber;
+  };
+
   // Pattern 1: 🔒 Claimed ... #123
-  const claimMatch = chunk.match(/🔒\s*Claimed[^\n#]*?#(\d+)/i);
-  if (claimMatch) return `Issue #${claimMatch[1]}`;
+  const claimMatches = chunk.matchAll(/🔒\s*Claimed[^\n#]*?#(\d+)/gi);
+  for (const m of claimMatches) {
+    if (!isExcluded(m[1])) return `Issue #${m[1]}`;
+  }
 
   // Pattern 2: gh issue (view|edit|comment|develop) 123
-  const ghMatch = chunk.match(/gh\s+issue\s+(?:view|edit|comment|develop)\s+(\d+)/i);
-  if (ghMatch) return `Issue #${ghMatch[1]}`;
+  const ghMatches = chunk.matchAll(/gh\s+issue\s+(?:view|edit|comment|develop)\s+(\d+)/gi);
+  for (const m of ghMatches) {
+    if (!isExcluded(m[1])) return `Issue #${m[1]}`;
+  }
 
   // Pattern 3: Candidate issue #123, Selected issue #123, Claiming issue #123
-  const textMatch = chunk.match(/(?:selected|claimed|claiming|target(?:ing)?|working|candidate)\s+(?:candidate\s+)?issue\s+#?(\d+)/i);
-  if (textMatch) return `Issue #${textMatch[1]}`;
+  const textMatches = chunk.matchAll(/(?:selected|claimed|claiming|target(?:ing)?|working|candidate)\s+(?:candidate\s+)?issue\s+#?(\d+)/gi);
+  for (const m of textMatches) {
+    if (!isExcluded(m[1])) return `Issue #${m[1]}`;
+  }
 
   // Pattern 4: Issue #123 claimed
-  const passiveMatch = chunk.match(/issue\s+#(\d+)\s+(?:claimed|selected)/i);
-  if (passiveMatch) return `Issue #${passiveMatch[1]}`;
+  const passiveMatches = chunk.matchAll(/issue\s+#(\d+)\s+(?:claimed|selected)/gi);
+  for (const m of passiveMatches) {
+    if (!isExcluded(m[1])) return `Issue #${m[1]}`;
+  }
 
   return null;
 }

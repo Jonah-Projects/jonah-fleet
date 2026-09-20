@@ -15,6 +15,7 @@ import {
   cleanTargetTitle,
   formatTargetLabel,
   fetchTargetTitleAsync,
+  isRoutineRunTitle,
   renderSummaryCard,
   renderErrorCard,
   stripAnsi,
@@ -905,7 +906,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
   const checkTargetDetection = (text: string) => {
     if (dynamicTargetDetected || !text) return;
     const detected =
-      routine === 'peer-review' ? detectClaimedPR(text) : detectClaimedIssue(text);
+      routine === 'peer-review' ? detectClaimedPR(text) : detectClaimedIssue(text, routineIssueNumber);
     if (detected) {
       dynamicTargetDetected = true;
       targetLabel = detected;
@@ -917,6 +918,12 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
       fetchTargetTitleAsync(executionDir, detected)
         .then((fetchedTitle) => {
           if (fetchedTitle) {
+            if (isRoutineRunTitle(fetchedTitle)) {
+              // Not a real target backlog issue, this was a routine run issue
+              dynamicTargetDetected = false;
+              targetLabel = routine;
+              return;
+            }
             targetTitle = fetchedTitle;
             targetLabel = formatTargetLabel(detected, fetchedTitle);
             options.onTargetDetected?.(targetLabel);
