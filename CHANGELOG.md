@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.1](https://github.com/juliendurandeu/jonah-fleet/compare/v1.23.0...v1.23.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* **runner,prompts:** prevent routine run tracking self-targeting and clarify untargeted failure sweeps ([#328](https://github.com/juliendurandeu/jonah-fleet/issues/328)) ([7762007](https://github.com/juliendurandeu/jonah-fleet/commit/7762007b48f4566863e664f18feae6941e72cbb8))
+
 ## [1.23.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.22.0...v1.23.0) (2026-09-20)
 
 
