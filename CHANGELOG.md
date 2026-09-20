@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **prompts:** add Prior Failure Ingestion Protocol to `autowork.md` and `peer-review.md`, inspecting past open failed routine issues to extract error logs and crash milestones before implementation or review.
 * **prompts:** add resolution-triggered auto-closure to `autowork.md` and `peer-review.md`, automatically commenting on and closing past failed routine issues for a target once work is marked ready or merged.
 * **housekeeping:** expand `issues-housekeeping.md` to sweep and close stale untargeted `status:failure` routine issues older than 48 hours or whose targets are resolved, eliminating backlog clutter.
+* **autowork:** add opportunistic operational log sweep (idle GC) to Step 9 in `autowork.md`, cleaning up stale untargeted failures when the issue backlog is clear.
 
 ## [1.16.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.15.1...v1.16.0) (2026-09-19)
 
