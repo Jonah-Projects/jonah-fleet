@@ -86,6 +86,21 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       expect(trip).toBeNull();
       expect(guard.isTripped()).toBe(false);
     });
+
+    it('exempts manage_task status and list polling from repetition trip', () => {
+      const guard = new LoopGuard({ repetitionThreshold: 5, slidingWindowSize: 20 });
+      // Calling manage_task status 10 times in a row should NOT trip repetition
+      for (let i = 0; i < 10; i++) {
+        expect(guard.recordAction('manage_task', { Action: 'status', TaskId: 'task-123' })).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+
+      // Calling manage_task list 10 times in a row should also NOT trip repetition
+      for (let i = 0; i < 10; i++) {
+        expect(guard.recordAction('manage_task', { Action: 'list' })).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+    });
   });
 
   describe('Ping-Pong Guard (Threshold = 3 alternating pairs, 6 actions)', () => {
@@ -104,6 +119,19 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       expect(trip).not.toBeNull();
       expect(trip?.reason).toBe('ping_pong');
       expect(guard.isTripped()).toBe(true);
+    });
+
+    it('exempts manage_task status and list polling from ping-pong trip', () => {
+      const guard = new LoopGuard({ pingPongThreshold: 3 });
+      const actionA = { tool: 'schedule', args: { DurationSeconds: 60 } };
+      const actionB = { tool: 'manage_task', args: { Action: 'status', TaskId: 'task-1' } };
+
+      // Alternate 4 pairs between schedule and manage_task status
+      for (let i = 0; i < 4; i++) {
+        expect(guard.recordAction(actionA.tool, actionA.args)).toBeNull();
+        expect(guard.recordAction(actionB.tool, actionB.args)).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
     });
 
     it('does not trip on 2 alternating pairs (A-B-A-B)', () => {
@@ -174,6 +202,21 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       expect(guard.recordAction('run_command', { CommandLine: 'cat foo.txt' }, true)).toBeNull();
       expect(guard.recordAction('run_command', { CommandLine: 'cat bar.txt' }, true)).toBeNull();
       expect(guard.isTripped()).toBe(false);
+    });
+
+    it('trips on consecutive errors even for manage_task status polling', () => {
+      const guard = new LoopGuard({ consecutiveErrorThreshold: 2 });
+      const tool = 'manage_task';
+      const args = { Action: 'status', TaskId: 'invalid-id' };
+
+      expect(guard.recordAction(tool, args, true)).toBeNull();
+      expect(guard.isTripped()).toBe(false);
+
+      const trip = guard.recordAction(tool, args, true);
+      expect(trip).not.toBeNull();
+      expect(trip?.reason).toBe('consecutive_errors');
+      expect(trip?.toolName).toBe('manage_task');
+      expect(guard.isTripped()).toBe(true);
     });
   });
 

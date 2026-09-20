@@ -168,9 +168,9 @@ Single source of truth for handling routine run failures, context extraction, an
    ```
    (or `PR #<PR_NUMBER>`). If prior failed runs exist, the runner extracts error messages, failing test names, or crash milestones from the Interruption Card and incorporates this context into Milestone 1 and its reproduction strategy, preventing repeated identical failures.
 3. **Resolution-Triggered Auto-Closure**: When a target issue or PR reaches terminal completion (a ready PR opened, review decision executed, or PR merged), the routine iterates through any open past failed routine issues for that target, posts a resolution comment referencing the successful run (including the Antigravity run footer), and closes them via `gh issue close <ISSUE> --reason completed`.
-4. **Garbage Collection for Untargeted / Stale Crashes (Housekeeping & Idle Autowork)**: Routine runs that fail before claiming a target (e.g. runner VM startup errors, GitHub CLI auth failures) or whose target has already been resolved are audited and closed once older than 48 hours by:
-   - `issues-housekeeping.md` during scheduled backlog maintenance sweeps.
-   - `autowork.md` Step 9 as an opportunistic idle sweep when no eligible unclaimed work exists, ensuring repositories running minimal presets without dedicated housekeeping crons stay pristine.
+4. **Garbage Collection for Untargeted / Stale Crashes (Housekeeping & Idle Autowork)**: Routine failure runs are audited and closed by `issues-housekeeping.md` (scheduled sweeps) and `autowork.md` Step 9 (opportunistic idle sweep):
+   - **Target Resolved**: If the routine failure references a target issue or PR that is already closed or merged, it is closed **immediately** (0-hour delay).
+   - **Untargeted Runner Crash**: Routine runs that fail before claiming a target (e.g. runner VM startup errors, GitHub CLI auth failures, or generic crashes without a target) are closed once older than **12 hours**.
 
 ---
 
