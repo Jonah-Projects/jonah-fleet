@@ -256,7 +256,7 @@ export function buildRoutinePrompt(
   const logPrompt = options.routineIssueNumber
     ? ` Tracking run log issue: #${options.routineIssueNumber}.`
     : '';
-  const headlessGuardrail = ` Execution Guardrail: You are executing in a headless autonomous session. You MUST NEVER call schedule or yield your turn with plain text to wait on background tasks or verification checks. If a verification command (tests, type-check, lint) runs in the background, actively inspect its completion with manage_task or execute commands with sufficient WaitMsBeforeAsync. Never stop calling tools or yield your turn until the routine's terminal Definition of Done is fully reached.`;
+  const headlessGuardrail = ` Execution Guardrail: You are executing in a headless autonomous session. You MUST NEVER call schedule or yield your turn with plain text to wait on background tasks or verification checks. If a verification command (tests, type-check, lint) runs in the background, inspect its completion with manage_task(Action='status') or manage_subagents(Action='list') (status polling with these tools is explicitly exempted from loop guard circuit breakers), or execute commands with sufficient WaitMsBeforeAsync (up to 10000 ms). DO NOT busy-wait by repeatedly calling read tools (such as view_file) on unchanged files to pass time while waiting, as calling non-polling tools with identical parameters will trip the loop circuit breaker. Never stop calling tools or yield your turn until the routine's terminal Definition of Done is fully reached.`;
 
   if (routine === 'autowork') {
     if (options.issue) {

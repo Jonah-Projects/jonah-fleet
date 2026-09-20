@@ -23,14 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
-* **orchestration:** adopt Chief of Staff verification discipline, mandatory Red Gate protocol, Bogus Green Check defect taxonomy, disk read-back verification, and precision path-scoped git commits across prompts and engineering skills.
-* **prompts:** embed 6-part Bogus Green Check defect taxonomy (Vacuous assertion, Silent no-match, Errored check, Wrong reference, Stale premise, Scope mismatch) into `peer-review.md` and `/code-review`.
-* **prompts:** add mandatory Red Gate pre-implementation check to `autowork.md` and `/tdd`, catching already-resolved tasks and vacuous tests before code changes.
-* **prompts:** enforce disk read-back verification directly from written files and precision path-scoped git commits (`git commit -m "..." -- <paths>`).
-* **prompts:** enforce autonomous surfacing cadence without rhetorical permission halts ("Shall I continue?") across routines.
-* **guard:** exempt `manage_task` status and list polling from action repetition and ping-pong circuit breaker trips in `run-with-loop-guard.js`.
-* **housekeeping:** close `status:failure` routine log issues immediately (0-hour delay) if target is already closed or merged, and lower untargeted runner crash threshold to 12 hours.
-* **autowork:** update Step 9 idle sweep to close resolved-target failures immediately and untargeted crashes after 12 hours.
+* **guard:** exempt `manage_subagents` list polling from action repetition and ping-pong circuit breaker trips in loop guard and runner scripts.
+* **orchestration:** clarify background task wait guidance in prompts and runner guardrails to prohibit busy-waiting on unchanged files (`view_file`) during headless execution.
 
 ## [1.20.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.19.0...v1.20.0) (2026-09-20)
 

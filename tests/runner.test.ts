@@ -79,6 +79,9 @@ describe('Local Routine Runner', () => {
     const prompt = buildRoutinePrompt(tmpRepo, 'peer-review', { pr: 105 });
     expect(prompt).toContain('Execution Guardrail: You are executing in a headless autonomous session');
     expect(prompt).toContain('NEVER call schedule or yield your turn with plain text');
+    expect(prompt).toContain("manage_task(Action='status')");
+    expect(prompt).toContain("manage_subagents(Action='list')");
+    expect(prompt).toContain('DO NOT busy-wait');
   });
 
   it('builds agy invocation args with stream-json output format', () => {
