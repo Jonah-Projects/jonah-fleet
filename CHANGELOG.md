@@ -5,6 +5,14 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Features
+
+* **guard:** exempt `manage_task` status and list polling from action repetition and ping-pong circuit breaker trips in `run-with-loop-guard.js`.
+* **housekeeping:** close `status:failure` routine log issues immediately (0-hour delay) if target is already closed or merged, and lower untargeted runner crash threshold to 12 hours.
+* **autowork:** update Step 9 idle sweep to close resolved-target failures immediately and untargeted crashes after 12 hours.
+
 ## [1.20.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.19.0...v1.20.0) (2026-09-20)
 
 
@@ -32,19 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 * **orchestration:** adopt 4-part human escalation card in peer-review routine ([#235](https://github.com/juliendurandeu/jonah-fleet/issues/235)) ([#256](https://github.com/juliendurandeu/jonah-fleet/issues/256)) ([053ef9b](https://github.com/juliendurandeu/jonah-fleet/commit/053ef9b48b7d19b1a503f59c9755b74b99624cc8))
-
-## [Unreleased]
-
-### Features
-
-* **guard:** execute routine GitHub Actions workflows via run-with-loop-guard wrapper script ([#227](https://github.com/juliendurandeu/jonah-fleet/issues/227))
-* **orchestration:** adopt 4-part human escalation card in peer-review routine on round-5 escalation ([#235](https://github.com/juliendurandeu/jonah-fleet/issues/235))
-* **orchestration:** add Routine Run Failure Ingestion & Auto-Closure Protocol to `ORCHESTRATION.md`, unifying prior failure memory and resolution lifecycle across `autowork` and `peer-review`.
-* **prompts:** add Dynamic Target Binding in Scan mode to `autowork.md` and `peer-review.md`, dynamically updating `$ROUTINE_ISSUE_NUMBER` titles with `(Issue #N)` or `(PR #M)` upon claiming so crashed runs are never anonymous.
-* **prompts:** add Prior Failure Ingestion Protocol to `autowork.md` and `peer-review.md`, inspecting past open failed routine issues to extract error logs and crash milestones before implementation or review.
-* **prompts:** add resolution-triggered auto-closure to `autowork.md` and `peer-review.md`, automatically commenting on and closing past failed routine issues for a target once work is marked ready or merged.
-* **housekeeping:** expand `issues-housekeeping.md` to sweep and close stale untargeted `status:failure` routine issues older than 48 hours or whose targets are resolved, eliminating backlog clutter.
-* **autowork:** add opportunistic operational log sweep (idle GC) to Step 9 in `autowork.md`, cleaning up stale untargeted failures when the issue backlog is clear.
 
 ## [1.16.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.15.1...v1.16.0) (2026-09-19)
 
