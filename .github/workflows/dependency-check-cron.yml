@@ -139,6 +139,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTIGRAVITY_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+          ROUTINE: dependency-update-security-check
           ROUTINE_ISSUE_NUMBER: ${{ steps.run-issue.outputs.issue_number }}
           MODEL: ${{ steps.routine-config.outputs.model || 'gemini-3.8-flash-medium' }}
           PRINT_TIMEOUT: ${{ steps.routine-config.outputs.print_timeout || '25m' }}
@@ -149,7 +150,8 @@ jobs:
           PROMPT="You are the Dependency Update & Security Check routine. Read and follow .github/prompts/dependency-update-security-check.md exactly. Check dependencies for updates and vulnerabilities, and create or update tracking issues."
 
           set +e
-          agy -p "$PROMPT" \
+          node .github/scripts/run-with-loop-guard.js \
+            -p "$PROMPT" \
             --model "$MODEL" \
             --output-format text \
             --print-timeout "$PRINT_TIMEOUT" \

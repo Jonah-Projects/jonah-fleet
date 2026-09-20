@@ -161,6 +161,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTIGRAVITY_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+          ROUTINE: analytics-review
           ROUTINE_ISSUE_NUMBER: ${{ steps.run-issue.outputs.issue_number }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
@@ -174,7 +175,8 @@ jobs:
           PROMPT="You are the Analytics Review routine for this repository. Read and follow the instructions in .github/prompts/analytics-review.md exactly. ${SKILLS_PROMPT}"
 
           set +e
-          agy -p "$PROMPT" \
+          node .github/scripts/run-with-loop-guard.js \
+            -p "$PROMPT" \
             --model "$MODEL" \
             --output-format text \
             --print-timeout "$PRINT_TIMEOUT" \
