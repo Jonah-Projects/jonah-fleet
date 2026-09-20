@@ -63,6 +63,13 @@ export class LoopGuard {
   recordAction(toolName, args, isError = false) {
     if (this.trippedResult) return this.trippedResult;
 
+    const isStatusPolling =
+      toolName === 'manage_task' &&
+      (args?.Action === 'status' ||
+        args?.action === 'status' ||
+        args?.Action === 'list' ||
+        args?.action === 'list');
+
     const hash = computeActionHash(toolName, args);
     const record = {
       toolName,
@@ -98,51 +105,64 @@ export class LoopGuard {
     this.history.push(record);
 
     // 2. Repetition Guard within sliding window
-    const windowStart = Math.max(0, this.history.length - this.slidingWindowSize);
-    const currentWindow = this.history.slice(windowStart);
+    if (!isStatusPolling) {
+      const windowStart = Math.max(0, this.history.length - this.slidingWindowSize);
+      const currentWindow = this.history.slice(windowStart);
 
-    let repetitionCount = 0;
-    for (const item of currentWindow) {
-      if (item.hash === hash) {
-        repetitionCount++;
+      let repetitionCount = 0;
+      for (const item of currentWindow) {
+        if (item.hash === hash) {
+          repetitionCount++;
+        }
       }
-    }
 
-    if (repetitionCount >= this.repetitionThreshold) {
-      return this.triggerTrip({
-        reason: 'repetition',
-        message: `Action repetition loop detected: tool '${toolName}' called ${repetitionCount} times with identical parameters within sliding window of ${this.slidingWindowSize}.`,
-        toolName,
-        actionHash: hash,
-        count: repetitionCount,
-      });
+      if (repetitionCount >= this.repetitionThreshold) {
+        return this.triggerTrip({
+          reason: 'repetition',
+          message: `Action repetition loop detected: tool '${toolName}' called ${repetitionCount} times with identical parameters within sliding window of ${this.slidingWindowSize}.`,
+          toolName,
+          actionHash: hash,
+          count: repetitionCount,
+        });
+      }
     }
 
     // 3. Ping-Pong Guard: 3 consecutive alternating pairs (length 6)
     const requiredPingPongLength = this.pingPongThreshold * 2;
     if (this.history.length >= requiredPingPongLength) {
       const pingPongSlice = this.history.slice(-requiredPingPongLength);
-      const hashA = pingPongSlice[0].hash;
-      const hashB = pingPongSlice[1].hash;
+      const hasStatusPolling = pingPongSlice.some(
+        (item) =>
+          item.toolName === 'manage_task' &&
+          (item.args?.Action === 'status' ||
+            item.args?.action === 'status' ||
+            item.args?.Action === 'list' ||
+            item.args?.action === 'list')
+      );
 
-      if (hashA !== hashB) {
-        let isPingPong = true;
-        for (let i = 0; i < requiredPingPongLength; i++) {
-          const expectedHash = i % 2 === 0 ? hashA : hashB;
-          if (pingPongSlice[i].hash !== expectedHash) {
-            isPingPong = false;
-            break;
+      if (!hasStatusPolling) {
+        const hashA = pingPongSlice[0].hash;
+        const hashB = pingPongSlice[1].hash;
+
+        if (hashA !== hashB) {
+          let isPingPong = true;
+          for (let i = 0; i < requiredPingPongLength; i++) {
+            const expectedHash = i % 2 === 0 ? hashA : hashB;
+            if (pingPongSlice[i].hash !== expectedHash) {
+              isPingPong = false;
+              break;
+            }
           }
-        }
 
-        if (isPingPong) {
-          return this.triggerTrip({
-            reason: 'ping_pong',
-            message: `Alternating ping-pong action loop detected: ${this.pingPongThreshold} consecutive alternating cycles between tools (A-B-A-B-A-B).`,
-            toolName,
-            actionHash: hash,
-            count: this.pingPongThreshold,
-          });
+          if (isPingPong) {
+            return this.triggerTrip({
+              reason: 'ping_pong',
+              message: `Alternating ping-pong action loop detected: ${this.pingPongThreshold} consecutive alternating cycles between tools (A-B-A-B-A-B).`,
+              toolName,
+              actionHash: hash,
+              count: this.pingPongThreshold,
+            });
+          }
         }
       }
     }
