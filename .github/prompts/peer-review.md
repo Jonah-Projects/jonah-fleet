@@ -131,8 +131,11 @@ Check if `$PR_NUMBER` is set:
    - **WCAG AA Contrast**: Enforce minimum 4.5:1 contrast on readable text (e.g. `text-gray-400` minimum on dark surfaces; avoid muted unreadable text).
    - **CTA Hierarchy**: Verify at most one primary forward CTA (`.btn-primary`) per active screen/tab.
    - **Mobile Viewport Budget**: Verify that new banners, nudges, or sticky elements do not stack concurrently above the fold on mobile viewports (~390px).
-4. If PR modifies rendered UI, verify screenshots or visual components if tooling/scripts are available.
-5. Run repository verification commands (tests, type-check) ONLY if CI status is unconfirmed or failing. If remote CI (such as GitHub Actions or Vercel preview) is already green and passing on the head commit, treat CI as verified. If verification commands must be run locally, specify `WaitMsBeforeAsync: 10000` and NEVER call `schedule` or yield the turn with plain text while waiting for background tasks.
+4. **Telemetry & Measurement Contract Pass**:
+   - **Question-First Validation**: Verify that any new custom analytics events answer a clear, decision-driving question per the 3-Tier Taxonomy in `AGENTS.md`. Flag vanity click-trackers on Tier 3 passive chrome/easter eggs as non-blocking cleanup (recommend removal).
+   - **Funnel Completeness**: For new Tier 1 user funnels or critical workflows, verify the telemetry contract: impression denominator (`_shown`), interaction (`_clicked`), and failure states (`_failed` with `reason`) are captured, and events are documented in the custom events catalog (`ARCHITECTURE.md` / `DATA_CONTEXT.md`). Flag missing denominators on core funnels as blocking.
+5. If PR modifies rendered UI, verify screenshots or visual components if tooling/scripts are available.
+6. Run repository verification commands (tests, type-check) ONLY if CI status is unconfirmed or failing. If remote CI (such as GitHub Actions or Vercel preview) is already green and passing on the head commit, treat CI as verified. If verification commands must be run locally, specify `WaitMsBeforeAsync: 10000` and NEVER call `schedule` or yield the turn with plain text while waiting for background tasks.
 
 ### Step 5: Classify Findings & Make Decision
 
