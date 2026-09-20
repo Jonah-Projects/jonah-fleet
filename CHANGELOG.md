@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.21.0...v1.22.0) (2026-09-20)
+
+
+### Features
+
+* **orchestration:** adopt Chief of Staff verification and Red Gate discipline ([#308](https://github.com/juliendurandeu/jonah-fleet/issues/308)) ([7e669de](https://github.com/juliendurandeu/jonah-fleet/commit/7e669de7e56a0fbe0feb0f694b2d29439416b421))
+
 ## [1.21.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.20.0...v1.21.0) (2026-09-20)
 
 
