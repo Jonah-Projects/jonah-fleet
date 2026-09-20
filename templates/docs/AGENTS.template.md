@@ -47,6 +47,15 @@ tests/            # Test suites
 - **Zero-Guesswork Ambiguity Gate**: Never make silent assumptions about underspecified requirements, schemas, edge cases, or UX flows. Stop and ask clarifying questions before implementation.
 - **Structured Clarifications & Grilling**: When asking questions, propose 1–2 high-leverage questions at a time with concrete options or trade-offs. For complex features or fuzzy requirements, invoke `/grill-me` to stress-test the design before writing code.
 
+## Telemetry & Measurement Intent
+
+- **Question-First Principle**: Every custom analytics event must answer an explicit question that influences a product, architectural, or growth decision. If observing an event would never change what is built, prioritized, or retired, do NOT instrument it.
+- **3-Tier Telemetry Taxonomy**:
+  - **Tier 1 (Core Funnel & Growth Levers)**: Acquisition, activation, retention, referral, revenue (North Star metrics). Instrumentation is **mandatory and rigorous**: must include impression denominator (`_shown`), interaction CTA (`_clicked`), outcome/completion (`_completed`), and structured failure/abandonment branches (`_failed` with `reason`). Must pair with a companion `Measure: ...` tracking issue.
+  - **Tier 2 (Exploratory Product UX & Feature Flags)**: Secondary features and discovery surfaces. Instrument only when tied to an explicit hypothesis or UX discovery question in the issue specification.
+  - **Tier 3 (Passive Chrome & Utility / Easter Eggs)**: Cosmetic toggles, credits popovers, dismiss buttons, informational tooltips. **Explicitly exempt from custom events**; rely on autocapture, web vitals, or session replay if diagnostic data is ever needed.
+- **Zero Vanity Tracking Guardrail**: Never emit telemetry purely for checklist compliance. Avoid adding arbitrary click trackers to passive or cosmetic UI surfaces.
+
 ## Conventions
 
 - **Language**: All code, comments, commit messages, and PR titles must be written in **English**.

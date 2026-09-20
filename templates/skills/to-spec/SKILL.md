@@ -64,6 +64,19 @@ A list of testing decisions that were made. Include:
 - Which modules will be tested
 - Prior art for the tests (i.e. similar types of tests in the codebase)
 
+## Telemetry & Measurement Decisions
+
+A list of measurement decisions for this feature based on the 3-Tier Telemetry Taxonomy:
+
+- **Tier Classification**: State whether this surface is Tier 1 (Core Funnel & Growth Levers), Tier 2 (Exploratory Product UX), or Tier 3 (Passive Chrome & Utility / Easter Eggs).
+- **If Tier 1 or Tier 2**:
+  - **Question this answers**: What concrete product, growth, or UX decision will this data influence?
+  - **Metric & Denominator**: What is the impression denominator (e.g. `_shown`) and target metric defining success or failure?
+  - **Events & Properties**: Required event names (`snake_case`), triggers, key properties, and structured failure/abandonment states (`reason`).
+  - **Measurement issue**: Outline the companion `Measure: ...` tracking issue to be filed upon merge.
+- **If Tier 3**:
+  - Explicitly declare: `Telemetry: None (Tier 3 utility/cosmetic — no decision value).` Do NOT add vanity click trackers.
+
 ## Out of Scope
 
 A description of the things that are out of scope for this spec.
