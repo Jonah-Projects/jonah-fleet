@@ -188,6 +188,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTIGRAVITY_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+          ROUTINE: autowork
           TARGET_ISSUE: ${{ inputs.issue_number }}
           ROUTINE_ISSUE_NUMBER: ${{ steps.run-issue.outputs.issue_number }}
           MODE: ${{ inputs.mode || 'targeted' }}
@@ -210,7 +211,8 @@ jobs:
           fi
 
           set +e
-          agy -p "$PROMPT" \
+          node .github/scripts/run-with-loop-guard.js \
+            -p "$PROMPT" \
             --model "$MODEL" \
             --output-format text \
             --print-timeout "$PRINT_TIMEOUT" \

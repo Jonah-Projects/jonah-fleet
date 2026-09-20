@@ -238,6 +238,40 @@ describe('Workflow Validation & Invariants', () => {
     }
   });
 
+  it('ensures all routine workflows execute through run-with-loop-guard.js wrapper with byte-for-byte template parity', () => {
+    const routineWorkflows = [
+      'autowork-cron.yml',
+      'dependency-check-cron.yml',
+      'issues-housekeeping-cron.yml',
+      'prompt-optimizer-cron.yml',
+      'trigger-autowork-manual.yml',
+      'trigger-autowork-on-bug.yml',
+      'trigger-autowork-on-merge.yml',
+      'trigger-review-routine.yml',
+      'analytics-review-cron.yml',
+      'design-review-cron.yml',
+    ];
+
+    for (const file of routineWorkflows) {
+      const templatePath = path.join(workflowsDir, file);
+      expect(fs.existsSync(templatePath), `Template ${file} should exist`).toBe(true);
+      const templateContent = fs.readFileSync(templatePath, 'utf8');
+
+      expect(templateContent).toContain('node .github/scripts/run-with-loop-guard.js');
+      expect(templateContent).not.toMatch(/^\s*agy -p/m);
+      expect(templateContent).toMatch(/^\s*ROUTINE:\s+\S+/m);
+
+      const githubPath = path.join(process.cwd(), '.github/workflows', file);
+      if (fs.existsSync(githubPath)) {
+        const githubContent = fs.readFileSync(githubPath, 'utf8');
+        expect(githubContent).toContain('node .github/scripts/run-with-loop-guard.js');
+        expect(githubContent).not.toMatch(/^\s*agy -p/m);
+        expect(githubContent).toMatch(/^\s*ROUTINE:\s+\S+/m);
+        expect(githubContent).toBe(templateContent);
+      }
+    }
+  });
+
   it('verifies detectQuotaExceeded parses reset timeline correctly', async () => {
     const { detectQuotaExceeded } = await import('../src/lib/runner.js');
 

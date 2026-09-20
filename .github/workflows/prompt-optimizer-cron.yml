@@ -139,6 +139,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTIGRAVITY_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+          ROUTINE: optimizer
           ROUTINE_ISSUE_NUMBER: ${{ steps.run-issue.outputs.issue_number }}
           MODEL: ${{ steps.routine-config.outputs.model || 'gemini-3.8-flash-high' }}
           PRINT_TIMEOUT: ${{ steps.routine-config.outputs.print_timeout || '35m' }}
@@ -149,7 +150,8 @@ jobs:
           PROMPT="You are the Prompt Optimizer routine for this repository. Read and follow .github/prompts/optimizer.md exactly. Diagnose failures, token anomalies, and review loops, and propose preventative prompt and test fixes."
 
           set +e
-          agy -p "$PROMPT" \
+          node .github/scripts/run-with-loop-guard.js \
+            -p "$PROMPT" \
             --model "$MODEL" \
             --output-format text \
             --print-timeout "$PRINT_TIMEOUT" \

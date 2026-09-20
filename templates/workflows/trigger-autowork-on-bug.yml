@@ -155,6 +155,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTIGRAVITY_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+          ROUTINE: autowork
           TARGET_ISSUE: ${{ github.event.issue.number }}
           ROUTINE_ISSUE_NUMBER: ${{ steps.run-issue.outputs.issue_number }}
           SKILLS_PROMPT: ${{ steps.skills.outputs.skills_prompt }}
@@ -167,7 +168,8 @@ jobs:
           PROMPT="You are the Autowork routine for this repository. A high-priority bug was filed. Read and follow .github/prompts/autowork.md. ${SKILLS_PROMPT} Your target is issue #${TARGET_ISSUE}. You are in Targeted mode: work issue #${TARGET_ISSUE} directly."
 
           set +e
-          agy -p "$PROMPT" \
+          node .github/scripts/run-with-loop-guard.js \
+            -p "$PROMPT" \
             --model "$MODEL" \
             --output-format text \
             --print-timeout "$PRINT_TIMEOUT" \

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **guard:** execute routine GitHub Actions workflows via run-with-loop-guard wrapper script ([#227](https://github.com/juliendurandeu/jonah-fleet/issues/227))
 * **orchestration:** adopt 4-part human escalation card in peer-review routine on round-5 escalation ([#235](https://github.com/juliendurandeu/jonah-fleet/issues/235))
 * **orchestration:** add Routine Run Failure Ingestion & Auto-Closure Protocol to `ORCHESTRATION.md`, unifying prior failure memory and resolution lifecycle across `autowork` and `peer-review`.
 * **prompts:** add Dynamic Target Binding in Scan mode to `autowork.md` and `peer-review.md`, dynamically updating `$ROUTINE_ISSUE_NUMBER` titles with `(Issue #N)` or `(PR #M)` upon claiming so crashed runs are never anonymous.
