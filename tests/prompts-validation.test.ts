@@ -643,5 +643,63 @@ describe("Prompt Validation & Invariants", () => {
     expect(peerReviewContent).toContain("Question-First Validation");
     expect(peerReviewContent).toContain("Funnel Completeness");
   });
+
+  it("validates Chief of Staff verification discipline, Red Gate protocol, and anti-vacuity invariants", () => {
+    const orchestrationPath = path.join(templatesDir, "prompts", "ORCHESTRATION.md");
+    const autoworkPath = path.join(templatesDir, "prompts", "autowork.md");
+    const peerReviewPath = path.join(templatesDir, "prompts", "peer-review.md");
+    const codeReviewSkillPath = path.join(templatesDir, "skills", "code-review", "SKILL.md");
+    const tddSkillPath = path.join(templatesDir, "skills", "tdd", "SKILL.md");
+
+    const orchestrationContent = fs.readFileSync(orchestrationPath, "utf8");
+    const autoworkContent = fs.readFileSync(autoworkPath, "utf8");
+    const peerReviewContent = fs.readFileSync(peerReviewPath, "utf8");
+    const codeReviewSkillContent = fs.readFileSync(codeReviewSkillPath, "utf8");
+    const tddSkillContent = fs.readFileSync(tddSkillPath, "utf8");
+
+    // ORCHESTRATION.md definitions
+    expect(orchestrationContent).toContain("## The Red Gate Protocol & Verification Discipline");
+    expect(orchestrationContent).toContain("The Red Gate (Pre-Implementation Failure Proof)");
+    expect(orchestrationContent).toContain("Defect Taxonomy of Bogus Green Checks");
+    expect(orchestrationContent).toContain("Vacuous assertion");
+    expect(orchestrationContent).toContain("Silent no-match");
+    expect(orchestrationContent).toContain("Errored check");
+    expect(orchestrationContent).toContain("Wrong reference");
+    expect(orchestrationContent).toContain("Stale premise");
+    expect(orchestrationContent).toContain("Scope mismatch");
+    expect(orchestrationContent).toContain("Prove a Positive Before Believing a Negative");
+    expect(orchestrationContent).toContain("Anti-Hallucination Disk Read-Back Verification");
+    expect(orchestrationContent).toContain("## Durable Channels Beat Ephemeral Ones");
+    expect(orchestrationContent).toContain("Messages are Nudges, Files are Contracts");
+    expect(orchestrationContent).toContain("Autonomous Surfacing Cadence (No Permission Traps)");
+    expect(orchestrationContent).toContain("Precision Git Scoping in Multi-Agent Environments");
+
+    // autowork.md implementation
+    expect(autoworkContent).toContain("The Red Gate Protocol (Pre-Implementation Verifier Check)");
+    expect(autoworkContent).toContain("The check MUST fail");
+    expect(autoworkContent).toContain("Already Green Check");
+    expect(autoworkContent).toContain("Precision Git Scoping");
+    expect(autoworkContent).toContain("Disk Read-Back Verification");
+    expect(autoworkContent).toContain("Autonomous Surfacing Cadence (No Permission Traps)");
+
+    // peer-review.md implementation
+    expect(peerReviewContent).toContain("Anti-Vacuity & Verifier Audit Pass (The 6 Bogus Green Shapes)");
+    expect(peerReviewContent).toContain("Vacuous assertion");
+    expect(peerReviewContent).toContain("Silent no-match");
+    expect(peerReviewContent).toContain("Errored check");
+    expect(peerReviewContent).toContain("Wrong reference");
+    expect(peerReviewContent).toContain("Stale premise");
+    expect(peerReviewContent).toContain("Scope mismatch");
+    expect(peerReviewContent).toContain("Prove a positive before believing a negative");
+    expect(peerReviewContent).toContain("Anti-Hallucination Disk Read-Back Verification");
+    expect(peerReviewContent).toContain("Autonomous Surfacing Cadence (No Permission Traps)");
+
+    // Skills integration
+    expect(codeReviewSkillContent).toContain("Anti-Vacuity / Bogus Green Check audit");
+    expect(tddSkillContent).toContain("The Red Gate (Red before green)");
+    expect(tddSkillContent).toContain("Tautological / Vacuous Assertion");
+    expect(tddSkillContent).toContain("Silent No-Match");
+    expect(tddSkillContent).toContain("Disk Read-Back Verification");
+  });
 });
 

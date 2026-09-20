@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **orchestration:** adopt Chief of Staff verification discipline, mandatory Red Gate protocol, Bogus Green Check defect taxonomy, disk read-back verification, and precision path-scoped git commits across prompts and engineering skills.
+* **prompts:** embed 6-part Bogus Green Check defect taxonomy (Vacuous assertion, Silent no-match, Errored check, Wrong reference, Stale premise, Scope mismatch) into `peer-review.md` and `/code-review`.
+* **prompts:** add mandatory Red Gate pre-implementation check to `autowork.md` and `/tdd`, catching already-resolved tasks and vacuous tests before code changes.
+* **prompts:** enforce disk read-back verification directly from written files and precision path-scoped git commits (`git commit -m "..." -- <paths>`).
+* **prompts:** enforce autonomous surfacing cadence without rhetorical permission halts ("Shall I continue?") across routines.
 * **guard:** execute routine GitHub Actions workflows via run-with-loop-guard wrapper script ([#227](https://github.com/juliendurandeu/jonah-fleet/issues/227))
 * **orchestration:** adopt 4-part human escalation card in peer-review routine on round-5 escalation ([#235](https://github.com/juliendurandeu/jonah-fleet/issues/235))
 * **orchestration:** add Routine Run Failure Ingestion & Auto-Closure Protocol to `ORCHESTRATION.md`, unifying prior failure memory and resolution lifecycle across `autowork` and `peer-review`.

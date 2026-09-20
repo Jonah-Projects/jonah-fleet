@@ -321,6 +321,48 @@ How autonomous routines escalate decisions, ambiguities, and blockers to human m
 
 ---
 
+## The Red Gate Protocol & Verification Discipline
+
+How agent routines ensure that tests, benchmarks, and verification commands are authoritative rather than vacuous:
+
+1. **The Red Gate (Pre-Implementation Failure Proof)**:
+   - Before writing any production code, the agent MUST formulate a reproduction test or verifier and execute it.
+   - **The check MUST fail** (red). If the check passes before any source code is changed, the subsequent work proves nothing.
+   - **Already Green Check**: If the check passes before changes, stop and evaluate:
+     - *Already Resolved*: If the requested behavior is already present in `origin/main`, close the issue as resolved, release the claim, and proceed to the next candidate. This single command check saves hours of redundant implementation.
+     - *Vacuous Assertion*: If the feature is missing but the test is green, the test is vacuous. Refactor the test until it reliably fails against the baseline before modifying code.
+2. **Defect Taxonomy of Bogus Green Checks**:
+   The most expensive errors in agentic engineering come from checks that report success for work they did not do. Verifiers and peer reviewers must audit for the 6 bogus green defect classes:
+   - **Vacuous assertion**: A test that passes whether or not the feature works (deleting the implementation under test leaves it green).
+   - **Silent no-match**: A grep, regex, linter, or predicate that matches nothing; zero matches falsely reads as "clean".
+   - **Errored check**: A command that failed to run or crashed (e.g. exit code 127 or syntax error), but the error was swallowed, reading absence as success. Exit codes are authoritative; agent summaries are intent.
+   - **Wrong reference**: A filter or diff baseline keyed on the wrong commit or tag (e.g. `HEAD~1` instead of `origin/main`), letting regressions slip through.
+   - **Stale premise**: An assertion whose expected value was copied directly off existing broken code, cementing the bug it was meant to catch.
+   - **Scope mismatch**: A green check executed only over a narrow subset presented as the whole (missing denominator).
+3. **Prove a Positive Before Believing a Negative**:
+   Before accepting an assertion that a defect or pattern is absent, verify that the check or tool flags a known-bad positive control. A tool that reports "clean" and a tool that is broken produce identical zero output.
+4. **Anti-Hallucination Disk Read-Back Verification**:
+   Always verify generated files, configs, and artifacts by reading values directly back from the written artifact on disk (`cat`, `jq`, file assertions), never from an in-memory variable, shell echo, or assumption.
+
+---
+
+## Durable Channels Beat Ephemeral Ones
+
+How autonomous agents manage state, handoffs, and communication across sessions:
+
+1. **Messages are Nudges, Files are Contracts**: Direct messaging between agents or subagents is useful for lightweight coordination, but can be dropped, delayed, or compacted. Anything that must survive and govern execution belongs in a durable channel:
+   - **Committed Policy**: Coding standards, conventions, and invariants belong in committed files (`AGENTS.md`, `.github/prompts/`).
+   - **Work Contracts**: Task descriptions, acceptance criteria, and status belong on the board (GitHub Issues, PR descriptions, or committed markdown briefs like `docs/briefs/`).
+   - **Pointer-Based Dispatch**: Pass links or file paths (`Context: <url>` or `Read docs/briefs/task.md`) in subagent launch prompts rather than pasting massive volatile blobs of text into prompts.
+2. **Policy vs. Ephemeral Separation**:
+   Keep long-lived policy (rules that govern every cycle) strictly separate from ephemeral session scratch. Never mix temporary task artifacts into long-lived documentation.
+3. **Autonomous Surfacing Cadence (No Permission Traps)**:
+   Timeboxing in autonomous runs is for surfacing progress, never for stopping. Checkpoints report status without halting execution. Autonomous agents MUST NEVER yield turns or ask rhetorical permission questions (e.g. "Shall I continue?", "Proceed to merge?").
+4. **Precision Git Scoping in Multi-Agent Environments**:
+   In environments where multiple agents, subagents, or local background commands operate, never execute bare `git commit` or blind `git add .`. Always scope commits explicitly with `git commit -m "..." -- <paths>` or verify `git status --porcelain` to avoid sweeping in uncommitted scratch files or parallel agent artifacts.
+
+---
+
 ## 3-Tier Prompt Prefix Caching Architecture
 
 How Jonah Fleet partitions prompt structures into Static $\rightarrow$ Semi-Stable $\rightarrow$ Dynamic tiers inspired by Orbital v0.4.2's prefix-caching architecture to achieve $>90\%$ cache hit rates on modern LLMs (Gemini, Anthropic, OpenAI), drastically reducing invocation latency and safeguarding the 70% weekly token budget ceiling:

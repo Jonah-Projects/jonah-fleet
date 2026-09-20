@@ -46,6 +46,11 @@ schema.json       # JSON Schema for agents-manifest.json
 - **Model Family Discipline**: Always track the latest version strictly within a model's designated family (e.g. Flash stays on Flash). Never substitute across model tiers (e.g. Flash to Pro) because fleet throughput, latency, and weekly token budgets are calibrated specifically for Flash.
 - **Drift Detection**: `jonah-fleet sync` and `jonah-fleet status` compare local project prompt/workflow files against fleet templates to surface updates and drifts.
 - **Bi-directional Bridge**: `optimizer.md` in consumer projects proposes generic orchestrator enhancements upstream to `jonah-fleet`.
+- **The Red Gate Invariant**: Always execute a failing test or verifier before modifying code. If the check passes before changes, diagnose immediately whether the issue is already resolved (saving hours of work) or the test is a vacuous assertion.
+- **Defect Taxonomy of Bogus Green Checks**: The most expensive errors come from checks reporting success for work they did not do. Interrogate verification against the 6 defect shapes (Vacuous assertion, Silent no-match, Errored check, Wrong reference, Stale premise, Scope mismatch). Always prove a positive before believing a negative.
+- **Anti-Hallucination Disk Read-Back**: Verify generated code, configs, and artifacts by reading values directly back from the file on disk, never from in-memory variables or shell command echoes.
+- **Precision Git Scoping**: Never run bare `git commit` or blind `git add .` in multi-agent environments. Scope commits explicitly (`git commit -m "..." -- <paths>`) to avoid sweeping in uncommitted scratch files or concurrent agent artifacts.
+- **Autonomous Surfacing Cadence**: Timeboxing is for surfacing progress, never for stopping. Checkpoints report status without halting execution. Never yield the turn or ask rhetorical permission questions ("Shall I continue?").
 
 ## Requirements Discovery & Inquisitive Stance
 

@@ -28,11 +28,14 @@ When the shape of that interface is itself in question (how deep the module is, 
 ## Anti-patterns
 
 - **Implementation-coupled**: mocks internal collaborators, tests private methods, or verifies through a side channel (querying the database instead of using the interface). The tell: the test breaks when you refactor but behavior hasn't changed.
-- **Tautological**: the assertion recomputes the expected value the way the code does (`expect(add(a, b)).toBe(a + b)`, a snapshot derived by hand the same way, a constant asserted equal to itself), so it passes by construction and can never disagree with the code. Expected values must come from an independent source of truth: a known-good literal, a worked example, the spec.
+- **Tautological / Vacuous Assertion**: the assertion recomputes the expected value the way the code does (`expect(add(a, b)).toBe(a + b)`, a snapshot derived by hand the same way, a constant asserted equal to itself), or asserts a condition that passes whether or not the feature works. Deleting the code under test must make the test fail.
+- **Silent No-Match**: a test filter, grep, or predicate that matches zero cases and reads as clean. Always prove a positive control before believing absence.
+- **Stale Premise**: an assertion whose expected value was copied directly off broken code, cementing the bug it was meant to catch.
 - **Horizontal slicing**: writing all tests first, then all implementation. Bulk tests verify _imagined_ behavior: you test the _shape_ of things rather than user-facing behavior, the tests go insensitive to real changes, and you commit to test structure before understanding the implementation. Work in **vertical slices** instead: one test → one implementation → repeat, each test a **tracer bullet** that responds to what the last cycle taught you.
 
 ## Rules of the loop
 
-- **Red before green.** Write the failing test first, then only enough code to pass it. Don't anticipate future tests or add speculative features.
+- **The Red Gate (Red before green).** Write the failing test first, run it, and confirm it fails. If it passes before code is written, STOP: either the feature already exists (avoiding redundant work), or the test is vacuous. Only write enough code to turn the red gate green. Don't anticipate future tests or add speculative features.
 - **One slice at a time.** One seam, one test, one minimal implementation per cycle.
+- **Disk Read-Back Verification.** Verify artifacts and written configs by reading values directly back from the file on disk (`cat`, `jq`, file assertions), never from in-memory variables.
 - **Refactoring is not part of the loop.** It belongs to the review stage (see the `code-review` skill), not the red → green implementation cycle.
