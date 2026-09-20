@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.17.0...v1.18.0) (2026-09-20)
+
+
+### Features
+
+* **guard:** update routine GitHub Actions workflows to execute via run-with-loop-guard wrapper ([#227](https://github.com/juliendurandeu/jonah-fleet/issues/227)) ([#277](https://github.com/juliendurandeu/jonah-fleet/issues/277)) ([496ce8c](https://github.com/juliendurandeu/jonah-fleet/commit/496ce8c0c56ddcfd8ac09e530fb4bdaee9c934c9))
+
 ## [1.17.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.16.0...v1.17.0) (2026-09-19)
 
 
