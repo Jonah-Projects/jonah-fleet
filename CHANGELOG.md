@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.20.0...v1.21.0) (2026-09-20)
+
+
+### Features
+
+* **guard:** exempt manage_task status polling from loop guard and expedite routine failure pruning ([#305](https://github.com/juliendurandeu/jonah-fleet/issues/305)) ([d6e5670](https://github.com/juliendurandeu/jonah-fleet/commit/d6e567029016d4bebaaab8d517ce1daea60b5a3c))
+
 ## [Unreleased]
 
 ### Features
