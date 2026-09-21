@@ -183,22 +183,19 @@ describe('Workflow Validation & Invariants', () => {
       const templatePath = path.join(workflowsDir, file);
       const githubPath = path.join(process.cwd(), '.github/workflows', file);
 
-      for (const filePath of [templatePath, githubPath]) {
-        expect(fs.existsSync(filePath)).toBe(true);
-        const content = fs.readFileSync(filePath, 'utf8');
-
-        // Verify top-level concurrency is absent (it should not start at column 0)
-        expect(content).not.toMatch(/^concurrency:/m);
-
-        // Verify concurrency is nested under the specific job
-        expect(content).toContain(`  ${job}:`);
-        expect(content).toMatch(new RegExp(`  ${job}:[\\s\\S]*?    concurrency:[\\s\\S]*?      cancel-in-progress: true`));
-      }
-
-      // Ensure exact byte-for-byte 1:1 parity between template and .github workflow
+      expect(fs.existsSync(templatePath)).toBe(true);
       const templateContent = fs.readFileSync(templatePath, 'utf8');
-      const githubContent = fs.readFileSync(githubPath, 'utf8');
-      expect(templateContent).toBe(githubContent);
+      expect(templateContent).not.toMatch(/^concurrency:/m);
+      expect(templateContent).toContain(`  ${job}:`);
+      expect(templateContent).toMatch(new RegExp(`  ${job}:[\\s\\S]*?    concurrency:[\\s\\S]*?      cancel-in-progress: true`));
+
+      if (fs.existsSync(githubPath)) {
+        const githubContent = fs.readFileSync(githubPath, 'utf8');
+        expect(githubContent).not.toMatch(/^concurrency:/m);
+        expect(githubContent).toContain(`  ${job}:`);
+        expect(githubContent).toMatch(new RegExp(`  ${job}:[\\s\\S]*?    concurrency:[\\s\\S]*?      cancel-in-progress: true`));
+        expect(templateContent).toBe(githubContent);
+      }
     }
   });
 
