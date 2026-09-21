@@ -21,6 +21,7 @@ Dispatch is both **scheduled** and **event-driven**. All routines run as ephemer
   - `trigger-review-routine.yml` fires Peer Review automatically when a PR is marked ready for review, updated, or review is requested (`ready_for_review`, `opened`, `reopened`, `synchronize`, `review_requested`). It can also be manually (re)triggered via `workflow_dispatch` (with optional `pr_number` for Targeted mode or blank for Scan mode) or by commenting `/review`, `/peer-review`, `/retrigger`, or `/re-review` on any open pull request.
   - `trigger-autowork-on-merge.yml` fires Autowork in **Targeted mode** when a PR merges to `main` and unblocks the next unit of chained work.
   - `trigger-autowork-on-bug.yml` fires Autowork when an issue becomes a high-priority bug.
+  - `trigger-autowork-on-assign.yml` fires Autowork in **Targeted mode** when an issue is assigned to a designated bot account or persona (`vars.AGENT_BOT_LOGIN` or `@jonah-fleet-bot`).
   - `trigger-autowork-manual.yml` fires Autowork manually via `workflow_dispatch` or badge link click on a specific issue in **Targeted mode**.
 
 Autowork triggers pass the target issue via environment variables (`TARGET_ISSUE`, `ISSUE_NUMBER`, `ISSUE_URL`), putting autowork.md into **Targeted mode** (working the named issue ahead of Phase 1 convergence). Single-flight per issue is strictly enforced across scheduled, event-driven, and manually triggered runs.
@@ -38,7 +39,7 @@ Invariants deliberately upheld from this spec:
 
 Single source of truth for both autowork candidate reclamation and housekeeping sweeps. An assigned issue is a _stale claim_ (a dead autowork run's orphaned reservation, safe to release) only when **all** of these hold:
 
-1. **It is an autowork claim, not a manual one.** The issue carries a `🔒 Claimed by autowork run …` comment. An assigned issue with **no** such comment is never stale; leave it alone (it may be a person working manually).
+1. **It is an autowork claim, not a manual one.** The issue carries a `🔒 Claimed by autowork run …` comment. An assigned issue with **no** such comment is never stale; leave it alone (it may be a person working manually), unless assigned to a designated bot persona (`vars.AGENT_BOT_LOGIN` or `@jonah-fleet-bot`) without active progress.
 2. **No live work exists.** There is **no open PR** referencing the issue (`Closes #N`). An open PR is live, recoverable work that autowork Phase 1 owns — never reclaim it, at any age.
 3. **The claim is old.** The most recent `🔒 Claimed by autowork run …` comment's GitHub creation time (`created_at`) is **more than 6 hours** ago. Measure age from that `created_at` only — never the issue's `updated_at`.
 
@@ -271,7 +272,7 @@ How closed-loop feedback from product telemetry and measurement trackers drives 
 How agent routines are partitioned between cloud GitHub Actions (24/7 cloud runners for fast time-to-resolution) and local machine agents (`jonah-fleet run` / `jonah-fleet daemon` for zero cloud quota consumption):
 
 1. **Priority Routing Rules**:
-   - **`priority/P0` & `priority/P1` & Bugs**: Processed immediately by cloud GitHub Actions upon event trigger (`issues`, `pull_request`, `schedule`).
+   - **`priority/P0` & `priority/P1` & Bugs & Persona Assignment**: Processed immediately by cloud GitHub Actions upon event trigger (`issues`, `pull_request`, `schedule`).
    - **`priority/P2` & `priority/P3` (Lower Priority)**: Handled primarily by local machine agents in isolated Git worktrees. Cloud Actions skips immediate event triggers on P2/P3 items to conserve Actions quota.
    - **Cloud Catchup Sweep (48h Fallback)**: If a P2/P3 issue or PR remains unclaimed/unreviewed for $>48\text{ hours}$ (e.g. because local machines were offline), the scheduled cloud Actions scan sweep automatically picks it up to prevent work starvation.
 2. **PR Priority Mirroring**: When Autowork opens a PR, it automatically mirrors the parent issue's priority labels (`priority/P0`..`P3`) onto the pull request so downstream review workflows can filter triggers without extra API overhead.

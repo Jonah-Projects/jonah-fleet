@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Features
+
+* **workflows:** support triggering autowork on issue assignment to bot persona ([#19](https://github.com/juliendurandeu/jonah-fleet/issues/19))
+
 ### Bug Fixes
 
 * **runner:** prevent routine tracking issues from being mistakenly claimed as target issues via `excludeIssueNumber` and `isRoutineRunTitle` guardrails.
