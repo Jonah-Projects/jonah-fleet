@@ -31,7 +31,7 @@ export interface ContributionResult {
 }
 
 export function prepareContributionPayload(options: ContributeOptions = {}): ContributionPayload {
-  const repo = options.repo || 'juliendurandeu/jonah-fleet';
+  const repo = options.repo || 'Jonah-Projects/jonah-fleet';
   const title = options.title || 'fix(prompts): improve orchestrator routine handling';
   const body = options.body || 'Proposed prompt optimization discovered during autonomous execution runs.';
   const branchName = `contrib/optimize-${Date.now()}`;

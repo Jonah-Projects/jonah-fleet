@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/juliendurandeu/jonah-fleet/main/schema.json",
+  "$schema": "https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/schema.json",
   "version": "1.6.0",
   "preset": "standard",
   "dualExecution": {

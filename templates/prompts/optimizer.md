@@ -12,7 +12,7 @@ Routine objective, Definition of Done, constraints, instructions, and logging.
 
 Scan recent agent run logs and closed issues, diagnose four classes of problem — **failures** (runs that logged FAILURE), **inefficiency** (runs burning excessive iterations or multi-loop PRs), **token consumption & cost anomalies** (runs trending toward weekly budget ceilings), and **preventable bugs & defect avoidance** (analyzing resolved bugs to determine root causes and authoring/review prevention checks) — and propose targeted prompt, template, test, and workflow fixes via pull requests.
 
-Additionally, this routine acts as the **Upstream Evolution Bridge**: when a prompt improvement solves a generic orchestrator pattern (benefiting all fleet-connected projects), it proposes the fix upstream to the `jonah-fleet` repository (`juliendurandeu/jonah-fleet`).
+Additionally, this routine acts as the **Upstream Evolution Bridge**: when a prompt improvement solves a generic orchestrator pattern (benefiting all fleet-connected projects), it proposes the fix upstream to the `jonah-fleet` repository (`Jonah-Projects/jonah-fleet`).
 
 ## Definition of Done
 
@@ -25,7 +25,7 @@ The run is SUCCESS if ALL of these are true:
 - [ ] Closed bug issues and merged bug-fix PRs in the window have been analyzed for systemic root causes
 - [ ] For each fixable pattern:
   - If project-specific: opened a local PR with a prompt, template, or test fix and marked ready for review
-  - If generic/fleet-wide: opened an upstream PR against `juliendurandeu/jonah-fleet` (or flagged via `npx jonah-fleet contribute`)
+  - If generic/fleet-wide: opened an upstream PR against `Jonah-Projects/jonah-fleet` (or flagged via `npx jonah-fleet contribute`)
 - [ ] Every PR links a tracking issue via `Closes #N`
 - [ ] If no issues or optimization patterns are found, logged SUCCESS with "No issues to address"
 
@@ -100,11 +100,11 @@ Translate findings into concrete preventative improvements and remediation trigg
   - Branch from `origin/main`, apply changes, and open PR via `gh pr create --draft`.
   - Link tracking issue and mark ready for review (`gh pr ready <PR>`).
 - **Generic / Fleet Improvement**: If the fix improves core prompt orchestration, claim protocols, or universal error handling:
-  - Open a PR against upstream `juliendurandeu/jonah-fleet` using the GitHub CLI:
+  - Open a PR against upstream `Jonah-Projects/jonah-fleet` using the GitHub CLI:
     ```bash
     npx jonah-fleet contribute --title "fix(prompt): <description>" --body "<evidence from local run logs>"
     ```
-    or branch and open a PR against upstream `juliendurandeu/jonah-fleet`.
+    or branch and open a PR against upstream `Jonah-Projects/jonah-fleet`.
 
 ## Logging
 

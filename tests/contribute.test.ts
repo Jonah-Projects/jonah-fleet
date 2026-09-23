@@ -4,11 +4,11 @@ import { runContribute, prepareContributionPayload } from '../src/commands/contr
 describe('Contribute Command & Upstream Bridge', () => {
   it('prepares structured contribution payload with default metadata', () => {
     const payload = prepareContributionPayload();
-    expect(payload.repo).toBe('juliendurandeu/jonah-fleet');
+    expect(payload.repo).toBe('Jonah-Projects/jonah-fleet');
     expect(payload.branchName).toMatch(/^contrib\/optimize-/);
     expect(payload.title).toContain('fix(prompts):');
     expect(payload.body).toContain('Proposed prompt optimization');
-    expect(payload.prCommand).toContain('gh pr create --repo juliendurandeu/jonah-fleet');
+    expect(payload.prCommand).toContain('gh pr create --repo Jonah-Projects/jonah-fleet');
   });
 
   it('prepares contribution payload with custom title and body', () => {
@@ -45,7 +45,7 @@ describe('Contribute Command & Upstream Bridge', () => {
       const cmd = args.join(' ');
       executedCommands.push(cmd);
       if (cmd.includes('auth status')) return 'Logged in to github.com';
-      if (cmd.includes('pr create')) return 'https://github.com/juliendurandeu/jonah-fleet/pull/99';
+      if (cmd.includes('pr create')) return 'https://github.com/Jonah-Projects/jonah-fleet/pull/99';
       return '';
     };
 
@@ -56,7 +56,7 @@ describe('Contribute Command & Upstream Bridge', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.prUrl).toBe('https://github.com/juliendurandeu/jonah-fleet/pull/99');
+    expect(result.prUrl).toBe('https://github.com/Jonah-Projects/jonah-fleet/pull/99');
     expect(executedCommands.some((c) => c.includes('auth status'))).toBe(true);
     expect(executedCommands.some((c) => c.includes('pr create'))).toBe(true);
   });

@@ -122,7 +122,7 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
       orbital: mockOrbitalData,
       lookbackDays: 7,
       serverUrl: 'https://github.com',
-      repository: 'juliendurandeu/jonah-fleet',
+      repository: 'Jonah-Projects/jonah-fleet',
       runId: '12345'
     });
 

@@ -3,7 +3,7 @@
 > **Standalone Autonomous Agent Fleet & Symphony Orchestration Engine**  
 > Battle-tested autonomous coding agents, claim protocols, review loops, and engineering skills for multi-repo teams.
 
-[![CI](https://github.com/juliendurandeu/jonah-fleet/actions/workflows/ci.yml/badge.svg)](https://github.com/juliendurandeu/jonah-fleet/actions/workflows/ci.yml)
+[![CI](https://github.com/Jonah-Projects/jonah-fleet/actions/workflows/ci.yml/badge.svg)](https://github.com/Jonah-Projects/jonah-fleet/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](./package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -145,7 +145,7 @@ Each target project contains an `agents-manifest.json` at its root:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/juliendurandeu/jonah-fleet/main/schema.json",
+  "$schema": "https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/schema.json",
   "version": "1.6.0",
   "preset": "standard",
   "routines": {
@@ -202,7 +202,7 @@ Each target project contains an `agents-manifest.json` at its root:
 ## 🔄 Bi-Directional Continuous Improvement
 
 1. **Local Optimization**: The `optimizer.md` routine monitors run logs in each connected project.
-2. **Upstream Contribution**: When a prompt or workflow improvement is discovered, the optimizer opens an upstream PR against `juliendurandeu/jonah-fleet` (or via `npx jonah-fleet contribute`).
+2. **Upstream Contribution**: When a prompt or workflow improvement is discovered, the optimizer opens an upstream PR against `Jonah-Projects/jonah-fleet` (or via `npx jonah-fleet contribute`).
 3. **Downstream Sync**: Merged improvements in `jonah-fleet` create a semantic release, and downstream consumer repositories receive automated update PRs via `.github/workflows/sync-fleet.yml`.
 
 ---

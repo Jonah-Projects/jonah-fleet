@@ -6,7 +6,7 @@ const LOOKBACK_DAYS = parseInt(process.env.LOOKBACK_DAYS || '7', 10);
 const FORCE_REPORT = process.env.FORCE_REPORT === 'true';
 const GITHUB_TOKEN = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
 const GITHUB_SERVER_URL = process.env.GITHUB_SERVER_URL || 'https://github.com';
-const GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY || 'juliendurandeu/jonah-fleet';
+const GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY || 'Jonah-Projects/jonah-fleet';
 const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID || 'manual';
 
 export function getHeaders(token = GITHUB_TOKEN) {
