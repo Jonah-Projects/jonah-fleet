@@ -62,8 +62,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
-          ACTOR_NAME=$(gh api user --jq .login 2>/dev/null || echo "${{ vars.AGENT_BOT_LOGIN || '' }}")
-          ACTOR_ID=$(gh api user --jq .id 2>/dev/null || echo "")
+          if USER_JSON=$(gh api user 2>/dev/null); then
+            ACTOR_NAME=$(echo "$USER_JSON" | jq -r '.login // empty')
+            ACTOR_ID=$(echo "$USER_JSON" | jq -r '.id // empty')
+          fi
+          ACTOR_NAME="${ACTOR_NAME:-${{ vars.AGENT_BOT_LOGIN || '' }}}"
           if [ -n "$ACTOR_NAME" ] && [ -n "$ACTOR_ID" ]; then
             git config --global user.name "$ACTOR_NAME"
             git config --global user.email "${ACTOR_ID}+${ACTOR_NAME}@users.noreply.github.com"

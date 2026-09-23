@@ -323,17 +323,50 @@ describe('Workflow Validation & Invariants', () => {
     expect(res3.resetInfo).toBeUndefined();
   });
 
-  it('ensures workflow templates configure Git author identity dynamically from active token', () => {
-    const workflowFiles = fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.yml'));
-    for (const file of workflowFiles) {
+  it('ensures agents-manifest.json points to Jonah-Projects schema URL', () => {
+    const manifestPath = path.join(process.cwd(), 'agents-manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    expect(manifest.$schema).toBe('https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/schema.json');
+  });
+
+  it('ensures workflow templates and active workflows configure Git author identity dynamically with robust error fallback', () => {
+    const templateFiles = fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.yml'));
+    const githubWorkflowsDir = path.join(process.cwd(), '.github/workflows');
+    const githubFiles = fs.readdirSync(githubWorkflowsDir).filter((f) => f.endsWith('.yml'));
+
+    let templateMatchCount = 0;
+    for (const file of templateFiles) {
       const content = fs.readFileSync(path.join(workflowsDir, file), 'utf8');
       if (content.includes('name: Configure Git author identity')) {
-        expect(content, `${file} must detect ACTOR_NAME via gh api user`).toContain('gh api user --jq .login');
-        expect(content, `${file} must detect ACTOR_ID via gh api user`).toContain('gh api user --jq .id');
+        templateMatchCount++;
+        expect(content, `${file} must capture USER_JSON with exit code check`).toContain('if USER_JSON=$(gh api user 2>/dev/null); then');
+        expect(content, `${file} must extract login via jq`).toContain("echo \"$USER_JSON\" | jq -r '.login // empty'");
+        expect(content, `${file} must extract id via jq`).toContain("echo \"$USER_JSON\" | jq -r '.id // empty'");
+        expect(content, `${file} must fallback to vars.AGENT_BOT_LOGIN`).toContain('ACTOR_NAME="${ACTOR_NAME:-${{ vars.AGENT_BOT_LOGIN || \'\' }}}"');
         expect(content, `${file} must format noreply email using ACTOR_ID and ACTOR_NAME`).toContain('${ACTOR_ID}+${ACTOR_NAME}@users.noreply.github.com');
         expect(content, `${file} must fallback to github-actions[bot]`).toContain('github-actions[bot]');
+        expect(content, `${file} must not use naive command substitution without exit code check`).not.toContain('ACTOR_NAME=$(gh api user');
       }
     }
+    // Positive control: exactly 12 templates configure Git author identity
+    expect(templateMatchCount).toBeGreaterThanOrEqual(12);
+
+    let githubMatchCount = 0;
+    for (const file of githubFiles) {
+      const content = fs.readFileSync(path.join(githubWorkflowsDir, file), 'utf8');
+      if (content.includes('name: Configure Git author identity')) {
+        githubMatchCount++;
+        expect(content, `.github/workflows/${file} must capture USER_JSON with exit code check`).toContain('if USER_JSON=$(gh api user 2>/dev/null); then');
+        expect(content, `.github/workflows/${file} must extract login via jq`).toContain("echo \"$USER_JSON\" | jq -r '.login // empty'");
+        expect(content, `.github/workflows/${file} must extract id via jq`).toContain("echo \"$USER_JSON\" | jq -r '.id // empty'");
+        expect(content, `.github/workflows/${file} must fallback to vars.AGENT_BOT_LOGIN`).toContain('ACTOR_NAME="${ACTOR_NAME:-${{ vars.AGENT_BOT_LOGIN || \'\' }}}"');
+        expect(content, `.github/workflows/${file} must format noreply email using ACTOR_ID and ACTOR_NAME`).toContain('${ACTOR_ID}+${ACTOR_NAME}@users.noreply.github.com');
+        expect(content, `.github/workflows/${file} must fallback to github-actions[bot]`).toContain('github-actions[bot]');
+        expect(content, `.github/workflows/${file} must not use naive command substitution without exit code check`).not.toContain('ACTOR_NAME=$(gh api user');
+      }
+    }
+    // Positive control: exactly 10 active repository workflows configure Git author identity
+    expect(githubMatchCount).toBeGreaterThanOrEqual(10);
   });
 });
 
