@@ -124,6 +124,19 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       }
       expect(guard.isTripped()).toBe(false);
     });
+
+    it('exempts replace_file_content and write_to_file from repetition trip', () => {
+      const guard = new LoopGuard({ repetitionThreshold: 5, slidingWindowSize: 20 });
+      for (let i = 0; i < 10; i++) {
+        expect(guard.recordAction('replace_file_content', { TargetFile: '/path/to/page.tsx' })).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+
+      for (let i = 0; i < 10; i++) {
+        expect(guard.recordAction('write_to_file', { TargetFile: '/path/to/newfile.ts' })).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+    });
   });
 
   describe('Ping-Pong Guard (Threshold = 3 alternating pairs, 6 actions)', () => {
@@ -162,6 +175,30 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       const guard = new LoopGuard({ pingPongThreshold: 3 });
       const actionA = { tool: 'manage_task', args: { Action: 'status', TaskId: 'task-1' } };
       const actionB = { tool: 'manage_subagents', args: { Action: 'list' } };
+
+      for (let i = 0; i < 4; i++) {
+        expect(guard.recordAction(actionA.tool, actionA.args)).toBeNull();
+        expect(guard.recordAction(actionB.tool, actionB.args)).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+    });
+
+    it('exempts alternating view_file and replace_file_content cycles from ping-pong trip', () => {
+      const guard = new LoopGuard({ pingPongThreshold: 3 });
+      const actionA = { tool: 'view_file', args: { AbsolutePath: '/path/to/page.tsx' } };
+      const actionB = { tool: 'replace_file_content', args: { TargetFile: '/path/to/page.tsx' } };
+
+      for (let i = 0; i < 5; i++) {
+        expect(guard.recordAction(actionA.tool, actionA.args)).toBeNull();
+        expect(guard.recordAction(actionB.tool, actionB.args)).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+    });
+
+    it('exempts alternating replace_file_content and run_command cycles from ping-pong trip', () => {
+      const guard = new LoopGuard({ pingPongThreshold: 3 });
+      const actionA = { tool: 'replace_file_content', args: { TargetFile: '/path/to/page.tsx' } };
+      const actionB = { tool: 'run_command', args: { CommandLine: 'npm test' } };
 
       for (let i = 0; i < 4; i++) {
         expect(guard.recordAction(actionA.tool, actionA.args)).toBeNull();

@@ -76,7 +76,9 @@ export class LoopGuard {
     const isExemptFromRepetition =
       isStatusPolling ||
       toolName === 'view_file' ||
-      toolName === 'read_file';
+      toolName === 'read_file' ||
+      toolName === 'replace_file_content' ||
+      toolName === 'write_to_file';
 
     const hash = computeActionHash(toolName, args);
     const record = {
@@ -141,7 +143,7 @@ export class LoopGuard {
     const requiredPingPongLength = this.pingPongThreshold * 2;
     if (this.history.length >= requiredPingPongLength) {
       const pingPongSlice = this.history.slice(-requiredPingPongLength);
-      const hasStatusPolling = pingPongSlice.some(
+      const hasExemptPingPongAction = pingPongSlice.some(
         (item) =>
           (item.toolName === 'manage_task' &&
             (item.args?.Action === 'status' ||
@@ -150,10 +152,12 @@ export class LoopGuard {
               item.args?.action === 'list')) ||
           (item.toolName === 'manage_subagents' &&
             (item.args?.Action === 'list' ||
-              item.args?.action === 'list'))
+              item.args?.action === 'list')) ||
+          item.toolName === 'replace_file_content' ||
+          item.toolName === 'write_to_file'
       );
 
-      if (!hasStatusPolling) {
+      if (!hasExemptPingPongAction) {
         const hashA = pingPongSlice[0].hash;
         const hashB = pingPongSlice[1].hash;
 
