@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **daemon:** autowork backlog zero-token preflight and diagnostic reporting ([#362](https://github.com/juliendurandeu/jonah-fleet/issues/362)) ([#387](https://github.com/juliendurandeu/jonah-fleet/issues/387)) ([4671829](https://github.com/juliendurandeu/jonah-fleet/commit/4671829701c0daf6e10544a22b59265a237630e6))
 * **workflows:** configure dynamic Git committer identity resolution from active token and update repository URLs to Jonah-Projects/jonah-fleet
 
+### Bug Fixes
+
+* **guard:** exempt replace_file_content and write_to_file from repetition and ping-pong circuit breakers
+
 ## [1.25.2](https://github.com/juliendurandeu/jonah-fleet/compare/v1.25.1...v1.25.2) (2026-09-23)
 
 
