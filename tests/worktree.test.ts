@@ -129,10 +129,30 @@ describe('Git Worktree Isolation', () => {
   });
 
   it('does not match sibling directories with similar prefix like worktrees-backup', async () => {
+    const wt1 = await createWorktree(tmpRepo, { branchName: 'agent/autowork-valid', baseRef: 'main' });
+
     const siblingDir = path.join(tmpRepo, '.jonah-fleet', 'worktrees-backup');
-    fs.mkdirSync(siblingDir, { recursive: true });
+    fs.mkdirSync(path.dirname(siblingDir), { recursive: true });
+    execSync(`git worktree add "${siblingDir}" -b test-sibling`, { cwd: tmpRepo });
     fs.writeFileSync(path.join(siblingDir, 'important.txt'), 'keep me', 'utf8');
 
+    // Positive control: verify git itself registers siblingDir as an active worktree
+    const rawWorktrees = execSync('git worktree list --porcelain', { cwd: tmpRepo }).toString();
+    expect(rawWorktrees).toContain(siblingDir);
+
+    // listActiveWorktrees must exclude siblingDir via baseDir + path.sep delimiter filter
+    const active = await listActiveWorktrees(tmpRepo);
+    expect(active.length).toBe(1);
+    expect(active[0].path).toBe(path.resolve(wt1.worktreePath));
+    expect(active.some((w) => w.path === path.resolve(siblingDir))).toBe(false);
+
+    // cleanupStaleWorktrees with keepPath must not prune or delete siblingDir
+    await cleanupStaleWorktrees(tmpRepo, { keepPath: wt1.worktreePath });
+    expect(fs.existsSync(siblingDir)).toBe(true);
+    expect(fs.existsSync(path.join(siblingDir, 'important.txt'))).toBe(true);
+    expect(fs.existsSync(wt1.worktreePath)).toBe(true);
+
+    // cleanupStaleWorktrees without keepPath must also preserve siblingDir
     await cleanupStaleWorktrees(tmpRepo);
     expect(fs.existsSync(siblingDir)).toBe(true);
     expect(fs.existsSync(path.join(siblingDir, 'important.txt'))).toBe(true);
