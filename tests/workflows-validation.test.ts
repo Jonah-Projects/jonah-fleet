@@ -13,6 +13,35 @@ describe('Workflow Validation & Invariants', () => {
     expect(ROUTINE_TO_WORKFLOW_MAP.autowork).toContain('trigger-autowork-manual.yml');
   });
 
+  it('includes trigger-autowork-on-assign.yml in ROUTINE_TO_WORKFLOW_MAP for autowork', () => {
+    expect(ROUTINE_TO_WORKFLOW_MAP.autowork).toContain('trigger-autowork-on-assign.yml');
+  });
+
+  it('has trigger-autowork-on-assign.yml template with assignment trigger, condition, concurrency, and target injection', () => {
+    const assignWorkflowPath = path.join(workflowsDir, 'trigger-autowork-on-assign.yml');
+    expect(fs.existsSync(assignWorkflowPath)).toBe(true);
+
+    const content = fs.readFileSync(assignWorkflowPath, 'utf8');
+    expect(content).toContain('types: [assigned]');
+    expect(content).toContain('vars.AGENT_BOT_LOGIN');
+    expect(content).toContain("'jonah-fleet-bot'");
+    expect(content).toContain('TARGET_ISSUE: ${{ github.event.issue.number }}');
+    expect(content).toContain('Targeted mode');
+    expect(content).toContain('Verify Atomic Handoff Invariant');
+  });
+
+  it('ensures trigger-autowork-on-assign.yml exists in .github/workflows with byte-for-byte parity against template', () => {
+    const templatePath = path.join(workflowsDir, 'trigger-autowork-on-assign.yml');
+    const githubPath = path.join(process.cwd(), '.github/workflows', 'trigger-autowork-on-assign.yml');
+
+    expect(fs.existsSync(templatePath), 'Template trigger-autowork-on-assign.yml must exist').toBe(true);
+    expect(fs.existsSync(githubPath), '.github/workflows/trigger-autowork-on-assign.yml must exist').toBe(true);
+
+    const templateContent = fs.readFileSync(templatePath, 'utf8');
+    const githubContent = fs.readFileSync(githubPath, 'utf8');
+    expect(githubContent).toBe(templateContent);
+  });
+
   it('has trigger-autowork-manual.yml template with required inputs and steps', () => {
     const manualWorkflowPath = path.join(workflowsDir, 'trigger-autowork-manual.yml');
     expect(fs.existsSync(manualWorkflowPath)).toBe(true);
@@ -41,6 +70,7 @@ describe('Workflow Validation & Invariants', () => {
       'trigger-autowork-manual.yml',
       'trigger-autowork-on-bug.yml',
       'trigger-autowork-on-merge.yml',
+      'trigger-autowork-on-assign.yml',
     ];
     for (const file of autoworkWorkflows) {
       const content = fs.readFileSync(path.join(workflowsDir, file), 'utf8');
@@ -158,6 +188,7 @@ describe('Workflow Validation & Invariants', () => {
       { file: 'trigger-review-routine.yml', job: 'trigger-routine' },
       { file: 'trigger-autowork-on-bug.yml', job: 'fire-autowork' },
       { file: 'trigger-autowork-on-merge.yml', job: 'fire-autowork' },
+      { file: 'trigger-autowork-on-assign.yml', job: 'fire-autowork' },
     ];
 
     for (const { file, job } of triggerWorkflows) {
@@ -165,7 +196,7 @@ describe('Workflow Validation & Invariants', () => {
       const githubPath = path.join(process.cwd(), '.github/workflows', file);
 
       for (const filePath of [templatePath, githubPath]) {
-        expect(fs.existsSync(filePath)).toBe(true);
+        expect(fs.existsSync(filePath), `Workflow file ${filePath} should exist`).toBe(true);
         const content = fs.readFileSync(filePath, 'utf8');
 
         // Verify top-level concurrency is absent (it should not start at column 0)
@@ -221,6 +252,7 @@ describe('Workflow Validation & Invariants', () => {
       'trigger-autowork-manual.yml',
       'trigger-autowork-on-bug.yml',
       'trigger-autowork-on-merge.yml',
+      'trigger-autowork-on-assign.yml',
       'trigger-review-routine.yml',
       'analytics-review-cron.yml',
       'design-review-cron.yml',
@@ -247,6 +279,7 @@ describe('Workflow Validation & Invariants', () => {
       'trigger-autowork-manual.yml',
       'trigger-autowork-on-bug.yml',
       'trigger-autowork-on-merge.yml',
+      'trigger-autowork-on-assign.yml',
       'trigger-review-routine.yml',
       'analytics-review-cron.yml',
       'design-review-cron.yml',

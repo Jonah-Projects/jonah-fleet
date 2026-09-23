@@ -69,6 +69,12 @@ tests/            # Test suites
 
 ## Autonomous Agent Dispatch (Targeted Autowork)
 
+### 1-Click Assignment Trigger
+
+Assigning any issue in GitHub's native sidebar Assignees dropdown to the designated fleet bot account (configured via `vars.AGENT_BOT_LOGIN` or machine user) automatically triggers Autowork in Targeted mode via `trigger-autowork-on-assign.yml`.
+
+### Manual Dispatch & Badge Link
+
 To trigger the Autowork routine manually on any specific issue, use the GitHub Actions `workflow_dispatch` trigger or embed this badge link in issue templates/descriptions:
 
 ```markdown

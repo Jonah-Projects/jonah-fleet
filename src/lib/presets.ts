@@ -244,6 +244,7 @@ export const ROUTINE_TO_WORKFLOW_MAP: Record<keyof FleetManifest['routines'], st
     'trigger-autowork-on-merge.yml',
     'trigger-autowork-on-bug.yml',
     'trigger-autowork-manual.yml',
+    'trigger-autowork-on-assign.yml',
   ],
   'peer-review': ['trigger-review-routine.yml'],
   optimizer: ['prompt-optimizer-cron.yml'],
@@ -256,6 +257,10 @@ export const ROUTINE_TO_WORKFLOW_MAP: Record<keyof FleetManifest['routines'], st
 
 export const WORKFLOW_TO_ROUTINE_MAP: Record<string, keyof FleetManifest['routines'] | 'sync-fleet'> = {
   'autowork-cron.yml': 'autowork',
+  'trigger-autowork-on-merge.yml': 'autowork',
+  'trigger-autowork-on-bug.yml': 'autowork',
+  'trigger-autowork-manual.yml': 'autowork',
+  'trigger-autowork-on-assign.yml': 'autowork',
   'trigger-review-routine.yml': 'peer-review',
   'prompt-optimizer-cron.yml': 'optimizer',
   'issues-housekeeping-cron.yml': 'issues-housekeeping',
