@@ -1058,3 +1058,209 @@ export class TerminalSpinner {
     }
   }
 }
+
+export interface BacklogIssueInfo {
+  number: number;
+  title: string;
+  labels?: Array<{ name: string }>;
+  assignees?: Array<{ login: string }>;
+  url?: string;
+}
+
+export interface BacklogTriageReport {
+  actionable: BacklogIssueInfo[];
+  inProgress: BacklogIssueInfo[];
+  gatedHuman: BacklogIssueInfo[];
+  awaitingInfo: BacklogIssueInfo[];
+  guardrails: BacklogIssueInfo[];
+  routineLogs: BacklogIssueInfo[];
+  total: number;
+}
+
+export interface BacklogCardOptions {
+  width?: number;
+  repoRoot?: string;
+}
+
+/**
+ * Renders a formatted diagnostic card when Autowork backlog preflight finds 0 actionable issues.
+ */
+export function renderBacklogDiagnosticCard(
+  report: BacklogTriageReport,
+  options?: BacklogCardOptions
+): string {
+  const width = options?.width || Math.min(Math.max((process.stdout.columns || 80) - 4, 64), 90);
+  const horizontal = '─'.repeat(width - 2);
+
+  const lines: string[] = [];
+  lines.push(pc.cyan(`┌${horizontal}┐`));
+
+  const total =
+    report.total ??
+    ((report.actionable?.length || 0) +
+      (report.inProgress?.length || 0) +
+      (report.gatedHuman?.length || 0) +
+      (report.awaitingInfo?.length || 0) +
+      (report.guardrails?.length || 0) +
+      (report.routineLogs?.length || 0));
+
+  const actionableCount = report.actionable?.length || 0;
+
+  // Header Title Bar
+  const headerParts = [
+    pc.bold(pc.white('AUTOWORK BACKLOG TRIAGE')),
+    pc.yellow(`${actionableCount} Actionable`),
+    pc.dim('(0 tokens used)'),
+  ];
+  const headerContent = headerParts.join(' · ');
+  const headerPlain = stripAnsi(headerContent);
+
+  lines.push(
+    pc.cyan('│') +
+      ` ${headerContent}` +
+      ' '.repeat(Math.max(1, width - 3 - headerPlain.length)) +
+      pc.cyan('│')
+  );
+
+  // If backlog is completely empty
+  const hasNoGated =
+    (report.inProgress?.length || 0) === 0 &&
+    (report.gatedHuman?.length || 0) === 0 &&
+    (report.awaitingInfo?.length || 0) === 0 &&
+    (report.guardrails?.length || 0) === 0;
+
+  if (total === 0 || (hasNoGated && actionableCount === 0)) {
+    lines.push(pc.cyan(`├${horizontal}┤`));
+    const emptyMsg = 'Backlog is completely empty. 0 open issues found.';
+    lines.push(
+      pc.cyan('│') +
+        `  ${pc.bold(emptyMsg)}` +
+        ' '.repeat(Math.max(1, width - 4 - stripAnsi(emptyMsg).length)) +
+        pc.cyan('│')
+    );
+    const tipMsg = 'Tip: Create an issue with priority/P1 or priority/P2 to trigger Autowork.';
+    lines.push(
+      pc.cyan('│') +
+        `  ${pc.dim(tipMsg)}` +
+        ' '.repeat(Math.max(1, width - 4 - stripAnsi(tipMsg).length)) +
+        pc.cyan('│')
+    );
+    lines.push(pc.cyan(`└${horizontal}┘`));
+    return lines.join('\n');
+  }
+
+  // Preflight status line
+  const statusMsg = `Preflight: Zero-token bypass active (no worktrees spawned)`;
+  lines.push(
+    pc.cyan('│') +
+      `  ${pc.dim(statusMsg)}` +
+      ' '.repeat(Math.max(1, width - 4 - stripAnsi(statusMsg).length)) +
+      pc.cyan('│')
+  );
+
+  lines.push(pc.cyan(`├${horizontal}┤`));
+
+  const renderSection = (
+    title: string,
+    colorFn: (s: string) => string,
+    items: BacklogIssueInfo[],
+    reasonLabel: string
+  ) => {
+    if (!items || items.length === 0) return;
+    const sectionHeader = ` ${colorFn(pc.bold(title))}`;
+    lines.push(
+      pc.cyan('│') +
+        sectionHeader +
+        ' '.repeat(Math.max(1, width - 2 - stripAnsi(sectionHeader).length)) +
+        pc.cyan('│')
+    );
+
+    for (const item of items) {
+      const itemTitle = cleanTargetTitle(item.title, width - 36);
+      const text = `• #${item.number}: ${itemTitle} (${reasonLabel})`;
+      const wrapped = wrapText(text, width - 8);
+      for (let i = 0; i < wrapped.length; i++) {
+        const wLine = wrapped[i];
+        const wPlain = stripAnsi(wLine);
+        lines.push(
+          pc.cyan('│') +
+            `   ${wLine}` +
+            ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
+            pc.cyan('│')
+        );
+      }
+    }
+  };
+
+  if (report.gatedHuman && report.gatedHuman.length > 0) {
+    renderSection('Gated by Human Decision (needs-human):', pc.red, report.gatedHuman, 'Gated: needs-human');
+  }
+
+  if (report.awaitingInfo && report.awaitingInfo.length > 0) {
+    renderSection(
+      'Awaiting Specifications (needs-info / needs-design):',
+      pc.yellow,
+      report.awaitingInfo,
+      'Awaiting info: needs-info'
+    );
+  }
+
+  if (report.inProgress && report.inProgress.length > 0) {
+    renderSection('Already In Progress:', pc.blue, report.inProgress, 'In Progress');
+  }
+
+  if (report.guardrails && report.guardrails.length > 0) {
+    renderSection('Metrics & Guardrails (measurement / wontfix):', pc.magenta, report.guardrails, 'Guardrail: measurement');
+  }
+
+  if (report.routineLogs && report.routineLogs.length > 0) {
+    const routineText = ` Operational Logs: ${report.routineLogs.length} routine run log(s) filtered`;
+    lines.push(
+      pc.cyan('│') +
+        pc.dim(routineText) +
+        ' '.repeat(Math.max(1, width - 2 - stripAnsi(routineText).length)) +
+        pc.cyan('│')
+    );
+  }
+
+  // Hints to unblock section
+  lines.push(pc.cyan(`├${horizontal}┤`));
+  const hintsHeader = ` ${pc.bold('Hints to unblock:')}`;
+  lines.push(
+    pc.cyan('│') +
+      hintsHeader +
+      ' '.repeat(Math.max(1, width - 2 - stripAnsi(hintsHeader).length)) +
+      pc.cyan('│')
+  );
+
+  const hints: string[] = [];
+  if (report.awaitingInfo && report.awaitingInfo.length > 0) {
+    hints.push("Remove 'needs-info' or 'needs-design' once specifications are clarified.");
+  }
+  if (report.gatedHuman && report.gatedHuman.length > 0) {
+    hints.push("Remove 'needs-human' if autonomous implementation is appropriate.");
+  }
+  if (report.inProgress && report.inProgress.length > 0) {
+    hints.push("Merge or close open PRs, or unassign human assignees to allow agent pickup.");
+  }
+  if (hints.length === 0) {
+    hints.push("Add priority/P1 or priority/P2 label to an issue to schedule autonomous work.");
+  }
+
+  for (const hint of hints) {
+    const text = `• ${hint}`;
+    const wrapped = wrapText(text, width - 8);
+    for (const wLine of wrapped) {
+      const wPlain = stripAnsi(wLine);
+      lines.push(
+        pc.cyan('│') +
+          `   ${pc.dim(wLine)}` +
+          ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
+          pc.cyan('│')
+      );
+    }
+  }
+
+  lines.push(pc.cyan(`└${horizontal}┘`));
+  return lines.join('\n');
+}
