@@ -538,9 +538,16 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
     writeDaemonState(repoRoot, state);
   }
 
-  let reviewablePRs = await getPRs(repoRoot);
+  let reviewablePRs: ReviewablePR[] = [];
+  try {
+    reviewablePRs = await getPRs(repoRoot);
+  } catch (err: any) {
+    console.error(pc.red(`✗ Failed to query reviewable PRs: ${err.message}`));
+    return;
+  }
 
   if (reviewablePRs.length === 0) {
+
     if (options.verbose) {
       console.log(pc.dim(`[${new Date().toLocaleTimeString()}] Peer Review Watchdog: 0 ready PRs found (0 tokens used).`));
     }
@@ -625,9 +632,15 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
     }
 
     // Re-query reviewable PRs after session
-    reviewablePRs = await getPRs(repoRoot);
+    try {
+      reviewablePRs = await getPRs(repoRoot);
+    } catch (err: any) {
+      console.error(pc.red(`✗ Failed to re-query reviewable PRs: ${err.message}`));
+      break;
+    }
   }
 }
+
 
 export interface PerformAutoworkScanOptions {
   repoRoot: string;
@@ -848,8 +861,14 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         getPRs: getPRsFn,
         runRoutine: runRoutineFn,
       });
-      const prs = await getPRsFn(repoRoot);
-      lastOpenPRCount = prs.length;
+      try {
+        const prs = await getPRsFn(repoRoot);
+        lastOpenPRCount = prs.length;
+      } catch (err: any) {
+        console.warn(pc.yellow(`⚠️  Failed to refresh open PR count: ${err?.message || err}`));
+      }
+    } catch (err: any) {
+      console.error(pc.red(`✗ Error in peer-review drain pass: ${err.message}`));
     } finally {
       isWorking = false;
       state.status = isPaused ? 'paused' : 'idle';
@@ -868,14 +887,19 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         const next = pendingRoutine;
         pendingRoutine = null;
         console.log(pc.cyan(`\n[${new Date().toLocaleTimeString()}] ⚡ Executing queued routine: ${next}...`));
-        if (next === 'peer-review') {
-          await performReviewDrain();
-        } else if (next === 'autowork') {
-          await runAutoworkCheck();
+        try {
+          if (next === 'peer-review') {
+            await performReviewDrain();
+          } else if (next === 'autowork') {
+            await runAutoworkCheck();
+          }
+        } catch (err: any) {
+          console.error(pc.red(`✗ Error executing queued routine ${next}: ${err.message}`));
         }
       }
     }
   };
+
 
   const runAutoworkCheck = async (): Promise<void> => {
     if (isStopping || isWorking || !routines.includes('autowork')) return;
@@ -895,8 +919,12 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         runRoutine: runRoutineFn,
       });
 
-      const prs = await getPRsFn(repoRoot);
-      lastOpenPRCount = prs.length;
+      try {
+        const prs = await getPRsFn(repoRoot);
+        lastOpenPRCount = prs.length;
+      } catch (err: any) {
+        console.warn(pc.yellow(`⚠️  Failed to refresh open PR count: ${err?.message || err}`));
+      }
     } catch (err: any) {
       console.error(pc.red(`✗ Error in autowork: ${err.message}`));
     } finally {
@@ -910,14 +938,18 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
 
       // Immediate post-autowork convergence sweep: if autowork opened/readied a PR, drain it immediately!
       if (!isStopping && routines.includes('peer-review')) {
-        const newPRCount = (await getPRsFn(repoRoot)).length;
-        if (newPRCount > 0) {
-          console.log(
-            pc.cyan(
-              `\n[${new Date().toLocaleTimeString()}] 🔄 Post-autowork convergence: Found ${newPRCount} ready PR(s). Initiating review sweep...`
-            )
-          );
-          await performReviewDrain();
+        try {
+          const newPRCount = (await getPRsFn(repoRoot)).length;
+          if (newPRCount > 0) {
+            console.log(
+              pc.cyan(
+                `\n[${new Date().toLocaleTimeString()}] 🔄 Post-autowork convergence: Found ${newPRCount} ready PR(s). Initiating review sweep...`
+              )
+            );
+            await performReviewDrain();
+          }
+        } catch (err: any) {
+          console.error(pc.red(`✗ Error in post-autowork convergence review: ${err.message}`));
         }
       }
 
@@ -930,14 +962,19 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         const next = pendingRoutine;
         pendingRoutine = null;
         console.log(pc.cyan(`\n[${new Date().toLocaleTimeString()}] ⚡ Executing queued routine: ${next}...`));
-        if (next === 'peer-review') {
-          await performReviewDrain();
-        } else if (next === 'autowork') {
-          await runAutoworkCheck();
+        try {
+          if (next === 'peer-review') {
+            await performReviewDrain();
+          } else if (next === 'autowork') {
+            await runAutoworkCheck();
+          }
+        } catch (err: any) {
+          console.error(pc.red(`✗ Error executing queued routine ${next}: ${err.message}`));
         }
       }
     }
   };
+
 
   const runTargetedReview = async (prNumber: number): Promise<void> => {
     if (isStopping || isWorking) return;
@@ -991,14 +1028,19 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         const next = pendingRoutine;
         pendingRoutine = null;
         console.log(pc.cyan(`\n[${new Date().toLocaleTimeString()}] ⚡ Executing queued routine: ${next}...`));
-        if (next === 'peer-review') {
-          await performReviewDrain();
-        } else if (next === 'autowork') {
-          await runAutoworkCheck();
+        try {
+          if (next === 'peer-review') {
+            await performReviewDrain();
+          } else if (next === 'autowork') {
+            await runAutoworkCheck();
+          }
+        } catch (err: any) {
+          console.error(pc.red(`✗ Error executing queued routine ${next}: ${err.message}`));
         }
       }
     }
   };
+
 
   const runTargetedAutowork = async (issueNumber: number): Promise<void> => {
     if (isStopping || isWorking) return;
@@ -1045,14 +1087,18 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
 
       // Immediate post-autowork convergence sweep
       if (!isStopping && routines.includes('peer-review')) {
-        const newPRCount = (await getPRsFn(repoRoot)).length;
-        if (newPRCount > 0) {
-          console.log(
-            pc.cyan(
-              `\n[${new Date().toLocaleTimeString()}] 🔄 Post-autowork convergence: Found ${newPRCount} ready PR(s). Initiating review sweep...`
-            )
-          );
-          await performReviewDrain();
+        try {
+          const newPRCount = (await getPRsFn(repoRoot)).length;
+          if (newPRCount > 0) {
+            console.log(
+              pc.cyan(
+                `\n[${new Date().toLocaleTimeString()}] 🔄 Post-autowork convergence: Found ${newPRCount} ready PR(s). Initiating review sweep...`
+              )
+            );
+            await performReviewDrain();
+          }
+        } catch (err: any) {
+          console.error(pc.red(`✗ Error in post-autowork convergence review: ${err.message}`));
         }
       }
 
@@ -1065,14 +1111,19 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         const next = pendingRoutine;
         pendingRoutine = null;
         console.log(pc.cyan(`\n[${new Date().toLocaleTimeString()}] ⚡ Executing queued routine: ${next}...`));
-        if (next === 'peer-review') {
-          await performReviewDrain();
-        } else if (next === 'autowork') {
-          await runAutoworkCheck();
+        try {
+          if (next === 'peer-review') {
+            await performReviewDrain();
+          } else if (next === 'autowork') {
+            await runAutoworkCheck();
+          }
+        } catch (err: any) {
+          console.error(pc.red(`✗ Error executing queued routine ${next}: ${err.message}`));
         }
       }
     }
   };
+
 
   // Keyboard Controller setup
   keyboard = new KeyboardController({
@@ -1287,11 +1338,15 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
   void reconcileOrphanedLocalRuns(repoRoot).catch(() => {});
 
   // Run initial checks on start: drain review queue first, then move to autowork
-  if (routines.includes('peer-review')) {
-    await performReviewDrain();
-  }
-  if (!isStopping && !isGracefulStopping && routines.includes('autowork')) {
-    await runAutoworkCheck();
+  try {
+    if (routines.includes('peer-review')) {
+      await performReviewDrain();
+    }
+    if (!isStopping && !isGracefulStopping && routines.includes('autowork')) {
+      await runAutoworkCheck();
+    }
+  } catch (err: any) {
+    console.error(pc.red(`\n✗ Error during initial routine sweep: ${err.message}`));
   }
 
   if (isStopping) return;
@@ -1316,10 +1371,13 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
       }
 
       updateTicker();
+    } catch (err: any) {
+      console.error(pc.red(`\n✗ Error during daemon watchdog tick: ${err.message}`));
     } finally {
       isTicking = false;
     }
   };
+
 
   tickerInterval = setInterval(tick, 1000);
 

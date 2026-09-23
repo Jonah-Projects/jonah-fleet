@@ -328,4 +328,35 @@ describe('Local Agent Daemon Manager', () => {
       expect(count).toBe(0);
     });
   });
+
+  describe('Daemon Error Handling & Worktree Resilience', () => {
+    it('gracefully handles getPRs throwing an API error without throwing', async () => {
+      await expect(
+        drainReviewQueue({
+          repoRoot: tmpRepo,
+          getPRs: async () => {
+            throw new Error('API error (attempt 1): UNAVAILABLE (code 503)');
+          },
+        })
+      ).resolves.not.toThrow();
+    });
+
+    it('gracefully handles re-query getPRs throwing an error after routine completion', async () => {
+      let callCount = 0;
+      await expect(
+        drainReviewQueue({
+          repoRoot: tmpRepo,
+          getPRs: async () => {
+            callCount++;
+            if (callCount === 1) {
+              return [{ number: 42, headRefName: 'feat/test', title: 'Test PR' }];
+            }
+            throw new Error('API error on re-query (code 503)');
+          },
+          runRoutine: async () => ({ success: true, exitCode: 0 }),
+        })
+      ).resolves.not.toThrow();
+    });
+  });
 });
+

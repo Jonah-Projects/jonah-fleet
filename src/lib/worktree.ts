@@ -130,7 +130,7 @@ export async function listActiveWorktrees(repoRoot: string): Promise<WorktreeInf
       }
 
       const resolvedPath = path.resolve(currentPath);
-      if (resolvedPath.startsWith(baseDir)) {
+      if (resolvedPath === baseDir || resolvedPath.startsWith(baseDir + path.sep)) {
         worktrees.push({
           path: resolvedPath,
           branch: currentBranch || 'detached',
@@ -145,29 +145,62 @@ export async function listActiveWorktrees(repoRoot: string): Promise<WorktreeInf
   }
 }
 
+export interface CleanupStaleWorktreesOptions {
+  keepPath?: string;
+}
+
 /**
  * Prunes orphaned worktrees and cleans empty worktree directories.
  */
-export async function cleanupStaleWorktrees(repoRoot: string): Promise<number> {
+export async function cleanupStaleWorktrees(
+  repoRoot: string,
+  options: CleanupStaleWorktreesOptions = {}
+): Promise<number> {
   let cleaned = 0;
   try {
-    await execFileAsync('git', ['worktree', 'prune'], { cwd: repoRoot });
-    const baseDir = getWorktreesBaseDir(repoRoot);
-    if (fs.existsSync(baseDir)) {
+    const keepNormalized = options.keepPath ? path.resolve(options.keepPath) : undefined;
+    const baseDir = path.resolve(getWorktreesBaseDir(repoRoot));
+
+    // 1. If keepPath is explicitly provided, remove other registered worktrees located within baseDir
+    if (keepNormalized) {
       const active = await listActiveWorktrees(repoRoot);
-      const activePaths = new Set(active.map((w) => w.path));
+      for (const wt of active) {
+        const wtResolved = path.resolve(wt.path);
+        const isInsideBaseDir = wtResolved === baseDir || wtResolved.startsWith(baseDir + path.sep);
+        if (isInsideBaseDir && wtResolved !== keepNormalized) {
+          try {
+            await execFileAsync('git', ['worktree', 'remove', '--force', wt.path], { cwd: repoRoot });
+          } catch {
+            if (fs.existsSync(wt.path)) {
+              fs.rmSync(wt.path, { recursive: true, force: true });
+            }
+          }
+          cleaned++;
+        }
+      }
+    }
+
+    await execFileAsync('git', ['worktree', 'prune'], { cwd: repoRoot }).catch(() => {});
+
+    // 2. Remove any remaining directories in baseDir not matching keepPath
+    if (fs.existsSync(baseDir)) {
+      const remainingActive = await listActiveWorktrees(repoRoot);
+      const remainingActivePaths = new Set(remainingActive.map((w) => path.resolve(w.path)));
       const dirs = fs.readdirSync(baseDir);
 
       for (const dir of dirs) {
         const fullPath = path.resolve(path.join(baseDir, dir));
-        if (!activePaths.has(fullPath)) {
+        if (fullPath !== keepNormalized && !remainingActivePaths.has(fullPath)) {
           fs.rmSync(fullPath, { recursive: true, force: true });
           cleaned++;
         }
       }
     }
+
+    await execFileAsync('git', ['worktree', 'prune'], { cwd: repoRoot }).catch(() => {});
   } catch {
     // Ignore cleanup errors
   }
   return cleaned;
 }
+

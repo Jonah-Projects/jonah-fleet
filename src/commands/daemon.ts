@@ -39,7 +39,12 @@ export async function runDaemonCommand(action?: string, options: DaemonCommandOp
 
   if (act === 'start') {
     if (options.foreground) {
-      await runDaemonLoop(cwd, daemonOpts);
+      try {
+        await runDaemonLoop(cwd, daemonOpts);
+      } catch (err: any) {
+        console.error(pc.red(`\n✗ Daemon exited with error: ${err.message}`));
+        process.exit(1);
+      }
       return;
     }
 
@@ -77,9 +82,15 @@ export async function runDaemonCommand(action?: string, options: DaemonCommandOp
   }
 
   if (act === 'foreground') {
-    await runDaemonLoop(cwd, daemonOpts);
+    try {
+      await runDaemonLoop(cwd, daemonOpts);
+    } catch (err: any) {
+      console.error(pc.red(`\n✗ Daemon exited with error: ${err.message}`));
+      process.exit(1);
+    }
     return;
   }
+
 
   // Default: status
   const running = isDaemonRunning(cwd);

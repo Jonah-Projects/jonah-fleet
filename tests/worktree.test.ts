@@ -79,4 +79,63 @@ describe('Git Worktree Isolation', () => {
     expect(cleaned).toBeGreaterThanOrEqual(1);
     expect(fs.existsSync(staleDir)).toBe(false);
   });
+
+  it('preserves registered active worktrees when keepPath is omitted and prunes orphaned directories', async () => {
+    const branchName = 'agent/autowork-active-session';
+    const result = await createWorktree(tmpRepo, { branchName, baseRef: 'main' });
+    expect(fs.existsSync(result.worktreePath)).toBe(true);
+
+    const baseDir = getWorktreesBaseDir(tmpRepo);
+    const orphanDir = path.join(baseDir, 'orphan-unregistered');
+    fs.mkdirSync(orphanDir, { recursive: true });
+
+    const activeBefore = await listActiveWorktrees(tmpRepo);
+    expect(activeBefore.length).toBe(1);
+
+    const cleaned = await cleanupStaleWorktrees(tmpRepo);
+    expect(cleaned).toBeGreaterThanOrEqual(1);
+    expect(fs.existsSync(result.worktreePath)).toBe(true);
+    expect(fs.existsSync(orphanDir)).toBe(false);
+
+    const activeAfter = await listActiveWorktrees(tmpRepo);
+    expect(activeAfter.length).toBe(1);
+    expect(activeAfter[0].path).toBe(path.resolve(result.worktreePath));
+  });
+
+  it('preserves designated worktree when keepPath is provided and cleans other registered worktrees', async () => {
+    const branch1 = 'agent/autowork-keep';
+    const wt1 = await createWorktree(tmpRepo, { branchName: branch1, baseRef: 'main' });
+
+    const branch2 = 'agent/autowork-to-remove';
+    const wt2 = await createWorktree(tmpRepo, { branchName: branch2, baseRef: 'main' });
+
+    const baseDir = getWorktreesBaseDir(tmpRepo);
+    const orphanDir = path.join(baseDir, 'orphan-dir-2');
+    fs.mkdirSync(orphanDir, { recursive: true });
+
+    const activeBefore = await listActiveWorktrees(tmpRepo);
+    expect(activeBefore.length).toBe(2);
+
+    const cleaned = await cleanupStaleWorktrees(tmpRepo, { keepPath: wt1.worktreePath });
+    expect(cleaned).toBeGreaterThanOrEqual(2);
+
+    expect(fs.existsSync(wt1.worktreePath)).toBe(true);
+    expect(fs.existsSync(wt2.worktreePath)).toBe(false);
+    expect(fs.existsSync(orphanDir)).toBe(false);
+
+    const activeAfter = await listActiveWorktrees(tmpRepo);
+    expect(activeAfter.length).toBe(1);
+    expect(activeAfter[0].path).toBe(path.resolve(wt1.worktreePath));
+  });
+
+  it('does not match sibling directories with similar prefix like worktrees-backup', async () => {
+    const siblingDir = path.join(tmpRepo, '.jonah-fleet', 'worktrees-backup');
+    fs.mkdirSync(siblingDir, { recursive: true });
+    fs.writeFileSync(path.join(siblingDir, 'important.txt'), 'keep me', 'utf8');
+
+    await cleanupStaleWorktrees(tmpRepo);
+    expect(fs.existsSync(siblingDir)).toBe(true);
+    expect(fs.existsSync(path.join(siblingDir, 'important.txt'))).toBe(true);
+  });
 });
+
