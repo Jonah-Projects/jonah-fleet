@@ -73,6 +73,11 @@ export class LoopGuard {
         (args?.Action === 'list' ||
           args?.action === 'list'));
 
+    const isExemptFromRepetition =
+      isStatusPolling ||
+      toolName === 'view_file' ||
+      toolName === 'read_file';
+
     const hash = computeActionHash(toolName, args);
     const record = {
       toolName,
@@ -109,7 +114,7 @@ export class LoopGuard {
     this.history.push(record);
 
     // 2. Repetition Guard within sliding window
-    if (!isStatusPolling) {
+    if (!isExemptFromRepetition) {
       const windowStart = Math.max(0, this.history.length - this.slidingWindowSize);
       const currentWindow = this.history.slice(windowStart);
 

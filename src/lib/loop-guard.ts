@@ -117,6 +117,11 @@ export class LoopGuard {
         (args?.Action === 'list' ||
           args?.action === 'list'));
 
+    const isExemptFromRepetition =
+      isStatusPolling ||
+      toolName === 'view_file' ||
+      toolName === 'read_file';
+
     const hash = computeActionHash(toolName, args);
     const record: ActionRecord = {
       toolName,
@@ -159,7 +164,7 @@ export class LoopGuard {
     const currentWindow = this.history.slice(windowStart);
 
     // 2. Repetition Guard: Check if 5 identical action hashes occur within sliding window
-    if (!isStatusPolling) {
+    if (!isExemptFromRepetition) {
       let repetitionCount = 0;
       for (const item of currentWindow) {
         if (item.hash === hash) {

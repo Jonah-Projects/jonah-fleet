@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+* **guard:** exempt read-only file inspection tools (`view_file`, `read_file`) from sliding-window repetition circuit breaker, preventing false-positive runner aborts during large-file slice reading.
 * **radar:** calibrate upstream heuristic classifier to filter release chores, non-GitHub platforms, and internal build details, eliminating false Category A/B alerts in weekly digests.
 
 ## [1.24.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.23.1...v1.24.0) (2026-09-23)
