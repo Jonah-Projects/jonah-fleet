@@ -111,6 +111,19 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       }
       expect(guard.isTripped()).toBe(false);
     });
+
+    it('exempts view_file and read_file inspections from repetition trip', () => {
+      const guard = new LoopGuard({ repetitionThreshold: 5, slidingWindowSize: 20 });
+      for (let i = 0; i < 10; i++) {
+        expect(guard.recordAction('view_file', { AbsolutePath: '/path/to/daemon.ts' })).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+
+      for (let i = 0; i < 10; i++) {
+        expect(guard.recordAction('read_file', { path: 'src/lib/daemon.ts' })).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+    });
   });
 
   describe('Ping-Pong Guard (Threshold = 3 alternating pairs, 6 actions)', () => {
