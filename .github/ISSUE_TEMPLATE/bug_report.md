@@ -6,7 +6,7 @@ labels: ['type/bug', 'priority/P1']
 assignees: ''
 ---
 
-[![Trigger Autowork](https://img.shields.io/badge/Autowork-Run_Targeted-blue?style=for-the-badge&logo=githubactions)](https://github.com/juliendurandeu/jonah-fleet/actions/workflows/trigger-autowork-manual.yml)
+[![Trigger Autowork](https://img.shields.io/badge/Autowork-Run_Targeted-blue?style=for-the-badge&logo=githubactions)](https://github.com/Jonah-Projects/jonah-fleet/actions/workflows/trigger-autowork-manual.yml)
 
 ## Summary
 <!-- A clear and concise description of what the bug is -->

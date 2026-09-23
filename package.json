@@ -30,11 +30,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/juliendurandeu/jonah-fleet.git"
+    "url": "https://github.com/Jonah-Projects/jonah-fleet.git"
   },
-  "homepage": "https://github.com/juliendurandeu/jonah-fleet#readme",
+  "homepage": "https://github.com/Jonah-Projects/jonah-fleet#readme",
   "bugs": {
-    "url": "https://github.com/juliendurandeu/jonah-fleet/issues"
+    "url": "https://github.com/Jonah-Projects/jonah-fleet/issues"
   },
   "dependencies": {
     "commander": "^15.0.0",

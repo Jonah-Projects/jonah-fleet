@@ -84,7 +84,7 @@ Assigning any issue in GitHub's native sidebar Assignees dropdown to the designa
 To trigger the Autowork routine manually on any specific issue, use the GitHub Actions `workflow_dispatch` trigger or embed this badge link in issue templates/descriptions:
 
 ```markdown
-[![Trigger Autowork](https://img.shields.io/badge/Autowork-Run_Targeted-blue?style=for-the-badge&logo=githubactions)](https://github.com/juliendurandeu/jonah-fleet/actions/workflows/trigger-autowork-manual.yml)
+[![Trigger Autowork](https://img.shields.io/badge/Autowork-Run_Targeted-blue?style=for-the-badge&logo=githubactions)](https://github.com/Jonah-Projects/jonah-fleet/actions/workflows/trigger-autowork-manual.yml)
 ```
 
 ## Design System & UI Guardrails

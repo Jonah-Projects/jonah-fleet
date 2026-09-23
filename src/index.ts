@@ -118,7 +118,7 @@ program
   .option('-t, --title <title>', 'Contribution PR title')
   .option('-b, --body <body>', 'Contribution PR description')
   .option('-p, --prompt <prompt>', 'Target prompt template being refined')
-  .option('-r, --repo <repo>', 'Upstream target repository (defaults to juliendurandeu/jonah-fleet)')
+  .option('-r, --repo <repo>', 'Upstream target repository (defaults to Jonah-Projects/jonah-fleet)')
   .option('-d, --dry-run', 'Preview contribution branch and PR command without executing', false)
   .action(async (options) => {
     await runContribute(options);
