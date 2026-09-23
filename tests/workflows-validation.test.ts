@@ -30,6 +30,18 @@ describe('Workflow Validation & Invariants', () => {
     expect(content).toContain('Verify Atomic Handoff Invariant');
   });
 
+  it('ensures trigger-autowork-on-assign.yml exists in .github/workflows with byte-for-byte parity against template', () => {
+    const templatePath = path.join(workflowsDir, 'trigger-autowork-on-assign.yml');
+    const githubPath = path.join(process.cwd(), '.github/workflows', 'trigger-autowork-on-assign.yml');
+
+    expect(fs.existsSync(templatePath), 'Template trigger-autowork-on-assign.yml must exist').toBe(true);
+    expect(fs.existsSync(githubPath), '.github/workflows/trigger-autowork-on-assign.yml must exist').toBe(true);
+
+    const templateContent = fs.readFileSync(templatePath, 'utf8');
+    const githubContent = fs.readFileSync(githubPath, 'utf8');
+    expect(githubContent).toBe(templateContent);
+  });
+
   it('has trigger-autowork-manual.yml template with required inputs and steps', () => {
     const manualWorkflowPath = path.join(workflowsDir, 'trigger-autowork-manual.yml');
     expect(fs.existsSync(manualWorkflowPath)).toBe(true);
@@ -183,19 +195,22 @@ describe('Workflow Validation & Invariants', () => {
       const templatePath = path.join(workflowsDir, file);
       const githubPath = path.join(process.cwd(), '.github/workflows', file);
 
-      expect(fs.existsSync(templatePath)).toBe(true);
-      const templateContent = fs.readFileSync(templatePath, 'utf8');
-      expect(templateContent).not.toMatch(/^concurrency:/m);
-      expect(templateContent).toContain(`  ${job}:`);
-      expect(templateContent).toMatch(new RegExp(`  ${job}:[\\s\\S]*?    concurrency:[\\s\\S]*?      cancel-in-progress: true`));
+      for (const filePath of [templatePath, githubPath]) {
+        expect(fs.existsSync(filePath), `Workflow file ${filePath} should exist`).toBe(true);
+        const content = fs.readFileSync(filePath, 'utf8');
 
-      if (fs.existsSync(githubPath)) {
-        const githubContent = fs.readFileSync(githubPath, 'utf8');
-        expect(githubContent).not.toMatch(/^concurrency:/m);
-        expect(githubContent).toContain(`  ${job}:`);
-        expect(githubContent).toMatch(new RegExp(`  ${job}:[\\s\\S]*?    concurrency:[\\s\\S]*?      cancel-in-progress: true`));
-        expect(templateContent).toBe(githubContent);
+        // Verify top-level concurrency is absent (it should not start at column 0)
+        expect(content).not.toMatch(/^concurrency:/m);
+
+        // Verify concurrency is nested under the specific job
+        expect(content).toContain(`  ${job}:`);
+        expect(content).toMatch(new RegExp(`  ${job}:[\\s\\S]*?    concurrency:[\\s\\S]*?      cancel-in-progress: true`));
       }
+
+      // Ensure exact byte-for-byte 1:1 parity between template and .github workflow
+      const templateContent = fs.readFileSync(templatePath, 'utf8');
+      const githubContent = fs.readFileSync(githubPath, 'utf8');
+      expect(templateContent).toBe(githubContent);
     }
   });
 

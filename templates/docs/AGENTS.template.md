@@ -71,7 +71,7 @@ tests/            # Test suites
 
 ### 1-Click Assignment Trigger
 
-Assigning any issue in GitHub's native sidebar Assignees dropdown to the designated fleet bot account (e.g. `@jonah-fleet-bot` or configured `vars.AGENT_BOT_LOGIN`) automatically triggers Autowork in Targeted mode via `trigger-autowork-on-assign.yml`.
+Assigning any issue in GitHub's native sidebar Assignees dropdown to the designated fleet bot account (configured via `vars.AGENT_BOT_LOGIN` or machine user) automatically triggers Autowork in Targeted mode via `trigger-autowork-on-assign.yml`.
 
 ### Manual Dispatch & Badge Link
 

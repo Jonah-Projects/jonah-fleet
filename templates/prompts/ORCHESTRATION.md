@@ -21,7 +21,7 @@ Dispatch is both **scheduled** and **event-driven**. All routines run as ephemer
   - `trigger-review-routine.yml` fires Peer Review automatically when a PR is marked ready for review, updated, or review is requested (`ready_for_review`, `opened`, `reopened`, `synchronize`, `review_requested`). It can also be manually (re)triggered via `workflow_dispatch` (with optional `pr_number` for Targeted mode or blank for Scan mode) or by commenting `/review`, `/peer-review`, `/retrigger`, or `/re-review` on any open pull request.
   - `trigger-autowork-on-merge.yml` fires Autowork in **Targeted mode** when a PR merges to `main` and unblocks the next unit of chained work.
   - `trigger-autowork-on-bug.yml` fires Autowork when an issue becomes a high-priority bug.
-  - `trigger-autowork-on-assign.yml` fires Autowork in **Targeted mode** when an issue is assigned to a designated bot account or persona (`vars.AGENT_BOT_LOGIN` or `@jonah-fleet-bot`).
+  - `trigger-autowork-on-assign.yml` fires Autowork in **Targeted mode** when an issue is assigned to a designated bot account or persona (`vars.AGENT_BOT_LOGIN`).
   - `trigger-autowork-manual.yml` fires Autowork manually via `workflow_dispatch` or badge link click on a specific issue in **Targeted mode**.
 
 Autowork triggers pass the target issue via environment variables (`TARGET_ISSUE`, `ISSUE_NUMBER`, `ISSUE_URL`), putting autowork.md into **Targeted mode** (working the named issue ahead of Phase 1 convergence). Single-flight per issue is strictly enforced across scheduled, event-driven, and manually triggered runs.
@@ -39,7 +39,7 @@ Invariants deliberately upheld from this spec:
 
 Single source of truth for both autowork candidate reclamation and housekeeping sweeps. An assigned issue is a _stale claim_ (a dead autowork run's orphaned reservation, safe to release) only when **all** of these hold:
 
-1. **It is an autowork claim, not a manual one.** The issue carries a `🔒 Claimed by autowork run …` comment. An assigned issue with **no** such comment is never stale; leave it alone (it may be a person working manually), unless assigned to a designated bot persona (`vars.AGENT_BOT_LOGIN` or `@jonah-fleet-bot`) without active progress.
+1. **It is an autowork claim, not a manual one.** The issue carries a `🔒 Claimed by autowork run …` comment. An assigned issue with **no** such comment is never stale; leave it alone (it may be a person working manually).
 2. **No live work exists.** There is **no open PR** referencing the issue (`Closes #N`). An open PR is live, recoverable work that autowork Phase 1 owns — never reclaim it, at any age.
 3. **The claim is old.** The most recent `🔒 Claimed by autowork run …` comment's GitHub creation time (`created_at`) is **more than 6 hours** ago. Measure age from that `created_at` only — never the issue's `updated_at`.
 
