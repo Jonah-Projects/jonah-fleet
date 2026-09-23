@@ -923,6 +923,15 @@ describe('Rotating Status-Line Tips & Viewport Width Guardrails', () => {
         stdin: mockStdin,
         routines: ['autowork', 'peer-review'],
         getPRs,
+        getBacklog: async () => ({
+          actionable: [{ number: 1, title: 'Test Issue' }],
+          inProgress: [],
+          gatedHuman: [],
+          awaitingInfo: [],
+          guardrails: [],
+          routineLogs: [],
+          total: 1,
+        }),
         runRoutine,
       });
 

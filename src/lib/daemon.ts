@@ -21,8 +21,17 @@ import {
   formatDaemonStatusLine,
 } from './daemon-keys.js';
 import pc from 'picocolors';
+import {
+  renderBacklogDiagnosticCard,
+  isRoutineRunTitle,
+  type BacklogTriageReport,
+  type BacklogIssueInfo,
+} from './terminal-card.js';
 
 const execFileAsync = promisify(execFile);
+
+export type BacklogIssue = BacklogIssueInfo;
+export type { BacklogTriageReport };
 
 export interface DaemonState {
   pid: number;
@@ -48,6 +57,7 @@ export interface DaemonOptions {
   verbose?: boolean;
   stdin?: any;
   getPRs?: (repoRoot: string) => Promise<ReviewablePR[]>;
+  getBacklog?: (repoRoot: string) => Promise<BacklogTriageReport>;
   runRoutine?: (opts: any) => Promise<{ success: boolean; exitCode?: number }>;
 }
 
@@ -140,6 +150,156 @@ export async function getOpenReviewablePRs(repoRoot: string): Promise<Reviewable
 export async function countOpenReadyPRs(repoRoot: string): Promise<number> {
   const prs = await getOpenReviewablePRs(repoRoot);
   return prs.length;
+}
+
+/**
+ * Checks if a GitHub user login corresponds to a bot account or designated agent persona.
+ */
+export function isBotLogin(login?: string | null): boolean {
+  if (!login) return false;
+  const l = login.toLowerCase().trim();
+  const configuredBot = process.env.AGENT_BOT_LOGIN?.toLowerCase().replace(/^@/, '');
+  if (configuredBot && l === configuredBot) {
+    return true;
+  }
+  return (
+    l.endsWith('[bot]') ||
+    l.endsWith('-bot') ||
+    l.endsWith('_bot') ||
+    l === 'github-actions' ||
+    l === 'github-actions[bot]' ||
+    l === 'jonah-fleet-bot'
+  );
+}
+
+/**
+ * Classifies a list of open GitHub issues according to the Autowork backlog taxonomy.
+ */
+export function classifyBacklogIssues(
+  issues: BacklogIssue[],
+  openPRs: Array<{ number: number; title?: string; body?: string; headRefName?: string }> = []
+): BacklogTriageReport {
+  const actionable: BacklogIssue[] = [];
+  const inProgress: BacklogIssue[] = [];
+  const gatedHuman: BacklogIssue[] = [];
+  const awaitingInfo: BacklogIssue[] = [];
+  const guardrails: BacklogIssue[] = [];
+  const routineLogs: BacklogIssue[] = [];
+
+  const prReferencedIssues = new Set<number>();
+  for (const pr of openPRs) {
+    const textToScan = `${pr.title || ''} ${pr.body || ''} ${pr.headRefName || ''}`;
+    const matches = textToScan.matchAll(/#(\d+)\b/g);
+    for (const m of matches) {
+      prReferencedIssues.add(parseInt(m[1], 10));
+    }
+    const branchMatch = (pr.headRefName || '').match(/(?:^|[-_/])(\d+)(?:[-_/]|$)/);
+    if (branchMatch) {
+      prReferencedIssues.add(parseInt(branchMatch[1], 10));
+    }
+  }
+
+  for (const issue of issues) {
+    const labelNames = (issue.labels || []).map((l) =>
+      (typeof l === 'string' ? l : l.name).toLowerCase()
+    );
+
+    // 1. Routine logs (operational metadata)
+    if (labelNames.includes('routine-log') || isRoutineRunTitle(issue.title)) {
+      routineLogs.push(issue);
+      continue;
+    }
+
+    // 2. Gated by human (needs-human)
+    if (labelNames.includes('needs-human')) {
+      gatedHuman.push(issue);
+      continue;
+    }
+
+    // 3. Awaiting info / design
+    if (labelNames.includes('needs-info') || labelNames.includes('needs-design')) {
+      awaitingInfo.push(issue);
+      continue;
+    }
+
+    // 4. Metric guardrails / wontfix
+    if (labelNames.includes('measurement') || labelNames.includes('wontfix')) {
+      guardrails.push(issue);
+      continue;
+    }
+
+    // 5. In progress: active open PR or assigned to non-bot human
+    const hasMatchingPR = prReferencedIssues.has(issue.number);
+    const hasHumanAssignee = (issue.assignees || []).some((a) => !isBotLogin(a.login));
+
+    if (hasMatchingPR || hasHumanAssignee) {
+      inProgress.push(issue);
+      continue;
+    }
+
+    // 6. Actionable (open, unassigned or bot-assigned, no open PR, no gating labels)
+    actionable.push(issue);
+  }
+
+  return {
+    actionable,
+    inProgress,
+    gatedHuman,
+    awaitingInfo,
+    guardrails,
+    routineLogs,
+    total: issues.length,
+  };
+}
+
+/**
+ * Fast GitHub CLI query for open issues in ~150ms with 0 token cost.
+ */
+export async function getBacklogIssues(repoRoot: string): Promise<BacklogIssue[]> {
+  try {
+    const { stdout } = await execFileAsync(
+      'gh',
+      ['issue', 'list', '--state', 'open', '--json', 'number,title,labels,assignees,url', '--limit', '50'],
+      { cwd: repoRoot, timeout: 5000 }
+    );
+    return JSON.parse(stdout || '[]') as BacklogIssue[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fast GitHub CLI query for open pull requests with titles and bodies.
+ */
+export async function getOpenPRsForBacklog(
+  repoRoot: string
+): Promise<Array<{ number: number; title?: string; body?: string; headRefName?: string }>> {
+  try {
+    const { stdout } = await execFileAsync(
+      'gh',
+      ['pr', 'list', '--state', 'open', '--json', 'number,title,body,headRefName', '--limit', '30'],
+      { cwd: repoRoot, timeout: 5000 }
+    );
+    return JSON.parse(stdout || '[]') as Array<{
+      number: number;
+      title?: string;
+      body?: string;
+      headRefName?: string;
+    }>;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Preflight query and classification for the full repository backlog with 0 token cost.
+ */
+export async function getBacklogTriageReport(repoRoot: string): Promise<BacklogTriageReport> {
+  const [issues, openPRs] = await Promise.all([
+    getBacklogIssues(repoRoot),
+    getOpenPRsForBacklog(repoRoot),
+  ]);
+  return classifyBacklogIssues(issues, openPRs);
 }
 
 /**
@@ -469,6 +629,123 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
   }
 }
 
+export interface PerformAutoworkScanOptions {
+  repoRoot: string;
+  state?: DaemonState;
+  options?: DaemonOptions;
+  isStopping?: () => boolean;
+  clearTicker?: () => void;
+  getPRs?: (repoRoot: string) => Promise<ReviewablePR[]>;
+  getBacklog?: (repoRoot: string) => Promise<BacklogTriageReport>;
+  runRoutine?: (opts: any) => Promise<{ success: boolean; exitCode?: number }>;
+  onDiagnosticCard?: (card: string) => void;
+}
+
+/**
+ * Performs an autowork backlog scan with zero-token preflight check.
+ * Drains reviewable PRs first, evaluates backlog, and bypasses worktree creation
+ * when zero actionable issues exist.
+ */
+export async function performAutoworkScan(
+  scanOptions: PerformAutoworkScanOptions
+): Promise<{ executed: boolean; reason?: string }> {
+  const {
+    repoRoot,
+    state,
+    options = {},
+    isStopping = () => false,
+    clearTicker,
+    getPRs = getOpenReviewablePRs,
+    getBacklog = options.getBacklog || getBacklogTriageReport,
+    runRoutine = options.runRoutine || runLocalRoutine,
+    onDiagnosticCard,
+  } = scanOptions;
+
+  if (isStopping()) return { executed: false, reason: 'stopping' };
+
+  const routines = options.routines || ['peer-review', 'autowork'];
+
+  // Strict priority invariant: drain reviewable PRs before running autowork
+  if (routines.includes('peer-review')) {
+    const pendingPRs = (await getPRs(repoRoot)).length;
+    if (pendingPRs > 0) {
+      console.log(
+        pc.cyan(
+          `\n[${new Date().toLocaleTimeString()}] ⏳ Autowork paused: draining ${pendingPRs} reviewable PR(s) first...`
+        )
+      );
+      await drainReviewQueue({
+        repoRoot,
+        state,
+        options,
+        isStopping,
+        clearTicker,
+        getPRs,
+        runRoutine,
+      });
+
+      const remainingPRs = (await getPRs(repoRoot)).length;
+      if (remainingPRs > 0) {
+        console.log(
+          pc.yellow(
+            `\n[${new Date().toLocaleTimeString()}] ⚠️  Review backlog still has ${remainingPRs} pending PR(s). Postponing autowork session.`
+          )
+        );
+        return { executed: false, reason: 'pending_prs' };
+      }
+    }
+  }
+
+  // Zero-Token Preflight Check
+  const report = await getBacklog(repoRoot);
+
+  if (report.actionable.length === 0) {
+    if (clearTicker) clearTicker();
+    const card = renderBacklogDiagnosticCard(report);
+    console.log('\n' + card + '\n');
+    onDiagnosticCard?.(card);
+    return { executed: false, reason: 'zero_actionable' };
+  }
+
+  // Actionable issues exist -> proceed with full autonomous execution
+  if (state) {
+    state.lastAutoworkCheckAt = new Date().toISOString();
+    state.status = 'working';
+    state.activeRoutine = 'autowork';
+    writeDaemonState(repoRoot, state);
+  }
+
+  if (clearTicker) clearTicker();
+  console.log(
+    pc.cyan(
+      `\n[${new Date().toLocaleTimeString()}] 🚀 Autowork Backlog Scan: Found ${report.actionable.length} actionable issue(s). Starting session...`
+    )
+  );
+  await cleanupStaleWorktrees(repoRoot);
+
+  const result = await runRoutine({
+    targetDir: repoRoot,
+    routine: 'autowork',
+    model: options.model,
+    verbose: options.verbose,
+    noWorktree: false,
+    onTargetDetected: (target: string) => {
+      if (state) {
+        state.activeTarget = target;
+        writeDaemonState(repoRoot, state);
+      }
+    },
+  });
+
+  if (result.success) {
+    console.log(pc.green(`✓ Local autowork completed successfully.\n`));
+  } else {
+    console.warn(pc.yellow(`⚠️  Local autowork completed with code ${result.exitCode}.\n`));
+  }
+
+  return { executed: true };
+}
+
 /**
  * Runs the multi-cadence polling daemon loop in the current process with interactive controls.
  */
@@ -607,65 +884,19 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
       isWorking = true;
       nextAutoworkCheckTime = Date.now() + autoworkIntervalMs;
 
-      // Strict priority invariant: drain reviewable PRs before running autowork
-      if (routines.includes('peer-review')) {
-        const pendingPRs = (await getPRsFn(repoRoot)).length;
-        if (pendingPRs > 0) {
-          console.log(
-            pc.cyan(
-              `\n[${new Date().toLocaleTimeString()}] ⏳ Autowork paused: draining ${pendingPRs} reviewable PR(s) first...`
-            )
-          );
-          await drainReviewQueue({
-            repoRoot,
-            state,
-            options,
-            isStopping: () => isStopping,
-            clearTicker,
-            getPRs: getPRsFn,
-            runRoutine: runRoutineFn,
-          });
-          const prs = await getPRsFn(repoRoot);
-          lastOpenPRCount = prs.length;
-
-          const remainingPRs = (await getPRsFn(repoRoot)).length;
-          if (remainingPRs > 0) {
-            console.log(
-              pc.yellow(
-                `\n[${new Date().toLocaleTimeString()}] ⚠️  Review backlog still has ${remainingPRs} pending PR(s). Postponing autowork session.`
-              )
-            );
-            return;
-          }
-        }
-      }
-
-      state.lastAutoworkCheckAt = new Date().toISOString();
-      clearTicker();
-      state.status = 'working';
-      state.activeRoutine = 'autowork';
-      writeDaemonState(repoRoot, state);
-
-      console.log(pc.cyan(`\n[${new Date().toLocaleTimeString()}] 🚀 Autowork Backlog Scan: Starting session...`));
-      await cleanupStaleWorktrees(repoRoot);
-
-      const result = await runRoutineFn({
-        targetDir: repoRoot,
-        routine: 'autowork',
-        model: options.model,
-        verbose: options.verbose,
-        noWorktree: false,
-        onTargetDetected: (target: string) => {
-          state.activeTarget = target;
-          writeDaemonState(repoRoot, state);
-        },
+      await performAutoworkScan({
+        repoRoot,
+        state,
+        options,
+        isStopping: () => isStopping,
+        clearTicker,
+        getPRs: getPRsFn,
+        getBacklog: options.getBacklog || getBacklogTriageReport,
+        runRoutine: runRoutineFn,
       });
 
-      if (result.success) {
-        console.log(pc.green(`✓ Local autowork completed successfully.\n`));
-      } else {
-        console.warn(pc.yellow(`⚠️  Local autowork completed with code ${result.exitCode}.\n`));
-      }
+      const prs = await getPRsFn(repoRoot);
+      lastOpenPRCount = prs.length;
     } catch (err: any) {
       console.error(pc.red(`✗ Error in autowork: ${err.message}`));
     } finally {
