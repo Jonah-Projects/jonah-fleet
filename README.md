@@ -1,10 +1,15 @@
-# ⚓ Jonah Fleet
+<p align="center">
+  <img src="./assets/brand/banner.jpg" alt="Fleet — Autonomous Repo Command" width="100%" />
+</p>
+
+# ⚡ Fleet
 
 > **Standalone Autonomous Agent Fleet & Symphony Orchestration Engine**  
 > Battle-tested autonomous coding agents, claim protocols, review loops, and engineering skills for multi-repo teams.
 
 [![CI](https://github.com/Jonah-Projects/jonah-fleet/actions/workflows/ci.yml/badge.svg)](https://github.com/Jonah-Projects/jonah-fleet/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](./package.json)
+[![Brand: Fleet](https://img.shields.io/badge/Brand-Fleet_Design_System-BBF65D?style=flat)](./assets/brand/README.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
@@ -23,11 +28,11 @@
 
 ## 🏛️ Architecture: The Symphony Lineage
 
-Jonah Fleet is a **GitHub-native implementation of OpenAI's [Symphony specification](https://github.com/openai/symphony/blob/main/SPEC.md)** for orchestrating autonomous coding agents against issue trackers. 
+Fleet is a **GitHub-native implementation of OpenAI's [Symphony specification](https://github.com/openai/symphony/blob/main/SPEC.md)** for orchestrating autonomous coding agents against issue trackers. 
 
-Rather than requiring a persistent orchestrator daemon or complex server infrastructure, Jonah Fleet maps all Symphony primitives directly onto GitHub and ephemeral CLI agent sessions:
+Rather than requiring a persistent orchestrator daemon or complex server infrastructure, Fleet maps all Symphony primitives directly onto GitHub and ephemeral CLI agent sessions:
 
-| Symphony Concept | Jonah Fleet Implementation |
+| Symphony Concept | Fleet Implementation |
 |---|---|
 | **`WORKFLOW.md`** (Repo config & prompt templates) | `AGENTS.md` (aliased as `GEMINI.md`/`CLAUDE.md`) + `.github/prompts/*.md` |
 | **Orchestrator** (Poll, dispatch, reconcile) | GitHub Actions event triggers + scheduled cron routines (zero persistent daemons) |
@@ -37,9 +42,9 @@ Rather than requiring a persistent orchestrator daemon or complex server infrast
 | **Warm-Context Synchronization** | In-session polling & live fix loops between Autowork and Peer Review before merge |
 | **Dead-Run Recovery** | Stale claim detection (>6h without live PR) via autowork & issues-housekeeping sweeps |
 
-### Architectural Comparison: Jonah Fleet vs. SwarmClaw
+### Architectural Comparison: Fleet vs. SwarmClaw
 
-| Dimension | ⚓ Jonah Fleet | 🦞 SwarmClaw (`@swarmclawai/swarmclaw`) |
+| Dimension | ⚡ Fleet | 🦞 SwarmClaw (`@swarmclawai/swarmclaw`) |
 |---|---|---|
 | **Paradigm** | **Symphony-aligned, issue-driven workflow automation** | **Self-hosted multi-agent runtime & swarm platform** |
 | **Runtime Model** | Ephemeral CLI sessions (`agy`) spun up per issue/PR | Persistent daemon / Electron desktop app / server |
@@ -207,9 +212,23 @@ Each target project contains an `agents-manifest.json` at its root:
 
 ---
 
+## 🎨 Brand & Visual Identity
+
+Fleet's visual design system and assets are located in [`assets/brand/`](./assets/brand):
+
+| Asset | Resource | Ratio | Usage |
+|---|---|---|---|
+| **Avatar / App Icon** | [`avatar.jpg`](./assets/brand/avatar.jpg) | 1:1 (1024x1024) | Bot user profile, app icon, social avatar |
+| **Logo Lockup** | [`logo.jpg`](./assets/brand/logo.jpg) | 3:2 (1536x1024) | Documentation headers, splash screens, decks |
+| **Header Banner** | [`banner.jpg`](./assets/brand/banner.jpg) | 16:9 (1792x1008) | Repository hero, social cards, release cards |
+
+See [`assets/brand/README.md`](./assets/brand/README.md) for the complete design system specifications, color codes, and typography guidelines.
+
+---
+
 ## 🙏 Acknowledgments & Credits
 
-- **[OpenAI Symphony](https://github.com/openai/symphony)**: Jonah Fleet's orchestration architecture, single-flight claim locking, reader/writer separation, and prompt engineering protocols are inspired by OpenAI's [Symphony Specification](https://github.com/openai/symphony/blob/main/SPEC.md), licensed under [Apache-2.0](https://github.com/openai/symphony/blob/main/LICENSE). See [NOTICE](./NOTICE) for formal attribution.
+- **[OpenAI Symphony](https://github.com/openai/symphony)**: Fleet's orchestration architecture, single-flight claim locking, reader/writer separation, and prompt engineering protocols are inspired by OpenAI's [Symphony Specification](https://github.com/openai/symphony/blob/main/SPEC.md), licensed under [Apache-2.0](https://github.com/openai/symphony/blob/main/LICENSE). See [NOTICE](./NOTICE) for formal attribution.
 
 ---
 
