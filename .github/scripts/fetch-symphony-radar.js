@@ -153,10 +153,21 @@ export function classifyUpstreamItem(item, options = {}) {
     };
   }
 
-  // 2. Category A: Core claim protocols, invariants, security, budget, prompt engineering, safety guards
+  // 2. Chores & version bump releases are Category C (triaged via originating PRs)
+  const isReleaseChore = /^chore(\([^)]+\))?:\s*(release|bump\s+version|bump\s+to|bump\s+[a-z0-9_-]+\s+version)\b/i.test(title);
+  if (isReleaseChore) {
+    return {
+      category: 'C',
+      badge: '🔴 **Category C** (Skip)',
+      isOpportunity: false,
+      rationale: 'Release version bump chore; upstream changes are triaged via their originating PRs.'
+    };
+  }
+
+  // 3. Category A: Core claim protocols, invariants, security, budget, prompt engineering, safety guards
   // Precedence: Category A invariant and prompt engineering keywords take precedence over general platform/runtime keywords
   const isClaimOrInvariant = /\b(claim|single-flight|claim lock|claim invariant|invariants?|reader[/-]writer|state machine)\b/i.test(text);
-  const isSecurityOrToken = /\b(security|token scrub|token alias|least privilege|sanitiz)\b/i.test(text);
+  const isSecurityOrToken = /\b(security guardrail|token scrub|token alias|least privilege|credential sanitiz|secret mask|token sanitiz|scrub token|mask secret)\b/i.test(text);
   const isTokenEconomyOrBudget = /\b(token budget|budget ceiling|loop stagnation|retry limit|token limit)\b/i.test(text);
   const isZeroLlmIngest = /\b(zero-llm|deterministic indexing|provenance retention)\b/i.test(text);
   const isPromptEngineering = /\b(prompt engineering|prompt optimiz|system prompt|prefix[- ]cach(?:e|ing)?|prompt cach(?:e|ing)?)\b/i.test(text);
@@ -216,7 +227,7 @@ export function classifyUpstreamItem(item, options = {}) {
     };
   }
 
-  // 3. Filter explicit platform mismatches & runtime-specific internals to Category C
+  // 4. Filter explicit platform mismatches & runtime-specific internals to Category C
   const isGitLabOrNonGitHub = /\b(gitlab|bitbucket|azure)\b/i.test(text);
   if (isGitLabOrNonGitHub) {
     return {
@@ -234,6 +245,26 @@ export function classifyUpstreamItem(item, options = {}) {
       badge: '🔴 **Category C** (Skip)',
       isOpportunity: false,
       rationale: 'Elixir/OTP/BEAM runtime internal specific to Symphony; skip for Node.js/Actions architecture.'
+    };
+  }
+
+  const isLowLevelBuildOrMath = /\b(protoc|vexp|gemm|denormal|simd|subnormal|microcode|fma)\b/i.test(text);
+  if (isLowLevelBuildOrMath) {
+    return {
+      category: 'C',
+      badge: '🔴 **Category C** (Skip)',
+      isOpportunity: false,
+      rationale: 'Upstream low-level compiler, build tool, or floating-point math detail; no action needed.'
+    };
+  }
+
+  const isInternalCiOrBuild = /\b(ci|workflow|actions|build scripts?)\b/i.test(title) && (repo.includes('funes') || repo.includes('symphony'));
+  if (isInternalCiOrBuild) {
+    return {
+      category: 'C',
+      badge: '🔴 **Category C** (Skip)',
+      isOpportunity: false,
+      rationale: 'Upstream CI or build workflow detail; not applicable to fleet architecture.'
     };
   }
 
@@ -267,12 +298,12 @@ export function classifyUpstreamItem(item, options = {}) {
     };
   }
 
-  // 4. Category B: Adaptable patterns (MCP, memory retrieval, backpressure, review loops, worker transports)
+  // 5. Category B: Adaptable patterns (MCP, memory retrieval, backpressure, review loops, worker transports)
   const isWorkerOrTransport = /\b(acp|pty|worker transport|worker delegation|process transport)\b/i.test(text);
-  const isMcpOrTools = /\b(mcp|model context protocol|tool|skill)\b/i.test(text);
-  const isMemoryOrSearch = /\b(recall|hybrid search|bm25|vector search|rrf|rerank|lance|operational memory|lessons)\b/i.test(text);
+  const isMcpOrTools = /\b(mcp|model context protocol|mcp tool|custom tool|tool definition|skill)\b/i.test(text);
+  const isMemoryOrSearch = /\b(recall|hybrid search|bm25|vector search|rrf|operational memory|lessons\.md|layer-1 context|agent memory)\b/i.test(text);
   const isPacingOrReview = /\b(pacing|backpressure|rate limit|review loop|multi-stage review|concurrency)\b/i.test(text);
-  const isSessionOrTrace = /\b(session|trace|transcript|tracesource)\b/i.test(text);
+  const isSessionOrTrace = /\b(session trace|trace parsing|transcript indexing|transcript parsing|tracesource|session replay)\b/i.test(text);
 
   if (isWorkerOrTransport) {
     return {

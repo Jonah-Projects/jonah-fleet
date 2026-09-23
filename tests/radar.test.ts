@@ -351,6 +351,47 @@ describe('Upstream Ecosystem Radar (Symphony & Funes)', () => {
       expect(query.isOpportunity).toBe(false);
     });
 
+    it('correctly classifies upstream release chores, non-GitHub fixes, CI hardening, and internal provider details as Category C', () => {
+      // Symphony release chore mentioning GitLab security fix (PR #125 / issue #344)
+      const symReleaseChore = classifyUpstreamItem({
+        title: 'chore: release Symphony 0.0.3',
+        body: 'The latest public release predates the GitLab cross-origin credential forwarding fix in #124. Bump Symphony to 0.0.3 so the security fix can ship in public release binaries.'
+      }, { repo: 'openai/symphony' });
+      expect(symReleaseChore.category).toBe('C');
+      expect(symReleaseChore.isOpportunity).toBe(false);
+
+      // Funes CI hardening bot PR (PR #159 / issue #344)
+      const funesCiHardening = classifyUpstreamItem({
+        title: 'fix(ci): harden GitHub Actions workflows (#157)',
+        body: 'Automated hardening of the workflow files flagged on #157... HIGH excessive-permissions (zizmor). Check in security channel.'
+      }, { repo: 'huggingface/funes' });
+      expect(funesCiHardening.category).toBe('C');
+      expect(funesCiHardening.isOpportunity).toBe(false);
+
+      // Funes build & math internal PRs (PR #157 & #160 / issue #344)
+      const funesProtoc = classifyUpstreamItem({
+        title: 'Always use system protoc',
+        body: 'The build instructions and CI scripts sometimes referred to a local install of protoc. Also since switch to Lance 11 stock ubuntu 22.04 protoc works.'
+      }, { repo: 'huggingface/funes' });
+      expect(funesProtoc.category).toBe('C');
+      expect(funesProtoc.isOpportunity).toBe(false);
+
+      const funesVexp = classifyUpstreamItem({
+        title: 'Fix/vexp denormal underflow',
+        body: 'Ragged batch (Xeon 8275CL): embed 5880 -> 1137 ms, rerank 11186 -> 2525 ms.'
+      }, { repo: 'huggingface/funes' });
+      expect(funesVexp.category).toBe('C');
+      expect(funesVexp.isOpportunity).toBe(false);
+
+      // Orbital internal provider argument fix mentioning session and tool (commit 47ceb0b / issue #344)
+      const orbitalToolArg = classifyUpstreamItem({
+        title: 'fix(provider): replay unparseable tool-call arguments as "{}"',
+        body: 'A stream that dies mid tool call persists the half-written arguments string. Replaying a copy of that session to deepseek-v4-flash.'
+      }, { repo: 'zqiren/Orbital' });
+      expect(orbitalToolArg.category).toBe('C');
+      expect(orbitalToolArg.isOpportunity).toBe(false);
+    });
+
     it('aggregates activity and surfaces opportunities in classifyAllActivity', () => {
       const analysis = classifyAllActivity(
         {

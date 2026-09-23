@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **guard:** capture action arguments on LoopGuard circuit breaker trips, enrich failure cards and reports with formatted action details, and surface active tool commands in runner stdout.
 * **workflows:** provision MCP servers for Antigravity CLI in `analytics-review-cron.yml` and `design-review-cron.yml`.
 
+### Bug Fixes
+
+* **radar:** calibrate upstream heuristic classifier to filter release chores, non-GitHub platforms, and internal build details, eliminating false Category A/B alerts in weekly digests.
+
 ## [1.24.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.23.1...v1.24.0) (2026-09-23)
 
 
