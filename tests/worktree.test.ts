@@ -79,4 +79,21 @@ describe('Git Worktree Isolation', () => {
     expect(cleaned).toBeGreaterThanOrEqual(1);
     expect(fs.existsSync(staleDir)).toBe(false);
   });
+
+  it('cleans up registered stale worktrees in .jonah-fleet/worktrees when keepPath is omitted', async () => {
+    const branchName = 'agent/autowork-stale-abandoned';
+    const result = await createWorktree(tmpRepo, { branchName, baseRef: 'main' });
+    expect(fs.existsSync(result.worktreePath)).toBe(true);
+
+    const activeBefore = await listActiveWorktrees(tmpRepo);
+    expect(activeBefore.length).toBe(1);
+
+    const cleaned = await cleanupStaleWorktrees(tmpRepo);
+    expect(cleaned).toBeGreaterThanOrEqual(1);
+    expect(fs.existsSync(result.worktreePath)).toBe(false);
+
+    const activeAfter = await listActiveWorktrees(tmpRepo);
+    expect(activeAfter.length).toBe(0);
+  });
 });
+
