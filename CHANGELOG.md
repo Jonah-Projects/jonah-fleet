@@ -5,6 +5,22 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.26.0...v1.27.0) (2026-09-23)
+
+
+### Features
+
+* **brand:** add Fleet visual assets and brand documentation ([812ef40](https://github.com/Jonah-Projects/jonah-fleet/commit/812ef40c217dc3a6d3b9bab59deb43aaecf9d34f))
+* **branding:** integrate Fleet brand identity, ASCII emblem, and tactical readout styling ([#413](https://github.com/Jonah-Projects/jonah-fleet/issues/413)) ([ff06856](https://github.com/Jonah-Projects/jonah-fleet/commit/ff06856a79f2b9b123076df205eb5f6e69964289))
+* **workflows:** configure dynamic Git committer resolution and migrate repo URLs to Jonah-Projects ([#392](https://github.com/Jonah-Projects/jonah-fleet/issues/392)) ([d0dd1c7](https://github.com/Jonah-Projects/jonah-fleet/commit/d0dd1c7dcbfe2e68d724c15fc4723fcd36681aeb))
+
+
+### Bug Fixes
+
+* **daemon:** harden error handling against unhandled rejections and prune stale worktrees ([#395](https://github.com/Jonah-Projects/jonah-fleet/issues/395)) ([d263585](https://github.com/Jonah-Projects/jonah-fleet/commit/d263585ccddefd82e20f9655722864ce1735f84e))
+* **guard:** exempt replace_file_content and write_to_file from repetition and ping-pong circuit breakers ([#420](https://github.com/Jonah-Projects/jonah-fleet/issues/420)) ([fee7e99](https://github.com/Jonah-Projects/jonah-fleet/commit/fee7e9978fb0ff0df9c8e383b4e7eeb211398e1a))
+* **presets:** dynamically resolve FLEET_VERSION from package.json and sync manifest ([#416](https://github.com/Jonah-Projects/jonah-fleet/issues/416)) ([40119fa](https://github.com/Jonah-Projects/jonah-fleet/commit/40119fa8fbd77b455d10b2fc1ea7299b4aa03f98))
+
 ## [1.26.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.25.2...v1.26.0) (2026-09-23)
 
 
