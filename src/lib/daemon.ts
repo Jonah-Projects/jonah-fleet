@@ -864,8 +864,8 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
       try {
         const prs = await getPRsFn(repoRoot);
         lastOpenPRCount = prs.length;
-      } catch {
-        // Ignore PR count refresh error
+      } catch (err: any) {
+        console.warn(pc.yellow(`⚠️  Failed to refresh open PR count: ${err?.message || err}`));
       }
     } catch (err: any) {
       console.error(pc.red(`✗ Error in peer-review drain pass: ${err.message}`));
@@ -922,8 +922,8 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
       try {
         const prs = await getPRsFn(repoRoot);
         lastOpenPRCount = prs.length;
-      } catch {
-        // Ignore PR count refresh error
+      } catch (err: any) {
+        console.warn(pc.yellow(`⚠️  Failed to refresh open PR count: ${err?.message || err}`));
       }
     } catch (err: any) {
       console.error(pc.red(`✗ Error in autowork: ${err.message}`));

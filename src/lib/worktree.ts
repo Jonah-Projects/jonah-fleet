@@ -130,7 +130,7 @@ export async function listActiveWorktrees(repoRoot: string): Promise<WorktreeInf
       }
 
       const resolvedPath = path.resolve(currentPath);
-      if (resolvedPath.startsWith(baseDir)) {
+      if (resolvedPath === baseDir || resolvedPath.startsWith(baseDir + path.sep)) {
         worktrees.push({
           path: resolvedPath,
           branch: currentBranch || 'detached',
@@ -161,19 +161,22 @@ export async function cleanupStaleWorktrees(
     const keepNormalized = options.keepPath ? path.resolve(options.keepPath) : undefined;
     const baseDir = path.resolve(getWorktreesBaseDir(repoRoot));
 
-    // 1. Remove registered worktrees located within .jonah-fleet/worktrees (unless keepPath matches)
-    const active = await listActiveWorktrees(repoRoot);
-    for (const wt of active) {
-      const wtResolved = path.resolve(wt.path);
-      if (wtResolved.startsWith(baseDir) && wtResolved !== keepNormalized) {
-        try {
-          await execFileAsync('git', ['worktree', 'remove', '--force', wt.path], { cwd: repoRoot });
-        } catch {
-          if (fs.existsSync(wt.path)) {
-            fs.rmSync(wt.path, { recursive: true, force: true });
+    // 1. If keepPath is explicitly provided, remove other registered worktrees located within baseDir
+    if (keepNormalized) {
+      const active = await listActiveWorktrees(repoRoot);
+      for (const wt of active) {
+        const wtResolved = path.resolve(wt.path);
+        const isInsideBaseDir = wtResolved === baseDir || wtResolved.startsWith(baseDir + path.sep);
+        if (isInsideBaseDir && wtResolved !== keepNormalized) {
+          try {
+            await execFileAsync('git', ['worktree', 'remove', '--force', wt.path], { cwd: repoRoot });
+          } catch {
+            if (fs.existsSync(wt.path)) {
+              fs.rmSync(wt.path, { recursive: true, force: true });
+            }
           }
+          cleaned++;
         }
-        cleaned++;
       }
     }
 
