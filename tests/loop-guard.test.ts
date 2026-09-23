@@ -7,6 +7,7 @@ import {
   computeActionHash,
   canonicalStringify,
   LoopGuard,
+  formatActionSummary,
   formatLoopGuardFailureCard,
   formatLoopGuardReport,
 } from '../src/lib/loop-guard.js';
@@ -359,6 +360,54 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       expect(report).toContain('| Category | `loop_circuit_breaker` |');
       expect(report).toContain('- **Parameters**: `view_file: /path/to/file.ts`');
       expect(report).toContain('Alternating ping-pong action loop detected');
+    });
+  });
+
+  describe('formatActionSummary', () => {
+    it('formats tool arguments containing CommandLine, command, TargetFile, path, AbsolutePath, and Query', () => {
+      expect(formatActionSummary('run_command', { CommandLine: 'npm test' })).toBe('run_command: npm test');
+      expect(formatActionSummary('bash', { command: 'echo "hello world"' })).toBe('bash: echo "hello world"');
+      expect(formatActionSummary('write_to_file', { TargetFile: '/path/to/file.ts' })).toBe('write_to_file: /path/to/file.ts');
+      expect(formatActionSummary('read_file', { path: 'src/lib/loop-guard.ts' })).toBe('read_file: src/lib/loop-guard.ts');
+      expect(formatActionSummary('view_file', { AbsolutePath: '/var/log/app.log' })).toBe('view_file: /var/log/app.log');
+      expect(formatActionSummary('grep_search', { Query: 'LoopGuard' })).toBe('grep_search: LoopGuard');
+    });
+
+    it('formats raw string argument payloads', () => {
+      expect(formatActionSummary('send_input', 'yes')).toBe('send_input: yes');
+      expect(formatActionSummary('custom_tool', 'plain string payload')).toBe('custom_tool: plain string payload');
+    });
+
+    it('handles nullish and undefined argument payloads safely', () => {
+      expect(formatActionSummary('get_me', null)).toBe('get_me');
+      expect(formatActionSummary('get_me', undefined)).toBe('get_me');
+      expect(formatActionSummary('get_me', '')).toBe('get_me');
+      expect(formatActionSummary('get_me', false)).toBe('get_me');
+      expect(formatActionSummary('get_me', 0)).toBe('get_me');
+    });
+
+    it('truncates canonicalized object arguments exceeding 200 characters', () => {
+      const largePayload = { data: 'a'.repeat(250) };
+      const canonical = canonicalStringify(largePayload);
+      expect(canonical.length).toBeGreaterThan(200);
+
+      const formatted = formatActionSummary('custom_tool', largePayload);
+      expect(formatted).toBe(`custom_tool: ${canonical.slice(0, 197)}...`);
+      expect(formatted.endsWith('...')).toBe(true);
+      expect(formatted.length).toBe('custom_tool: '.length + 200);
+    });
+
+    it('formats non-truncated object arguments within 200 characters', () => {
+      const smallPayload = { Action: 'status', TaskId: 'task-123' };
+      expect(formatActionSummary('manage_task', smallPayload)).toBe(
+        'manage_task: {"Action":"status","TaskId":"task-123"}'
+      );
+      expect(formatActionSummary('empty_tool', {})).toBe('empty_tool: {}');
+    });
+
+    it('respects parameter precedence ordering when multiple candidate keys exist', () => {
+      expect(formatActionSummary('run_command', { CommandLine: 'first', command: 'second' })).toBe('run_command: first');
+      expect(formatActionSummary('file_tool', { TargetFile: '/first.ts', path: '/second.ts' })).toBe('file_tool: /first.ts');
     });
   });
 });
