@@ -62,8 +62,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if USER_JSON=$(gh api user 2>/dev/null); then
+            ACTOR_NAME=$(echo "$USER_JSON" | jq -r '.login // empty')
+            ACTOR_ID=$(echo "$USER_JSON" | jq -r '.id // empty')
+          fi
+          ACTOR_NAME="${ACTOR_NAME:-${{ vars.AGENT_BOT_LOGIN || '' }}}"
+          if [ -n "$ACTOR_NAME" ] && [ -n "$ACTOR_ID" ]; then
+            git config --global user.name "$ACTOR_NAME"
+            git config --global user.email "${ACTOR_ID}+${ACTOR_NAME}@users.noreply.github.com"
+          elif [ -n "$ACTOR_NAME" ]; then
+            git config --global user.name "$ACTOR_NAME"
+            git config --global user.email "${ACTOR_NAME}@users.noreply.github.com"
+          else
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          fi
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           gh auth setup-git
 

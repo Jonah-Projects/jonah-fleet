@@ -271,4 +271,4 @@ export const WORKFLOW_TO_ROUTINE_MAP: Record<string, keyof FleetManifest['routin
 };
 
 export const FLEET_VERSION = '1.8.0';
-export const SCHEMA_URL = 'https://raw.githubusercontent.com/juliendurandeu/jonah-fleet/main/schema.json';
+export const SCHEMA_URL = 'https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/schema.json';
