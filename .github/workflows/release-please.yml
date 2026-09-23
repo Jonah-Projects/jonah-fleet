@@ -18,6 +18,7 @@ jobs:
     steps:
       - name: Generate GitHub App token
         id: app-token
+        continue-on-error: true
         env:
           APP_ID: ${{ secrets.APP_ID }}
           APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
