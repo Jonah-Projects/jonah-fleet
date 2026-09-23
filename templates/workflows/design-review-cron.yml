@@ -89,6 +89,16 @@ jobs:
           fi
           echo "✓ Preflight credential validation passed."
 
+      - name: Configure MCP servers for Antigravity CLI
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -n "$VERCEL_TOKEN" ]; then
+            echo "Configuring Vercel MCP server..."
+            agy mcp add --header "Authorization: Bearer $VERCEL_TOKEN" vercel https://mcp.vercel.com || true
+          fi
+          agy mcp list || true
+
       - name: Discover and compile domain skills (SwarmClaw Pattern #4)
         id: skills
         run: |
@@ -129,7 +139,6 @@ jobs:
           ROUTINE: design-review
           ROUTINE_ISSUE_NUMBER: ${{ steps.run-issue.outputs.issue_number }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           TARGET_SURFACE: ${{ inputs.target_surface }}
           SKILLS_PROMPT: ${{ steps.skills.outputs.skills_prompt }}
           GITHUB_SERVER_URL: ${{ github.server_url }}

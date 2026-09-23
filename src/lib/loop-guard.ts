@@ -8,6 +8,7 @@ export interface LoopGuardTrip {
   toolName: string;
   actionHash: string;
   count: number;
+  args?: any;
 }
 
 export interface ActionRecord {
@@ -141,6 +142,7 @@ export class LoopGuard {
           toolName,
           actionHash: hash,
           count: this.consecutiveErrorCount,
+          args,
         });
       }
     } else {
@@ -172,6 +174,7 @@ export class LoopGuard {
           toolName,
           actionHash: hash,
           count: repetitionCount,
+          args,
         });
       }
     }
@@ -213,6 +216,7 @@ export class LoopGuard {
               toolName,
               actionHash: hash,
               count: this.pingPongThreshold,
+              args,
             });
           }
         }
@@ -264,6 +268,22 @@ export class LoopGuard {
   }
 }
 
+/**
+ * Formats a concise, human-readable summary of a tool action and its parameters.
+ */
+export function formatActionSummary(toolName: string, args: any): string {
+  if (!args) return toolName;
+  if (typeof args === 'string') return `${toolName}: ${args}`;
+  if (args.CommandLine) return `${toolName}: ${args.CommandLine}`;
+  if (args.command) return `${toolName}: ${args.command}`;
+  if (args.TargetFile) return `${toolName}: ${args.TargetFile}`;
+  if (args.path) return `${toolName}: ${args.path}`;
+  if (args.AbsolutePath) return `${toolName}: ${args.AbsolutePath}`;
+  if (args.Query) return `${toolName}: ${args.Query}`;
+  const str = canonicalStringify(args);
+  return str.length > 200 ? `${toolName}: ${str.slice(0, 197)}...` : `${toolName}: ${str}`;
+}
+
 export interface LoopGuardFailureCardOptions {
   routine: string;
   trip: LoopGuardTrip;
@@ -288,8 +308,13 @@ export function formatLoopGuardFailureCard(options: LoopGuardFailureCardOptions)
     `- **Root Cause Category**: \`loop_circuit_breaker\``,
     `- **Trigger**: \`${options.trip.reason}\``,
     `- **Reason**: ${options.trip.message}`,
-    `- **Action**: Process terminated to prevent runaway token burn`,
   ];
+
+  if (options.trip.args !== undefined) {
+    lines.push(`- **Triggered Action**: \`${formatActionSummary(options.trip.toolName, options.trip.args)}\``);
+  }
+
+  lines.push(`- **Action**: Process terminated to prevent runaway token burn`);
 
   if (logUrl) {
     lines.push(`- **Action Log**: [View Run Logs](${logUrl})`);
@@ -308,7 +333,7 @@ export interface LoopGuardReportOptions {
  * Formats a markdown run report for .jonah-fleet/run-report.md when loop guard terminates a run.
  */
 export function formatLoopGuardReport(options: LoopGuardReportOptions): string {
-  return [
+  const reportLines = [
     `# Run Report`,
     ``,
     `## Result`,
@@ -330,7 +355,16 @@ export function formatLoopGuardReport(options: LoopGuardReportOptions): string {
     `- **Category**: \`loop_circuit_breaker\``,
     `- **Trigger**: \`${options.trip.reason}\``,
     `- **Tool**: \`${options.trip.toolName}\``,
+  ];
+
+  if (options.trip.args !== undefined) {
+    reportLines.push(`- **Parameters**: \`${formatActionSummary(options.trip.toolName, options.trip.args)}\``);
+  }
+
+  reportLines.push(
     `- **Action Hash**: \`${options.trip.actionHash}\``,
     `- **Message**: ${options.trip.message}`,
-  ].join('\n');
+  );
+
+  return reportLines.join('\n');
 }

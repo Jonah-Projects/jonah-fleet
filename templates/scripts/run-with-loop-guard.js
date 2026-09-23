@@ -98,6 +98,7 @@ export class LoopGuard {
           toolName,
           actionHash: hash,
           count: this.consecutiveErrorCount,
+          args,
         });
       }
     } else {
@@ -126,6 +127,7 @@ export class LoopGuard {
           toolName,
           actionHash: hash,
           count: repetitionCount,
+          args,
         });
       }
     }
@@ -167,6 +169,7 @@ export class LoopGuard {
               toolName,
               actionHash: hash,
               count: this.pingPongThreshold,
+              args,
             });
           }
         }
@@ -209,6 +212,22 @@ export class LoopGuard {
   }
 }
 
+/**
+ * Formats a concise, human-readable summary of a tool action and its parameters.
+ */
+export function formatActionSummary(toolName, args) {
+  if (!args) return toolName;
+  if (typeof args === 'string') return `${toolName}: ${args}`;
+  if (args.CommandLine) return `${toolName}: ${args.CommandLine}`;
+  if (args.command) return `${toolName}: ${args.command}`;
+  if (args.TargetFile) return `${toolName}: ${args.TargetFile}`;
+  if (args.path) return `${toolName}: ${args.path}`;
+  if (args.AbsolutePath) return `${toolName}: ${args.AbsolutePath}`;
+  if (args.Query) return `${toolName}: ${args.Query}`;
+  const str = canonicalStringify(args);
+  return str.length > 200 ? `${toolName}: ${str.slice(0, 197)}...` : `${toolName}: ${str}`;
+}
+
 export function formatLoopGuardFailureCard(options) {
   const serverUrl = options.serverUrl || process.env.GITHUB_SERVER_URL || 'https://github.com';
   const repository = options.repository || process.env.GITHUB_REPOSITORY || '';
@@ -222,8 +241,13 @@ export function formatLoopGuardFailureCard(options) {
     `- **Root Cause Category**: \`loop_circuit_breaker\``,
     `- **Trigger**: \`${options.trip.reason}\``,
     `- **Reason**: ${options.trip.message}`,
-    `- **Action**: Process terminated to prevent runaway token burn`,
   ];
+
+  if (options.trip.args !== undefined) {
+    lines.push(`- **Triggered Action**: \`${formatActionSummary(options.trip.toolName, options.trip.args)}\``);
+  }
+
+  lines.push(`- **Action**: Process terminated to prevent runaway token burn`);
 
   if (logUrl) {
     lines.push(`- **Action Log**: [View Run Logs](${logUrl})`);
@@ -233,7 +257,7 @@ export function formatLoopGuardFailureCard(options) {
 }
 
 export function formatLoopGuardReport(options) {
-  return [
+  const reportLines = [
     `# Run Report`,
     ``,
     `## Result`,
@@ -255,9 +279,18 @@ export function formatLoopGuardReport(options) {
     `- **Category**: \`loop_circuit_breaker\``,
     `- **Trigger**: \`${options.trip.reason}\``,
     `- **Tool**: \`${options.trip.toolName}\``,
+  ];
+
+  if (options.trip.args !== undefined) {
+    reportLines.push(`- **Parameters**: \`${formatActionSummary(options.trip.toolName, options.trip.args)}\``);
+  }
+
+  reportLines.push(
     `- **Action Hash**: \`${options.trip.actionHash}\``,
     `- **Message**: ${options.trip.message}`,
-  ].join('\n');
+  );
+
+  return reportLines.join('\n');
 }
 
 class LineParser {
@@ -332,6 +365,9 @@ async function main() {
     onTrip: (trip) => {
       tripped = trip;
       console.error(`\n🚨 ::error::[LoopGuard] ${trip.message}`);
+      if (trip.args) {
+        console.error(`🚨 Action Details: ${formatActionSummary(trip.toolName, trip.args)}`);
+      }
 
       if (childProcess && !childProcess.killed) {
         console.error(`🛑 Terminating runner process with SIGTERM...`);
@@ -364,12 +400,14 @@ async function main() {
             }
           } else if (su.step_type === 'tool') {
             const name = su.tool_name || su.tool_info?.name || 'tool';
+            const params = su.tool_info?.parameters;
+            const summary = formatActionSummary(name, params);
             if (su.state === 'ACTIVE') {
-              console.log(`\n[tool:start] ${name}`);
+              console.log(`\n[tool:start] ${summary}`);
             } else if (su.state === 'DONE') {
-              console.log(`[tool:done] ${name}`);
+              console.log(`[tool:done] ${summary}`);
             } else if (su.state === 'ERROR') {
-              console.log(`[tool:error] ${name}`);
+              console.log(`[tool:error] ${summary}`);
             }
           }
         } else if (parsed.event === 'result' && parsed.result?.response) {

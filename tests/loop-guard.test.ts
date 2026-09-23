@@ -60,6 +60,7 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       expect(trip?.reason).toBe('repetition');
       expect(trip?.toolName).toBe('run_command');
       expect(trip?.count).toBe(5);
+      expect(trip?.args).toEqual(args);
       expect(guard.isTripped()).toBe(true);
     });
 
@@ -126,6 +127,7 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       const trip = guard.recordAction(actionB.tool, actionB.args); // B (3) -> 6 actions, 3 pairs
       expect(trip).not.toBeNull();
       expect(trip?.reason).toBe('ping_pong');
+      expect(trip?.args).toEqual(actionB.args);
       expect(guard.isTripped()).toBe(true);
     });
 
@@ -200,6 +202,7 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       expect(trip?.reason).toBe('consecutive_errors');
       expect(trip?.toolName).toBe('run_command');
       expect(trip?.count).toBe(2);
+      expect(trip?.args).toEqual(args);
       expect(guard.isTripped()).toBe(true);
     });
 
@@ -294,6 +297,7 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       guard.feedLine(makeErrorLine('view_file', { AbsolutePath: '/no/file.txt' }));
       expect(guard.isTripped()).toBe(true);
       expect(guard.getTrip()?.reason).toBe('consecutive_errors');
+      expect(guard.getTrip()?.args).toEqual({ AbsolutePath: '/no/file.txt' });
     });
 
     it('ignores non-json and non-tool lines gracefully', () => {
@@ -307,7 +311,7 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
   });
 
   describe('Card and Report Formatting', () => {
-    it('formats a structured failure card with category loop_circuit_breaker', () => {
+    it('formats a structured failure card with category loop_circuit_breaker and action details', () => {
       const card = formatLoopGuardFailureCard({
         routine: 'autowork',
         trip: {
@@ -316,6 +320,7 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
           toolName: 'run_command',
           actionHash: 'abc1234567890',
           count: 5,
+          args: { CommandLine: 'git status' },
         },
         runId: '12345',
         serverUrl: 'https://github.com',
@@ -328,10 +333,12 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       expect(card).toContain('- **Root Cause Category**: `loop_circuit_breaker`');
       expect(card).toContain('- **Trigger**: `repetition`');
       expect(card).toContain('Action repetition loop detected');
+      expect(card).toContain('- **Triggered Action**: `run_command: git status`');
+      expect(card).toContain('- **Action**: Process terminated to prevent runaway token burn');
       expect(card).toContain('[View Run Logs](https://github.com/owner/repo/actions/runs/12345)');
     });
 
-    it('formats a fallback markdown run report on circuit breaker trip', () => {
+    it('formats a fallback markdown run report on circuit breaker trip with action details', () => {
       const report = formatLoopGuardReport({
         routine: 'autowork',
         timestamp: '2026-09-18T12:00:00Z',
@@ -341,6 +348,7 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
           toolName: 'view_file',
           actionHash: 'def9876543210',
           count: 3,
+          args: { AbsolutePath: '/path/to/file.ts' },
         },
       });
 
@@ -349,6 +357,7 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       expect(report).toContain('FAILURE');
       expect(report).toContain('| Result | `FAILURE` |');
       expect(report).toContain('| Category | `loop_circuit_breaker` |');
+      expect(report).toContain('- **Parameters**: `view_file: /path/to/file.ts`');
       expect(report).toContain('Alternating ping-pong action loop detected');
     });
   });

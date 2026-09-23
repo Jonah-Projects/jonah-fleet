@@ -82,6 +82,21 @@ jobs:
           fi
           echo "✓ Preflight credential validation passed."
 
+      - name: Configure MCP servers for Antigravity CLI
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -n "$POSTHOG_API_KEY" ]; then
+            echo "Configuring PostHog MCP server..."
+            agy mcp add --header "Authorization: Bearer $POSTHOG_API_KEY" posthog https://mcp.posthog.com/mcp || true
+          fi
+          if [ -n "$VERCEL_TOKEN" ]; then
+            echo "Configuring Vercel MCP server..."
+            agy mcp add --header "Authorization: Bearer $VERCEL_TOKEN" vercel https://mcp.vercel.com || true
+          fi
+          agy mcp list || true
+
       - name: Discover and compile domain skills (SwarmClaw Pattern #4)
         id: skills
         run: |
