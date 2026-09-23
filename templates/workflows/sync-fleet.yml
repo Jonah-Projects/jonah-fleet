@@ -30,8 +30,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          ACTOR_NAME=$(gh api user --jq .login 2>/dev/null || echo "${{ vars.AGENT_BOT_LOGIN || '' }}")
+          ACTOR_ID=$(gh api user --jq .id 2>/dev/null || echo "")
+          if [ -n "$ACTOR_NAME" ] && [ -n "$ACTOR_ID" ]; then
+            git config --global user.name "$ACTOR_NAME"
+            git config --global user.email "${ACTOR_ID}+${ACTOR_NAME}@users.noreply.github.com"
+          elif [ -n "$ACTOR_NAME" ]; then
+            git config --global user.name "$ACTOR_NAME"
+            git config --global user.email "${ACTOR_NAME}@users.noreply.github.com"
+          else
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          fi
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           gh auth setup-git
 
       - name: Run jonah-fleet sync

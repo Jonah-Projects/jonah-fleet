@@ -322,6 +322,19 @@ describe('Workflow Validation & Invariants', () => {
     expect(res3.isQuota).toBe(false);
     expect(res3.resetInfo).toBeUndefined();
   });
+
+  it('ensures workflow templates configure Git author identity dynamically from active token', () => {
+    const workflowFiles = fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.yml'));
+    for (const file of workflowFiles) {
+      const content = fs.readFileSync(path.join(workflowsDir, file), 'utf8');
+      if (content.includes('name: Configure Git author identity')) {
+        expect(content, `${file} must detect ACTOR_NAME via gh api user`).toContain('gh api user --jq .login');
+        expect(content, `${file} must detect ACTOR_ID via gh api user`).toContain('gh api user --jq .id');
+        expect(content, `${file} must format noreply email using ACTOR_ID and ACTOR_NAME`).toContain('${ACTOR_ID}+${ACTOR_NAME}@users.noreply.github.com');
+        expect(content, `${file} must fallback to github-actions[bot]`).toContain('github-actions[bot]');
+      }
+    }
+  });
 });
 
 
