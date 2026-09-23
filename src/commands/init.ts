@@ -8,6 +8,8 @@ import { detectTechStack, DetectedStack } from '../lib/detector.js';
 import { pruneLabels } from '../lib/labels.js';
 import { defaultGhExecutor, GhExecutor } from '../lib/fleet-query.js';
 
+import { renderFleetBanner } from '../lib/brand.js';
+
 export interface InitOptions {
   preset?: string;
   force?: boolean;
@@ -39,6 +41,16 @@ export async function runInit(options: InitOptions = {}): Promise<void> {
   const cwd = options.cwd || process.cwd();
   const preset = (options.preset || 'standard') as PresetName;
 
+  console.log(
+    renderFleetBanner({
+      command: 'INIT',
+      subtitle: `INITIALIZING FLEET (preset: ${preset})`,
+      details: [
+        { label: 'Preset', value: preset },
+        { label: 'Target', value: cwd },
+      ],
+    })
+  );
   console.log(pc.cyan(`\n⚓ Initializing Jonah Fleet (preset: ${pc.bold(preset)}) in ${cwd}\n`));
 
   // 1. Auto-detect tech stack

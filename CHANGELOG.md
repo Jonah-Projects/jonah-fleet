@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **branding:** integrate Fleet brand identity, ASCII emblem, tactical CLI readout banners, and unified routine footers and run badges ([#401](https://github.com/Jonah-Projects/jonah-fleet/issues/401)).
 * **daemon:** autowork backlog zero-token preflight and diagnostic reporting ([#362](https://github.com/juliendurandeu/jonah-fleet/issues/362)).
 * **guard:** capture action arguments on LoopGuard circuit breaker trips, enrich failure cards and reports with formatted action details, and surface active tool commands in runner stdout.
 * **workflows:** provision MCP servers for Antigravity CLI in `analytics-review-cron.yml` and `design-review-cron.yml`.

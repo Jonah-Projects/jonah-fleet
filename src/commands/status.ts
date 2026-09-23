@@ -7,6 +7,7 @@ import { FLEET_VERSION } from '../lib/presets.js';
 import { computeTokenSpendFromLogs } from '../lib/fleet-query.js';
 import { formatTokens, formatCurrency } from '../lib/dashboard.js';
 import { runMonitor } from './monitor.js';
+import { renderFleetBanner } from '../lib/brand.js';
 
 export interface StatusOptions {
   cwd?: string;
@@ -96,6 +97,17 @@ export async function runStatus(options: StatusOptions = {}): Promise<void> {
     return;
   }
 
+  console.log(
+    renderFleetBanner({
+      command: 'STATUS',
+      subtitle: 'TELEMETRY & DRIFT AUDIT',
+      details: [
+        { label: 'Version', value: manifest.version },
+        { label: 'Preset', value: manifest.preset },
+        { label: 'Target', value: cwd },
+      ],
+    })
+  );
   console.log(pc.bold(pc.cyan(`\n📊 Jonah Fleet Status for ${cwd}\n`)));
   console.log(`  Version:         ${manifest.version === FLEET_VERSION ? pc.green(manifest.version) : pc.yellow(`${manifest.version} (fleet latest: ${FLEET_VERSION})`)}`);
   console.log(`  Preset:          ${pc.bold(manifest.preset)}`);
