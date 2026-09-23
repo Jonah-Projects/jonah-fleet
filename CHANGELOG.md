@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.23.1...v1.24.0) (2026-09-23)
+
+
+### Features
+
+* **workflows:** support triggering autowork on issue assignment to bot/persona ([#339](https://github.com/juliendurandeu/jonah-fleet/issues/339)) ([7a976f3](https://github.com/juliendurandeu/jonah-fleet/commit/7a976f32defa9ebc464df40702986d32db8508bc))
+
 ## [1.23.1](https://github.com/juliendurandeu/jonah-fleet/compare/v1.23.0...v1.23.1) (2026-09-20)
 
 
