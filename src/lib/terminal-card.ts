@@ -713,8 +713,9 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
     ? `${Math.round(options.durationMs / 1000)}s`
     : parsedFromLog?.duration || '';
 
+  const border = (s: string) => pc.dim(pc.gray(s));
   const lines: string[] = [];
-  lines.push(pc.cyan(`┌${horizontal}┐`));
+  lines.push(border(`┌${horizontal}┐`));
 
   // Title Bar line
   const headerParts = [pc.bold(pc.white(options.routine.toUpperCase()))];
@@ -724,10 +725,10 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
   const headerPlain = stripAnsi(headerContent);
 
   lines.push(
-    pc.cyan('│') +
+    border('│') +
       ` ${headerContent}` +
       ' '.repeat(Math.max(1, width - 3 - headerPlain.length)) +
-      pc.cyan('│')
+      border('│')
   );
 
   // PR / Issue Title line (with multi-line wrapping so nothing is cropped!)
@@ -739,10 +740,10 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
       const text = wrappedTitle[i];
       const plainLen = titlePrefix.length + stripAnsi(text).length;
       lines.push(
-        pc.cyan('│') +
+        border('│') +
           ` ${prefix}${pc.white(pc.bold(text))}` +
           ' '.repeat(Math.max(1, width - 3 - plainLen)) +
-          pc.cyan('│')
+          border('│')
       );
     }
   }
@@ -757,14 +758,14 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
     }
     const decisionPlain = ` Action: ${decision}`;
     lines.push(
-      pc.cyan('│') +
+      border('│') +
         ` Action: ${decisionBadge}` +
         ' '.repeat(Math.max(1, width - 3 - decisionPlain.length)) +
-        pc.cyan('│')
+        border('│')
     );
   }
 
-  lines.push(pc.cyan(`├${horizontal}┤`));
+  lines.push(border(`├${horizontal}┤`));
 
   // Format body content (Summary or Fallback Passes)
   if (rawSummary) {
@@ -782,10 +783,10 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
       if (line.startsWith('### ')) {
         const heading = line.replace('### ', '').trim();
         lines.push(
-          pc.cyan('│') +
+          border('│') +
             ` ${pc.bold(pc.cyan(heading))}` +
             ' '.repeat(Math.max(1, width - 3 - heading.length)) +
-            pc.cyan('│')
+            border('│')
         );
       } else if (line.startsWith('- ') || line.startsWith('* ')) {
         const item = sanitizeWorktreePaths(line.slice(2)).trim();
@@ -800,17 +801,17 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
           const wPlain = stripAnsi(wLine);
           if (i === 0) {
             lines.push(
-              pc.cyan('│') +
+              border('│') +
                 `  • ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
-                pc.cyan('│')
+                border('│')
             );
           } else {
             lines.push(
-              pc.cyan('│') +
+              border('│') +
                 `    ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
-                pc.cyan('│')
+                border('│')
             );
           }
         }
@@ -827,24 +828,24 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
           const wPlain = stripAnsi(wLine);
           if (i === 0) {
             lines.push(
-              pc.cyan('│') +
+              border('│') +
                 `  ✔ ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
-                pc.cyan('│')
+                border('│')
             );
           } else {
             lines.push(
-              pc.cyan('│') +
+              border('│') +
                 `    ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
-                pc.cyan('│')
+                border('│')
             );
           }
         }
       }
     }
   } else if (parsedFromLog && parsedFromLog.passes && parsedFromLog.passes.length > 0) {
-    lines.push(pc.cyan('│') + ` ${pc.bold('Verification Passes:')}` + ' '.repeat(Math.max(1, width - 23)) + pc.cyan('│'));
+    lines.push(border('│') + ` ${pc.bold('Verification Passes:')}` + ' '.repeat(Math.max(1, width - 23)) + border('│'));
     for (const pass of parsedFromLog.passes.slice(0, 6)) {
       const icon = pass.status === 'pass' ? pc.green('✔') : pc.red('✖');
       let criterionName = pass.name;
@@ -859,24 +860,24 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
         const wPlain = stripAnsi(wLine);
         if (i === 0) {
           lines.push(
-            pc.cyan('│') +
+            border('│') +
               `  ${icon} ${wLine}` +
               ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
-              pc.cyan('│')
+              border('│')
           );
         } else {
           lines.push(
-            pc.cyan('│') +
+            border('│') +
               `    ${pc.dim(wLine)}` +
               ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
-              pc.cyan('│')
+              border('│')
           );
         }
       }
     }
 
     if (parsedFromLog.actions && parsedFromLog.actions.length > 0) {
-      lines.push(pc.cyan('│') + ` ${pc.bold('Actions Taken:')}` + ' '.repeat(Math.max(1, width - 16)) + pc.cyan('│'));
+      lines.push(border('│') + ` ${pc.bold('Actions Taken:')}` + ' '.repeat(Math.max(1, width - 16)) + border('│'));
       for (const action of parsedFromLog.actions.slice(0, 4)) {
         const wrapped = wrapText(action, width - 8);
         for (let i = 0; i < wrapped.length; i++) {
@@ -884,17 +885,17 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
           const wPlain = stripAnsi(wLine);
           if (i === 0) {
             lines.push(
-              pc.cyan('│') +
+              border('│') +
                 `  • ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
-                pc.cyan('│')
+                border('│')
             );
           } else {
             lines.push(
-              pc.cyan('│') +
+              border('│') +
                 `    ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
-                pc.cyan('│')
+                border('│')
             );
           }
         }
@@ -904,13 +905,13 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
 
   // Footer section with log link
   if (parsedFromLog?.logPath) {
-    lines.push(pc.cyan(`├${horizontal}┤`));
+    lines.push(border(`├${horizontal}┤`));
     const logInfo = ` Run log: ${pc.dim(parsedFromLog.logPath)}`;
     const logPlain = ` Run log: ${parsedFromLog.logPath}`;
-    lines.push(pc.cyan('│') + logInfo + ' '.repeat(Math.max(1, width - 2 - logPlain.length)) + pc.cyan('│'));
+    lines.push(border('│') + logInfo + ' '.repeat(Math.max(1, width - 2 - logPlain.length)) + border('│'));
   }
 
-  lines.push(pc.cyan(`└${horizontal}┘`));
+  lines.push(border(`└${horizontal}┘`));
   return lines.join('\n');
 }
 
@@ -1091,9 +1092,10 @@ export function renderBacklogDiagnosticCard(
 ): string {
   const width = options?.width || Math.min(Math.max((process.stdout.columns || 80) - 4, 64), 90);
   const horizontal = '─'.repeat(width - 2);
+  const border = (s: string) => pc.dim(pc.gray(s));
 
   const lines: string[] = [];
-  lines.push(pc.cyan(`┌${horizontal}┐`));
+  lines.push(border(`┌${horizontal}┐`));
 
   const total =
     report.total ??
@@ -1116,10 +1118,10 @@ export function renderBacklogDiagnosticCard(
   const headerPlain = stripAnsi(headerContent);
 
   lines.push(
-    pc.cyan('│') +
+    border('│') +
       ` ${headerContent}` +
       ' '.repeat(Math.max(1, width - 3 - headerPlain.length)) +
-      pc.cyan('│')
+      border('│')
   );
 
   // If backlog is completely empty
@@ -1130,35 +1132,35 @@ export function renderBacklogDiagnosticCard(
     (report.guardrails?.length || 0) === 0;
 
   if (total === 0 || (hasNoGated && actionableCount === 0)) {
-    lines.push(pc.cyan(`├${horizontal}┤`));
+    lines.push(border(`├${horizontal}┤`));
     const emptyMsg = 'Backlog is completely empty. 0 open issues found.';
     lines.push(
-      pc.cyan('│') +
+      border('│') +
         `  ${pc.bold(emptyMsg)}` +
         ' '.repeat(Math.max(1, width - 4 - stripAnsi(emptyMsg).length)) +
-        pc.cyan('│')
+        border('│')
     );
     const tipMsg = 'Tip: Create an issue with priority/P1 or priority/P2 to trigger Autowork.';
     lines.push(
-      pc.cyan('│') +
+      border('│') +
         `  ${pc.dim(tipMsg)}` +
         ' '.repeat(Math.max(1, width - 4 - stripAnsi(tipMsg).length)) +
-        pc.cyan('│')
+        border('│')
     );
-    lines.push(pc.cyan(`└${horizontal}┘`));
+    lines.push(border(`└${horizontal}┘`));
     return lines.join('\n');
   }
 
   // Preflight status line
   const statusMsg = `Preflight: Zero-token bypass active (no worktrees spawned)`;
   lines.push(
-    pc.cyan('│') +
+    border('│') +
       `  ${pc.dim(statusMsg)}` +
       ' '.repeat(Math.max(1, width - 4 - stripAnsi(statusMsg).length)) +
-      pc.cyan('│')
+      border('│')
   );
 
-  lines.push(pc.cyan(`├${horizontal}┤`));
+  lines.push(border(`├${horizontal}┤`));
 
   const renderSection = (
     title: string,
@@ -1169,10 +1171,10 @@ export function renderBacklogDiagnosticCard(
     if (!items || items.length === 0) return;
     const sectionHeader = ` ${colorFn(pc.bold(title))}`;
     lines.push(
-      pc.cyan('│') +
+      border('│') +
         sectionHeader +
         ' '.repeat(Math.max(1, width - 2 - stripAnsi(sectionHeader).length)) +
-        pc.cyan('│')
+        border('│')
     );
 
     for (const item of items) {
@@ -1183,10 +1185,10 @@ export function renderBacklogDiagnosticCard(
         const wLine = wrapped[i];
         const wPlain = stripAnsi(wLine);
         lines.push(
-          pc.cyan('│') +
+          border('│') +
             `   ${wLine}` +
             ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
-            pc.cyan('│')
+            border('│')
         );
       }
     }
@@ -1216,21 +1218,21 @@ export function renderBacklogDiagnosticCard(
   if (report.routineLogs && report.routineLogs.length > 0) {
     const routineText = ` Operational Logs: ${report.routineLogs.length} routine run log(s) filtered`;
     lines.push(
-      pc.cyan('│') +
+      border('│') +
         pc.dim(routineText) +
         ' '.repeat(Math.max(1, width - 2 - stripAnsi(routineText).length)) +
-        pc.cyan('│')
+        border('│')
     );
   }
 
   // Hints to unblock section
-  lines.push(pc.cyan(`├${horizontal}┤`));
+  lines.push(border(`├${horizontal}┤`));
   const hintsHeader = ` ${pc.bold('Hints to unblock:')}`;
   lines.push(
-    pc.cyan('│') +
+    border('│') +
       hintsHeader +
       ' '.repeat(Math.max(1, width - 2 - stripAnsi(hintsHeader).length)) +
-      pc.cyan('│')
+      border('│')
   );
 
   const hints: string[] = [];
@@ -1253,14 +1255,14 @@ export function renderBacklogDiagnosticCard(
     for (const wLine of wrapped) {
       const wPlain = stripAnsi(wLine);
       lines.push(
-        pc.cyan('│') +
+        border('│') +
           `   ${pc.dim(wLine)}` +
           ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
-          pc.cyan('│')
+          border('│')
       );
     }
   }
 
-  lines.push(pc.cyan(`└${horizontal}┘`));
+  lines.push(border(`└${horizontal}┘`));
   return lines.join('\n');
 }

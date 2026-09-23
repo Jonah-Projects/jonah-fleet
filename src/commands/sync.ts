@@ -4,6 +4,7 @@ import { installFleet } from '../lib/installer.js';
 import { checkDrift } from '../lib/diff.js';
 import { FLEET_VERSION } from '../lib/presets.js';
 import { provisionLabels } from '../lib/labels.js';
+import { renderFleetBanner } from '../lib/brand.js';
 
 export interface SyncOptions {
   check?: boolean;
@@ -20,6 +21,20 @@ export async function runSync(options: SyncOptions = {}): Promise<void> {
     process.exit(1);
   }
 
+  console.log(
+    renderFleetBanner({
+      command: 'SYNC',
+      subtitle: `SYNCHRONIZING FLEET (v${manifest.version} -> v${FLEET_VERSION})`,
+      details: [
+        { label: 'Installed', value: `v${manifest.version}` },
+        { label: 'Upstream', value: `v${FLEET_VERSION}` },
+        {
+          label: 'Mode',
+          value: options.check ? 'Check Drift' : options.force ? 'Force Overwrite' : 'Standard Sync',
+        },
+      ],
+    })
+  );
   console.log(pc.cyan(`\n🔄 Syncing Jonah Fleet (current: v${manifest.version}, fleet: v${FLEET_VERSION})...\n`));
 
   const drift = checkDrift(cwd, manifest);

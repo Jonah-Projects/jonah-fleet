@@ -140,3 +140,4 @@ program
 program.parse(process.argv);
 
 export * from './lib/loop-guard.js';
+export * from './lib/brand.js';
