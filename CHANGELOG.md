@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.0](https://github.com/juliendurandeu/jonah-fleet/compare/v1.24.0...v1.25.0) (2026-09-23)
+
+
+### Features
+
+* **guard:** enrich LoopGuard diagnostics with action details and provision MCP in review workflows ([#367](https://github.com/juliendurandeu/jonah-fleet/issues/367)) ([a93d783](https://github.com/juliendurandeu/jonah-fleet/commit/a93d7833fd3caf6b5a4f8e50ccfeaa2d1e146c36))
+
 ## [Unreleased]
 
 ### Features
