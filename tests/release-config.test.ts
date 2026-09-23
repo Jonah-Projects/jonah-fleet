@@ -16,19 +16,24 @@ describe('Release Configuration & Manifests', () => {
     expect(config.packages['.']['package-name']).toBe('jonah-fleet');
     expect(config.packages['.']['changelog-path']).toBe('CHANGELOG.md');
     expect(config.packages['.']['include-component-in-tag']).toBe(false);
+    expect(config.packages['.']['extra-files']).toContain('agents-manifest.json');
   });
 
-  it('validates .release-please-manifest.json aligns with package.json version', () => {
+  it('validates .release-please-manifest.json and agents-manifest.json align with package.json version', () => {
     const manifestPath = path.join(rootDir, '.release-please-manifest.json');
+    const agentsManifestPath = path.join(rootDir, 'agents-manifest.json');
     const packageJsonPath = path.join(rootDir, 'package.json');
 
     expect(fs.existsSync(manifestPath)).toBe(true);
+    expect(fs.existsSync(agentsManifestPath)).toBe(true);
     expect(fs.existsSync(packageJsonPath)).toBe(true);
 
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const agentsManifest = JSON.parse(fs.readFileSync(agentsManifestPath, 'utf8'));
     const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
     expect(manifest['.']).toBe(pkg.version);
+    expect(agentsManifest.version).toBe(pkg.version);
   });
 
   it('validates .github/workflows/release-please.yml workflow configuration', () => {

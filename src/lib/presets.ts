@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 export type PresetName = 'minimal' | 'standard' | 'full' | 'custom';
 
 export interface RoutineModels {
@@ -270,5 +274,28 @@ export const WORKFLOW_TO_ROUTINE_MAP: Record<string, keyof FleetManifest['routin
   'sync-fleet.yml': 'sync-fleet',
 };
 
-export const FLEET_VERSION = '1.8.0';
+function resolveFleetVersion(): string {
+  try {
+    let currentDir = path.dirname(fileURLToPath(import.meta.url));
+    while (currentDir && currentDir !== path.dirname(currentDir)) {
+      const candidate = path.join(currentDir, 'package.json');
+      if (fs.existsSync(candidate)) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+          if (pkg.name === 'jonah-fleet' && pkg.version) {
+            return pkg.version;
+          }
+        } catch {
+          // ignore error and continue searching
+        }
+      }
+      currentDir = path.dirname(currentDir);
+    }
+  } catch {
+    // fallback
+  }
+  return '1.26.0';
+}
+
+export const FLEET_VERSION = resolveFleetVersion();
 export const SCHEMA_URL = 'https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/schema.json';
