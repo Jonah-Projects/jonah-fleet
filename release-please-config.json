@@ -9,7 +9,10 @@
       "bump-patch-for-minor-pre-major": false,
       "include-component-in-tag": false,
       "draft": false,
-      "prerelease": false
+      "prerelease": false,
+      "extra-files": [
+        "agents-manifest.json"
+      ]
     }
   }
 }

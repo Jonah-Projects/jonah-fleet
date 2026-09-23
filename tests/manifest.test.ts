@@ -1,8 +1,15 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { createDefaultManifest } from '../src/lib/manifest.js';
 import { FLEET_VERSION } from '../src/lib/presets.js';
 
 describe('Manifest generation', () => {
+  it('aligns FLEET_VERSION with package.json version', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
+    expect(FLEET_VERSION).toBe(pkg.version);
+  });
+
   it('generates a standard manifest with standard routines', () => {
     const manifest = createDefaultManifest('standard');
     expect(manifest.version).toBe(FLEET_VERSION);
