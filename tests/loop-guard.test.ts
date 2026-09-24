@@ -137,6 +137,30 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       }
       expect(guard.isTripped()).toBe(false);
     });
+
+    it('exempts run_command and multiple tool calls in analytics-review from repetition trip', () => {
+      const guard = new LoopGuard({
+        routine: 'analytics-review',
+        repetitionThreshold: 5,
+        slidingWindowSize: 20,
+      });
+
+      // Calling run_command 10 times with identical parameters in analytics-review should NOT trip repetition
+      for (let i = 0; i < 10; i++) {
+        expect(
+          guard.recordAction('run_command', { CommandLine: 'gh issue view 3189 --json body' })
+        ).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+
+      // Calling analytical MCP tools multiple times in analytics-review should also NOT trip repetition
+      for (let i = 0; i < 10; i++) {
+        expect(
+          guard.recordAction('call_mcp_tool', { server: 'posthog', method: 'query_events' })
+        ).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+    });
   });
 
   describe('Ping-Pong Guard (Threshold = 3 alternating pairs, 6 actions)', () => {
@@ -201,6 +225,18 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       const actionB = { tool: 'run_command', args: { CommandLine: 'npm test' } };
 
       for (let i = 0; i < 4; i++) {
+        expect(guard.recordAction(actionA.tool, actionA.args)).toBeNull();
+        expect(guard.recordAction(actionB.tool, actionB.args)).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+    });
+
+    it('exempts alternating queries and actions in analytics-review from ping-pong trip', () => {
+      const guard = new LoopGuard({ routine: 'analytics-review', pingPongThreshold: 3 });
+      const actionA = { tool: 'run_command', args: { CommandLine: 'curl https://api.posthog.com/query1' } };
+      const actionB = { tool: 'run_command', args: { CommandLine: 'curl https://api.posthog.com/query2' } };
+
+      for (let i = 0; i < 5; i++) {
         expect(guard.recordAction(actionA.tool, actionA.args)).toBeNull();
         expect(guard.recordAction(actionB.tool, actionB.args)).toBeNull();
       }
@@ -290,6 +326,21 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       expect(trip).not.toBeNull();
       expect(trip?.reason).toBe('consecutive_errors');
       expect(trip?.toolName).toBe('manage_task');
+      expect(guard.isTripped()).toBe(true);
+    });
+
+    it('trips on consecutive errors even for analytics-review routine', () => {
+      const guard = new LoopGuard({ routine: 'analytics-review', consecutiveErrorThreshold: 2 });
+      const tool = 'run_command';
+      const args = { CommandLine: 'curl https://invalid-url.local' };
+
+      expect(guard.recordAction(tool, args, true)).toBeNull();
+      expect(guard.isTripped()).toBe(false);
+
+      const trip = guard.recordAction(tool, args, true);
+      expect(trip).not.toBeNull();
+      expect(trip?.reason).toBe('consecutive_errors');
+      expect(trip?.toolName).toBe('run_command');
       expect(guard.isTripped()).toBe(true);
     });
   });
@@ -523,5 +574,52 @@ describe('Wrapper Script Execution Integration', () => {
     const reportContent = fs.readFileSync(reportPath, 'utf8');
     expect(reportContent).toContain('loop_circuit_breaker');
     expect(reportContent).toContain('Action repetition loop detected');
+  });
+
+  it('permits repeated tool calls when running analytics-review routine without tripping', async () => {
+    const mockRunnerPath = path.join(tmpDir, 'mock-analytics-runner.js');
+    const mockCode = `
+      const line = JSON.stringify({
+        event: 'step_update',
+        step_update: {
+          step_type: 'tool',
+          state: 'ACTIVE',
+          tool_name: 'run_command',
+          tool_info: { name: 'run_command', parameters: { CommandLine: 'gh issue view 3189' } }
+        }
+      });
+      for (let i = 0; i < 7; i++) {
+        console.log(line);
+      }
+      setTimeout(() => process.exit(0), 100);
+    `;
+    fs.writeFileSync(mockRunnerPath, mockCode, 'utf8');
+
+    let childExited = false;
+    let exitCode: number | null = null;
+
+    await new Promise<void>((resolve) => {
+      const child = spawn(process.execPath, [scriptPath], {
+        cwd: tmpDir,
+        env: {
+          ...process.env,
+          ROUTINE: 'analytics-review',
+          RUNNER_BIN: `${process.execPath} ${mockRunnerPath}`,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      child.on('close', (code) => {
+        exitCode = code;
+        childExited = true;
+        resolve();
+      });
+    });
+
+    expect(childExited).toBe(true);
+    expect(exitCode).toBe(0);
+
+    const reportPath = path.join(tmpDir, '.jonah-fleet', 'run-report.md');
+    expect(fs.existsSync(reportPath)).toBe(false);
   });
 });
