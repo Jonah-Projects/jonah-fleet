@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.3](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.2...v1.28.3) (2026-09-24)
+
+
+### Bug Fixes
+
+* **peer-review:** synthesize companion measurement issues upon merge ([#455](https://github.com/Jonah-Projects/jonah-fleet/issues/455)) ([6123c18](https://github.com/Jonah-Projects/jonah-fleet/commit/6123c18fb2d3bece994daa65cf8139f31b6fb154))
+
 ## [Unreleased]
 
 ### Bug Fixes
