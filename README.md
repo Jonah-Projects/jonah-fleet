@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/brand/banner.jpg" alt="Fleet — Autonomous Repo Command" width="100%" />
+  <img src="https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/assets/brand/banner.jpg" alt="Fleet — Autonomous Repo Command" width="100%" />
 </p>
 
 # ⚡ Fleet
@@ -9,7 +9,7 @@
 
 [![CI](https://github.com/Jonah-Projects/jonah-fleet/actions/workflows/ci.yml/badge.svg)](https://github.com/Jonah-Projects/jonah-fleet/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](./package.json)
-[![Brand: Fleet](https://img.shields.io/badge/Brand-Fleet_Design_System-BBF65D?style=flat)](./assets/brand/README.md)
+[![Brand: Fleet](https://img.shields.io/badge/Brand-Fleet_Design_System-BBF65D?style=flat)](https://github.com/Jonah-Projects/jonah-fleet/blob/main/assets/brand/README.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
@@ -214,15 +214,15 @@ Each target project contains an `agents-manifest.json` at its root:
 
 ## 🎨 Brand & Visual Identity
 
-Fleet's visual design system and assets are located in [`assets/brand/`](./assets/brand):
+Fleet's visual design system and assets are located in [`assets/brand/`](https://github.com/Jonah-Projects/jonah-fleet/tree/main/assets/brand):
 
 | Asset | Resource | Ratio | Usage |
 |---|---|---|---|
-| **Avatar / App Icon** | [`avatar.jpg`](./assets/brand/avatar.jpg) | 1:1 (1024x1024) | Bot user profile, app icon, social avatar |
-| **Logo Lockup** | [`logo.jpg`](./assets/brand/logo.jpg) | 3:2 (1536x1024) | Documentation headers, splash screens, decks |
-| **Header Banner** | [`banner.jpg`](./assets/brand/banner.jpg) | 16:9 (1792x1008) | Repository hero, social cards, release cards |
+| **Avatar / App Icon** | [`avatar.jpg`](https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/assets/brand/avatar.jpg) | 1:1 (1024x1024) | Bot user profile, app icon, social avatar |
+| **Logo Lockup** | [`logo.jpg`](https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/assets/brand/logo.jpg) | 3:2 (1536x1024) | Documentation headers, splash screens, decks |
+| **Header Banner** | [`banner.jpg`](https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/assets/brand/banner.jpg) | 16:9 (1792x1008) | Repository hero, social cards, release cards |
 
-See [`assets/brand/README.md`](./assets/brand/README.md) for the complete design system specifications, color codes, and typography guidelines.
+See [`assets/brand/README.md`](https://github.com/Jonah-Projects/jonah-fleet/blob/main/assets/brand/README.md) for the complete design system specifications, color codes, and typography guidelines.
 
 ---
 
