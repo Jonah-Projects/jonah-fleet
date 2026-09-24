@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.1...v1.28.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* **guard:** exempt analytics-review from repetition and ping-pong loop circuit breakers ([#447](https://github.com/Jonah-Projects/jonah-fleet/issues/447)) ([#450](https://github.com/Jonah-Projects/jonah-fleet/issues/450)) ([839873c](https://github.com/Jonah-Projects/jonah-fleet/commit/839873c1c9e40b633a3e52a77aa74fc66374b8df))
+
 ## [Unreleased]
 
 ### Bug Fixes
