@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/schema.json",
-  "version": "1.27.1",
+  "version": "1.27.2",
   "preset": "standard",
   "dualExecution": {
     "enabled": true,
