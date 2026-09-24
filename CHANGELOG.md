@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.27.2...v1.28.0) (2026-09-24)
+
+
+### Features
+
+* **runner:** preserve uncommitted work on crash and enforce incremental commits ([da58b83](https://github.com/Jonah-Projects/jonah-fleet/commit/da58b83334df971778417142520b321f7b520d5b))
+
 ## [1.27.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.27.1...v1.27.2) (2026-09-24)
 
 
