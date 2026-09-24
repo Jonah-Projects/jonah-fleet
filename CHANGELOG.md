@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **runner:** preserve uncommitted work by committing modified files to the active routine branch before worktree cleanup on session crashes or interruptions
+* **prompts:** add Incremental Commits protocol to `autowork.md` to commit immediately upon passing tests and prevent work loss during long-running sessions
 * **daemon:** update foreground interface, status commands, hotkey cheat sheet, and status ticker to Fleet brand identity
 
 ### Bug Fixes

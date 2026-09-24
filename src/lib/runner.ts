@@ -756,6 +756,33 @@ export function formatFallbackRunReport(options: FallbackReportOptions): string 
 }
 
 /**
+ * Preserves uncommitted files in a worktree by committing them to the branch
+ * before worktree cleanup, preventing work loss on interruptions or crashes.
+ */
+export async function preserveUncommittedWork(
+  worktreePath: string,
+  routine: string
+): Promise<{ preserved: boolean; commitSha?: string; fileCount?: number }> {
+  try {
+    if (!fs.existsSync(worktreePath)) return { preserved: false };
+    const { stdout: statusOut } = await execFileAsync('git', ['status', '--porcelain'], { cwd: worktreePath });
+    const trimmed = statusOut.trim();
+    if (!trimmed) return { preserved: false };
+    const fileCount = trimmed.split('\n').filter(Boolean).length;
+    await execFileAsync('git', ['add', '-A'], { cwd: worktreePath });
+    await execFileAsync(
+      'git',
+      ['commit', '-m', `wip(${routine}): preserve uncommitted work (${fileCount} files) before session termination`],
+      { cwd: worktreePath }
+    );
+    const { stdout: shaOut } = await execFileAsync('git', ['rev-parse', '--short', 'HEAD'], { cwd: worktreePath });
+    return { preserved: true, commitSha: shaOut.trim(), fileCount };
+  } catch {
+    return { preserved: false };
+  }
+}
+
+/**
  * Runs a routine locally with worktree isolation and Antigravity CLI invocation.
  */
 export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<RunLocalRoutineResult> {
@@ -892,6 +919,16 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
   const cleanup = async () => {
     spinner?.stop();
     if (worktreePath && !options.keepWorktree) {
+      if (fs.existsSync(worktreePath)) {
+        const pres = await preserveUncommittedWork(worktreePath, routine);
+        if (pres.preserved) {
+          console.log(
+            pc.yellow(
+              `\n[${new Date().toLocaleTimeString()}] 💾 Preserved ${pres.fileCount} uncommitted file(s) to branch '${branchName}' (${pres.commitSha}).`
+            )
+          );
+        }
+      }
       await removeWorktree(targetDir, worktreePath, { deleteBranch: false }).catch(() => {});
     }
   };

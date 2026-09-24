@@ -22,6 +22,7 @@ import {
   resolveExitCode,
   formatFallbackRunReport,
   detectPrematureRoutineExit,
+  preserveUncommittedWork,
 } from '../src/lib/runner.js';
 
 describe('Local Routine Runner', () => {
@@ -585,6 +586,49 @@ describe('Local Routine Runner', () => {
     it('returns null when output is empty or routine has no premature patterns', () => {
       expect(detectPrematureRoutineExit('', 'peer-review')).toBeNull();
       expect(detectPrematureRoutineExit('Clean autowork run completed.', 'autowork')).toBeNull();
+    });
+  });
+
+  describe('preserveUncommittedWork', () => {
+    it('returns preserved false when worktreePath does not exist', async () => {
+      const result = await preserveUncommittedWork('/non/existent/path', 'autowork');
+      expect(result.preserved).toBe(false);
+    });
+
+    it('returns preserved false when git status is clean', async () => {
+      // Initialize a real git repo in tmpRepo with all files committed
+      const { execSync } = await import('node:child_process');
+      execSync('git init && git config user.email "test@fleet.local" && git config user.name "Fleet Test" && git add -A && git commit -m "initial"', {
+        cwd: tmpRepo,
+        stdio: 'ignore',
+      });
+      const result = await preserveUncommittedWork(tmpRepo, 'autowork');
+      expect(result.preserved).toBe(false);
+    });
+
+    it('commits uncommitted files and returns preserved true with commitSha and fileCount', async () => {
+      const { execSync } = await import('node:child_process');
+      execSync('git init && git config user.email "test@fleet.local" && git config user.name "Fleet Test" && git add -A && git commit -m "initial"', {
+        cwd: tmpRepo,
+        stdio: 'ignore',
+      });
+
+      // Create some uncommitted changes
+      fs.writeFileSync(path.join(tmpRepo, 'modified.txt'), 'hello world', 'utf8');
+      fs.writeFileSync(path.join(tmpRepo, 'new-file.ts'), 'export const x = 1;', 'utf8');
+
+      const result = await preserveUncommittedWork(tmpRepo, 'autowork');
+      expect(result.preserved).toBe(true);
+      expect(result.fileCount).toBe(2);
+      expect(result.commitSha).toBeDefined();
+
+      // Verify git log contains wip commit
+      const log = execSync('git log -n 1 --pretty=%B', { cwd: tmpRepo, encoding: 'utf8' });
+      expect(log).toContain('wip(autowork): preserve uncommitted work');
+
+      // Verify working tree is now clean
+      const status = execSync('git status --porcelain', { cwd: tmpRepo, encoding: 'utf8' });
+      expect(status.trim()).toBe('');
     });
   });
 });
