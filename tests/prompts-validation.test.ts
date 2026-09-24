@@ -385,6 +385,7 @@ describe("Prompt Validation & Invariants", () => {
     expect(content).toContain("Post-Measurement Product Bridge");
     expect(content).toContain("Intent vs. Defect Guardrail");
     expect(content).toContain("RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]");
+    expect(content).toContain("Post-Merge Measurement Tracker Ingestion");
   });
 
   it("validates peer-review.md, autowork.md, and analytics-review.md define Design System & Telemetry Friction Guardrails", () => {
@@ -702,10 +703,15 @@ describe("Prompt Validation & Invariants", () => {
     expect(autoworkContent).toContain("Tier 1 (Core Funnel & Levers)");
     expect(autoworkContent).toContain("Tier 3 (Passive Chrome & Utility / Easter Eggs)");
 
-    // peer-review.md review pass
+    // peer-review.md review pass & post-merge measurement filing
     expect(peerReviewContent).toContain("Telemetry & Measurement Contract Pass");
     expect(peerReviewContent).toContain("Question-First Validation");
     expect(peerReviewContent).toContain("Funnel Completeness");
+    expect(peerReviewContent).toContain("Post-Merge Companion Measurement Issue Filing");
+    expect(peerReviewContent).toMatch(
+      /gh issue create \\\s+--title "Measure: <Feature Name>" \\\s+--label "measurement"/,
+    );
+    expect(peerReviewContent).toMatch(/--body-file - <<'EOF'/);
   });
 
   it("validates Chief of Staff verification discipline, Red Gate protocol, and anti-vacuity invariants", () => {
