@@ -87,7 +87,7 @@ a. **Read the target issue and check eligibility.** Eligible = open, unassigned 
 
 ### Phase 1: Converge on open work (Scan mode; skipped in Targeted mode)
 
-1. List all open PRs authored by this routine.
+1. List all open PRs needing attention (specifically draft PRs bounced back by peer review or open PRs with review comments: `gh pr list --state open --json number,title,isDraft,headRefName,assignees,labels,author`, excluding automated release PRs `release-please--*` / `chore(main): release*`).
    1a. **PR Claim Protocol (Single-Flight PR Convergence)**:
    - For each open PR needing attention (bounced to draft with actionable findings, or open with unaddressed review comments):
    - **Check eligibility**: re-read candidate PR (`gh pr view <PR> --json assignees,comments`). Skip PRs currently assigned to another live runner or carrying an active claim comment posted within the last 2 hours (unless stale claim per `ORCHESTRATION.md`).

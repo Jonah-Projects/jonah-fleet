@@ -117,6 +117,94 @@ describe('Daemon Autowork Backlog Preflight & Classification', () => {
       expect(report.actionable).toHaveLength(0);
     });
 
+    it('classifies issues with draft PRs needing convergence as actionable', () => {
+      const issues: BacklogIssue[] = [
+        {
+          number: 4439,
+          title: 'profile settings UI for franchise and season 3-state',
+          labels: [{ name: 'priority/P1' }],
+          assignees: [],
+        },
+      ];
+      const openPRs = [
+        {
+          number: 4440,
+          title: 'feat: profile settings UI (#4439)',
+          body: 'Closes #4439',
+          headRefName: 'feat/4439-settings',
+          isDraft: true,
+        },
+      ];
+
+      const report = classifyBacklogIssues(issues, openPRs);
+      expect(report.actionable).toHaveLength(1);
+      expect(report.actionable[0].number).toBe(4439);
+      expect(report.inProgress).toHaveLength(0);
+    });
+
+    it('classifies issues with draft PRs carrying needs-human as gatedHuman', () => {
+      const issues: BacklogIssue[] = [
+        {
+          number: 4439,
+          title: 'profile settings UI',
+          labels: [],
+          assignees: [],
+        },
+      ];
+      const openPRs = [
+        {
+          number: 4440,
+          title: 'feat: profile settings UI (#4439)',
+          isDraft: true,
+          labels: [{ name: 'needs-human' }],
+        },
+      ];
+
+      const report = classifyBacklogIssues(issues, openPRs);
+      expect(report.gatedHuman).toHaveLength(1);
+      expect(report.gatedHuman[0].number).toBe(4439);
+      expect(report.actionable).toHaveLength(0);
+    });
+
+    it('classifies issues with human-assigned draft PRs as inProgress', () => {
+      const issues: BacklogIssue[] = [
+        {
+          number: 4439,
+          title: 'profile settings UI',
+          labels: [],
+          assignees: [],
+        },
+      ];
+      const openPRs = [
+        {
+          number: 4440,
+          title: 'feat: profile settings UI (#4439)',
+          isDraft: true,
+          assignees: [{ login: 'juliendurandeu' }],
+        },
+      ];
+
+      const report = classifyBacklogIssues(issues, openPRs);
+      expect(report.inProgress).toHaveLength(1);
+      expect(report.inProgress[0].number).toBe(4439);
+      expect(report.actionable).toHaveLength(0);
+    });
+
+    it('classifies unlinked draft PRs needing convergence as actionable', () => {
+      const issues: BacklogIssue[] = [];
+      const openPRs = [
+        {
+          number: 77,
+          title: 'refactor: decouple queue',
+          isDraft: true,
+        },
+      ];
+
+      const report = classifyBacklogIssues(issues, openPRs);
+      expect(report.actionable).toHaveLength(1);
+      expect(report.actionable[0].number).toBe(77);
+    });
+
     it('classifies issues with needs-human as gatedHuman', () => {
       const issues: BacklogIssue[] = [
         {
@@ -317,6 +405,28 @@ describe('Daemon Autowork Backlog Preflight & Classification', () => {
         repoRoot: tmpRepo,
         getPRs: async () => [],
         getBacklog: async () => dummyReport,
+        runRoutine: async () => {
+          runRoutineCalled = true;
+          return { success: true };
+        },
+      });
+
+      expect(runRoutineCalled).toBe(true);
+      expect(result.executed).toBe(true);
+    });
+
+    it('proceeds with routine execution when an issue has a draft PR needing convergence', async () => {
+      let runRoutineCalled = false;
+
+      const reportWithDraftPR = classifyBacklogIssues(
+        [{ number: 4439, title: 'profile settings UI' }],
+        [{ number: 4440, title: 'feat: profile settings UI (#4439)', isDraft: true }]
+      );
+
+      const result = await performAutoworkScan({
+        repoRoot: tmpRepo,
+        getPRs: async () => [],
+        getBacklog: async () => reportWithDraftPR,
         runRoutine: async () => {
           runRoutineCalled = true;
           return { success: true };

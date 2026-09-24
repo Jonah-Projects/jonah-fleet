@@ -46,6 +46,23 @@ describe('Fleet Brand Identity & Terminal Primitives', () => {
     expect(plain).toContain('TARGET: /tmp/test-repo');
   });
 
+  it('renders a tactical command banner for daemon with PID and cadence telemetry', () => {
+    const banner = renderFleetBanner({
+      command: 'DAEMON',
+      subtitle: 'LOCAL MULTI-CADENCE RUNNER',
+      details: [
+        { label: 'PID', value: '4242' },
+        { label: 'Cadence', value: '3m review · 30m autowork' },
+      ],
+      width: 76,
+    });
+
+    const plain = stripAnsi(banner);
+    expect(plain).toContain('DAEMON');
+    expect(plain).toContain('PID: 4242');
+    expect(plain).toContain('CADENCE: 3m review · 30m autowork');
+  });
+
   it('renders a compact banner when width is restricted', () => {
     const compactBanner = renderFleetBanner({
       command: 'STATUS',

@@ -297,14 +297,16 @@ describe('Daemon Status and Keybinding UI formatting', () => {
     fs.rmSync(tmpRepo, { recursive: true, force: true });
   });
 
-  it('prints keybinding cheat-sheet without throwing', () => {
+  it('prints keybinding cheat-sheet with on-brand tactical header', () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(() => printKeybindingCheatSheet()).not.toThrow();
     expect(consoleSpy).toHaveBeenCalled();
+    const output = consoleSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('⚡ Jonah Fleet Daemon Keybindings // Command Reference');
     consoleSpy.mockRestore();
   });
 
-  it('prints daemon status summary with pending queue information', () => {
+  it('prints daemon status summary with pending queue information and on-brand header', () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const state: DaemonState = {
       pid: 12345,
@@ -326,6 +328,8 @@ describe('Daemon Status and Keybinding UI formatting', () => {
     ).not.toThrow();
 
     expect(consoleSpy).toHaveBeenCalled();
+    const output = consoleSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('⚡ Jonah Fleet Daemon Status Readout');
     consoleSpy.mockRestore();
   });
 });
@@ -751,6 +755,7 @@ describe('Rotating Status-Line Tips & Viewport Width Guardrails', () => {
     });
 
     const plain = stripAnsi(line);
+    expect(plain).toContain('⚡');
     expect(plain).toContain('Watchdog Idle');
     expect(plain).toContain('Next check in 2m 30s (2 ready PRs)');
     expect(plain).toContain("Tip: press 'r' to run review pass now");

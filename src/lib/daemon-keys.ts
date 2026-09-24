@@ -306,7 +306,7 @@ export function printDaemonLogTail(repoRoot: string, linesCount: number = 20): v
   const logPath = path.join(repoRoot, '.jonah-fleet', 'daemon.log');
   const relativePath = path.relative(repoRoot, logPath) || logPath;
 
-  console.log(pc.cyan(`\n📄 Tail of ${relativePath} (last ${linesCount} lines):\n`));
+  console.log(pc.bold(pc.cyan(`\n⚡ Tail of ${relativePath} (last ${linesCount} lines):\n`)));
   if (lines.length === 0) {
     console.log(pc.dim(`  (Log file is empty or does not exist yet at ${relativePath})\n`));
     return;
@@ -336,7 +336,7 @@ export async function inspectAndCleanWorktrees(repoRoot: string): Promise<Worktr
  * Prints worktree inspection and maintenance details.
  */
 export function printWorktreesInspection(result: WorktreeInspectionResult): void {
-  console.log(pc.cyan(`\n🌳 Jonah Fleet Worktree Inspection & Maintenance\n`));
+  console.log(pc.bold(pc.cyan(`\n⚡ Jonah Fleet Worktree Inspection & Maintenance\n`)));
   console.log(`  Active Worktrees: ${result.active.length}`);
   if (result.active.length === 0) {
     console.log(pc.dim(`  (No active routine worktrees found)`));
@@ -351,19 +351,19 @@ export function printWorktreesInspection(result: WorktreeInspectionResult): void
 }
 
 export function printKeybindingCheatSheet(): void {
-  console.log(pc.cyan(`\n⌨️  Jonah Fleet Daemon Keybindings\n`));
-  console.log(`  ${pc.bold('r')}        Trigger peer-review scan immediately`);
-  console.log(`  ${pc.bold('R')}        Prompt for PR # and run targeted peer-review`);
-  console.log(`  ${pc.bold('a')}        Trigger autowork backlog scan immediately`);
-  console.log(`  ${pc.bold('A')}        Prompt for Issue # and run targeted autowork`);
-  console.log(`  ${pc.bold('p')}        Pause / resume automated polling intervals`);
-  console.log(`  ${pc.bold('s')}        Print current daemon status summary card`);
-  console.log(`  ${pc.bold('v')}        Toggle verbose streaming logging live`);
-  console.log(`  ${pc.bold('l')}        Tail recent lines from .jonah-fleet/daemon.log`);
-  console.log(`  ${pc.bold('w')}        Inspect active worktrees and clean stale ones`);
-  console.log(`  ${pc.bold('q')}        Graceful shutdown (waits for active routine to finish)`);
-  console.log(`  ${pc.bold('Ctrl+C')}   Immediate force abort`);
-  console.log(`  ${pc.bold('?')} / ${pc.bold('h')}   Show this keybindings cheat-sheet\n`);
+  console.log(pc.bold(pc.cyan(`\n⚡ Jonah Fleet Daemon Keybindings // Command Reference\n`)));
+  console.log(`  ${pc.bold(pc.green('r'))}        Trigger peer-review scan immediately`);
+  console.log(`  ${pc.bold(pc.green('R'))}        Prompt for PR # and run targeted peer-review`);
+  console.log(`  ${pc.bold(pc.green('a'))}        Trigger autowork backlog scan immediately`);
+  console.log(`  ${pc.bold(pc.green('A'))}        Prompt for Issue # and run targeted autowork`);
+  console.log(`  ${pc.bold(pc.green('p'))}        Pause / resume automated polling intervals`);
+  console.log(`  ${pc.bold(pc.green('s'))}        Print current daemon status summary card`);
+  console.log(`  ${pc.bold(pc.green('v'))}        Toggle verbose streaming logging live`);
+  console.log(`  ${pc.bold(pc.green('l'))}        Tail recent lines from .jonah-fleet/daemon.log`);
+  console.log(`  ${pc.bold(pc.green('w'))}        Inspect active worktrees and clean stale ones`);
+  console.log(`  ${pc.bold(pc.green('q'))}        Graceful shutdown (waits for active routine to finish)`);
+  console.log(`  ${pc.bold(pc.red('Ctrl+C'))}   Immediate force abort`);
+  console.log(`  ${pc.bold(pc.green('?'))} / ${pc.bold(pc.green('h'))}   Show this keybindings cheat-sheet\n`);
 }
 
 export interface DaemonStatusSummaryOptions {
@@ -377,7 +377,7 @@ export interface DaemonStatusSummaryOptions {
 export function printDaemonStatusSummary(options: DaemonStatusSummaryOptions): void {
   const { state, pendingRoutine, activeWorktrees = [], verbose } = options;
 
-  console.log(pc.cyan(`\n🤖 Jonah Fleet Local Daemon Status\n`));
+  console.log(pc.bold(pc.cyan(`\n⚡ Jonah Fleet Daemon Status Readout\n`)));
   if (state) {
     let statusText: string;
     if (state.status === 'working') {
@@ -508,7 +508,7 @@ export function formatDaemonStatusLine(options: FormatDaemonStatusLineOptions = 
   let core: string;
   if (options.isPaused) {
     const queueStr = options.pendingRoutine ? pc.cyan(` [Queued: ${options.pendingRoutine}]`) : '';
-    core = `${pc.dim('[' + timeString + ']')} ⏸️  ${pc.yellow('PAUSED')}${queueStr}`;
+    core = `${pc.dim('[' + timeString + ']')} ⏸  ${pc.yellow('PAUSED')}${queueStr}`;
   } else {
     const nextCheck = options.nextCheckTime !== undefined ? options.nextCheckTime : nowMs;
     const diffMs = Math.max(0, nextCheck - nowMs);
@@ -518,7 +518,7 @@ export function formatDaemonStatusLine(options: FormatDaemonStatusLineOptions = 
     const timeStr = `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
     const prStr = options.lastOpenPRCount !== undefined ? ` (${options.lastOpenPRCount} ready PRs)` : '';
     const queueStr = options.pendingRoutine ? pc.cyan(` [Queued: ${options.pendingRoutine}]`) : '';
-    core = `${pc.dim('[' + timeString + ']')} 💤 ${pc.dim('Watchdog Idle · Next check in ' + timeStr + prStr)}${queueStr}`;
+    core = `${pc.dim('[' + timeString + ']')} ⚡ ${pc.dim('Watchdog Idle · Next check in ' + timeStr + prStr)}${queueStr}`;
   }
 
   if (!includeTip) {
