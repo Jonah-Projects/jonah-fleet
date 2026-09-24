@@ -264,6 +264,70 @@ describe("Prompt Validation & Invariants", () => {
     expect(peerReviewContent).toContain("NEVER call `schedule` or yield the turn");
   });
 
+  it("validates peer-review.md and ORCHESTRATION.md define in-progress CI protocol and zero-polling guardrails", () => {
+    const peerReviewPath = path.join(promptsDir, "peer-review.md");
+    const orchestrationPath = path.join(promptsDir, "ORCHESTRATION.md");
+
+    const peerReviewContent = fs.readFileSync(peerReviewPath, "utf8");
+    const orchestrationContent = fs.readFileSync(orchestrationPath, "utf8");
+
+    // Guardrail constraints and negative rules
+    expect(peerReviewContent).toContain("In-Progress CI & Zero-Polling Guardrail");
+    expect(peerReviewContent).toContain(
+      "Calling `run_command` 5 times with identical parameters within a sliding window of 20 trips the deterministic loop guard circuit breaker",
+    );
+    expect(peerReviewContent).toContain(
+      "Do not busy-poll `gh run view` or `gh pr checks` in a loop when remote CI is in progress",
+    );
+
+    // Objective & DoD terminal states
+    expect(peerReviewContent).toContain(
+      "post an approval note and defer merge if clean while remote CI is in-progress",
+    );
+    expect(peerReviewContent).toContain(
+      "approved and deferred merge pending in-progress remote CI checks",
+    );
+    expect(peerReviewContent).toContain("DEFER_CI");
+
+    // Step 1-2 scan mode prioritization & CI gating
+    expect(peerReviewContent).toContain("Category A (re-review)");
+    expect(peerReviewContent).toContain(
+      "Category B (first review / unreviewed)",
+    );
+    expect(peerReviewContent).toContain(
+      "Category C (ready to merge / CI-cleared)",
+    );
+    expect(peerReviewContent).toContain("CI State Gating");
+    expect(peerReviewContent).toContain(
+      "check status (`gh pr checks <PR_NUMBER>`)",
+    );
+
+    // Step 4 early bounce directive
+    expect(peerReviewContent).toContain(
+      "If blocking findings exist, bounce to draft immediately without waiting for CI.",
+    );
+
+    // Step 6 approval comment template and mandatory Fleet badge
+    expect(peerReviewContent).toContain(
+      "If Clean (or only Non-blocking findings) but Remote CI is In-Progress",
+    );
+    expect(peerReviewContent).toContain(
+      "Waiting for in-progress remote CI checks to conclude before merge.",
+    );
+    expect(peerReviewContent).toContain(
+      "[![Fleet](https://img.shields.io/badge/Fleet-Autonomous_Command-BBF65D?style=flat&logo=githubactions)](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})",
+    );
+
+    // ORCHESTRATION protocol
+    expect(orchestrationContent).toContain("In-Progress CI Protocol");
+    expect(orchestrationContent).toContain(
+      "run local verification once synchronously",
+    );
+    expect(orchestrationContent).toContain(
+      "defer merging to the next sweep once CI concludes",
+    );
+  });
+
   it("validates analytics-review.md defines mandatory post-measurement action directives and product planning bridge", () => {
     const templatePath = path.join(promptsDir, "analytics-review.md");
     expect(fs.existsSync(templatePath)).toBe(true);

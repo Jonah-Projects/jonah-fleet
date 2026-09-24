@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
 * **daemon:** classify draft PRs needing convergence as actionable instead of in-progress to prevent zero-token preflight bypass from stalling draft PR recovery
+* **peer-review:** add In-Progress CI Protocol and Zero-Polling Guardrail to `peer-review.md` and `ORCHESTRATION.md` to prevent loop guard circuit breaker trips on running checks
 
 ## [1.27.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.27.0...v1.27.1) (2026-09-23)
 
