@@ -10,7 +10,7 @@ Routine objective, Definition of Done, constraints, instructions, and logging.
 
 ## Objective
 
-Review a pull request (in Targeted mode for a specific `$PR_NUMBER`, or in Scan mode selecting the highest-priority open PR), evaluate code quality, security, and specification compliance via multi-angle subagent code reviews (`/code-review`), and take exactly one final action: squash-merge if clean, or post findings and bounce the PR back to draft (`gh pr ready <N> --undo`) for in-session author fixes.
+Review a pull request (in Targeted mode for a specific `$PR_NUMBER`, or in Scan mode selecting the highest-priority open PR), evaluate code quality, security, and specification compliance via multi-angle subagent code reviews (`/code-review`), and take exactly one final action: squash-merge if clean, post findings and bounce the PR back to draft (`gh pr ready <N> --undo`) for in-session author fixes, or post an approval note and defer merge if clean while remote CI is in-progress.
 
 ## FIRST ACTION — determine the target PR before anything else
 
@@ -27,7 +27,7 @@ The run is SUCCESS only if ALL of these are true:
 
 - [ ] Identified the target PR: if one was named in the invocation, reviewed exactly that PR; otherwise listed open PRs and selected one by priority
 - [ ] Ran the code-review pass (`/code-review` and security pass), and posted findings as inline review comments
-- [ ] Took exactly one final action: squash-merged (if PR is good, CI green and present; executed Autonomous Issue Synthesis if unlinked; closed tracking issue explicitly if referenced) OR posted findings and **converted the PR back to draft** (`gh pr ready <N> --undo`) for author/autowork in-session fixes OR, if round cap reached at round 5 with blocking findings, converted to draft and escalated to human via the 4-part escalation card with `needs-human`
+- [ ] Took exactly one final action: squash-merged (if PR is good, CI green and present; executed Autonomous Issue Synthesis if unlinked; closed tracking issue explicitly if referenced) OR posted findings and **converted the PR back to draft** (`gh pr ready <N> --undo`) for author/autowork in-session fixes OR approved and deferred merge pending in-progress remote CI checks OR, if round cap reached at round 5 with blocking findings, converted to draft and escalated to human via the 4-part escalation card with `needs-human`
 - [ ] If merging: captured deferred non-blocking findings per materiality bar (filed follow-up issues for material ones, batched or dropped immaterial ones)
 - [ ] If in Scan mode and no eligible PRs exist, logged SUCCESS with "No PRs to review"
 
@@ -103,7 +103,8 @@ Check if `$PR_NUMBER` is set:
 3. Prioritize:
    - **Category A (re-review)**: PRs with prior review comments where author has pushed new fix commits.
    - **Category B (first review / unreviewed)**: Brand new PRs ready for review, or ready PRs whose previous review session failed or timed out.
-4. **CI State Gating**: In Scan mode, check check status (`gh pr checks <PR_NUMBER>`). Prioritize PRs whose CI runs are already completed (`SUCCESS` or `FAILURE`). If a candidate PR's CI is still actively `IN_PROGRESS` or `QUEUED`, deprioritize it behind PRs with completed checks so CI can conclude naturally without stalling the review queue.
+   - **Category C (ready to merge / CI-cleared)**: Ready PRs whose code review was completed/approved pending CI and whose CI checks have now completed and passed (`SUCCESS`). Prioritize these for immediate squash-merge.
+4. **CI State Gating**: In Scan mode, check status (`gh pr checks <PR_NUMBER>`). Prioritize PRs whose CI runs are already completed (`SUCCESS` or `FAILURE`). If a candidate PR's CI is still actively `IN_PROGRESS` or `QUEUED`, deprioritize it behind PRs with completed checks so CI can conclude naturally without stalling the review queue.
 
 ### Step 3: Round tracking, Target Binding, Failure Ingestion & Starting Review marker
 
@@ -150,7 +151,7 @@ Check if `$PR_NUMBER` is set:
    - **Question-First Validation**: Verify that any new custom analytics events answer a clear, decision-driving question per the 3-Tier Taxonomy in `AGENTS.md`. Flag vanity click-trackers on Tier 3 passive chrome/easter eggs as non-blocking cleanup (recommend removal).
    - **Funnel Completeness**: For new Tier 1 user funnels or critical workflows, verify the telemetry contract: impression denominator (`_shown`), interaction (`_clicked`), and failure states (`_failed` with `reason`) are captured, and events are documented in the custom events catalog (`ARCHITECTURE.md` / `DATA_CONTEXT.md`). Flag missing denominators on core funnels as blocking.
 5. If PR modifies rendered UI, verify screenshots or visual components if tooling/scripts are available.
-6. Run repository verification commands (tests, type-check) ONLY if CI status is unconfirmed or failing. If remote CI (such as GitHub Actions or Vercel preview) is already green and passing on the head commit, treat CI as verified. If verification commands must be run locally, specify `WaitMsBeforeAsync: 10000` and NEVER call `schedule` or yield the turn with plain text while waiting for background tasks. If a command runs in the background, poll its completion with `manage_task(Action='status')` without busy-waiting on unchanged files. If remote CI is currently in-progress (`PENDING` / `IN_PROGRESS` / `QUEUED`), proceed through the remaining review passes first. NEVER busy-poll `gh run view` or `gh pr checks` repeatedly with `run_command`.
+6. Run repository verification commands (tests, type-check) ONLY if CI status is unconfirmed or failing. If remote CI (such as GitHub Actions or Vercel preview) is already green and passing on the head commit, treat CI as verified. If verification commands must be run locally, specify `WaitMsBeforeAsync: 10000` and NEVER call `schedule` or yield the turn with plain text while waiting for background tasks. If a command runs in the background, poll its completion with `manage_task(Action='status')` without busy-waiting on unchanged files. If remote CI is currently in-progress (`PENDING` / `IN_PROGRESS` / `QUEUED`), proceed through the remaining review passes first. If blocking findings exist, bounce to draft immediately without waiting for CI. NEVER busy-poll `gh run view` or `gh pr checks` repeatedly with `run_command`.
 7. **Anti-Vacuity & Verifier Audit Pass (The 6 Bogus Green Shapes)**:
    Actively interrogate new or modified tests and verification commands against the 6 bogus green defect classes:
    - **Vacuous assertion**: Test passes whether or not the feature works (e.g. deleting the implementation under test leaves it green). Require a red-gate failure or mutation check.
@@ -218,7 +219,9 @@ _Generated by [Antigravity](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/ru
     ```bash
     gh pr comment <PR_NUMBER> --body "✅ Code review completed: clean (no blocking findings). Waiting for in-progress remote CI checks to conclude before merge.
 
-_Generated by [Antigravity](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID:-})_"
+[![Fleet](https://img.shields.io/badge/Fleet-Autonomous_Command-BBF65D?style=flat&logo=githubactions)](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})
+
+_Generated by [Antigravity](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_"
     ```
   - Submit held review comments (if any).
   - Leave the PR open and ready for review (do NOT run `gh pr ready <N> --undo`).
@@ -242,7 +245,7 @@ _Generated by [Antigravity](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/ru
 After completing (SUCCESS or FAILURE), record run execution details to `.jonah-fleet/run-report.md`. Include:
 
 - Prompt SHA
-- Target PR number and decision (MERGE / BOUNCE / ESCALATE)
+- Target PR number and decision (MERGE / BOUNCE / ESCALATE / DEFER_CI)
 - Execution trace and findings summary
 
 **Issue Logging Protocol**:
@@ -252,7 +255,7 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
 - **Phase**: \`Phase 4 · Reconciliation\`
 - **Status**: ✅ SUCCESS
 - **Target / Context**: \`PR #<PR_NUMBER>\`
-- **Key Decision / Finding**: Review completed with decision \`<MERGE | BOUNCE | ESCALATE>\`.
+- **Key Decision / Finding**: Review completed with decision \`<MERGE | BOUNCE | ESCALATE | DEFER_CI>\`.
 - **Next**: Routine finished; issue closed by harness" || true
   ```
 - Follow the Routine Issue Logging & Telemetry Protocol in `ORCHESTRATION.md`. Never commit run logs to git branches.
