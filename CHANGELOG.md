@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.0...v1.28.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* **peer-review:** add In-Progress CI Protocol and Zero-Polling Guardrail ([#438](https://github.com/Jonah-Projects/jonah-fleet/issues/438)) ([78922eb](https://github.com/Jonah-Projects/jonah-fleet/commit/78922eb4efda5071d709e292e406d6896c7920e4))
+
 ## [1.28.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.27.2...v1.28.0) (2026-09-24)
 
 
