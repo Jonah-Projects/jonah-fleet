@@ -977,6 +977,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
   let activeChild: any = null;
 
   const loopGuard = new LoopGuard({
+    routine: options.routine,
     repetitionThreshold: 5,
     pingPongThreshold: 3,
     consecutiveErrorThreshold: 2,

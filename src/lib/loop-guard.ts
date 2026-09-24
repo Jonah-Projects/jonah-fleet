@@ -20,6 +20,7 @@ export interface ActionRecord {
 }
 
 export interface LoopGuardOptions {
+  routine?: string;
   repetitionThreshold?: number;
   pingPongThreshold?: number;
   consecutiveErrorThreshold?: number;
@@ -57,6 +58,7 @@ export function computeActionHash(toolName: string, args: any): string {
  * Deterministic Loop Guard & Circuit Breaker monitoring tool calls and execution events.
  */
 export class LoopGuard {
+  private routine?: string;
   private repetitionThreshold: number;
   private pingPongThreshold: number;
   private consecutiveErrorThreshold: number;
@@ -69,6 +71,7 @@ export class LoopGuard {
   private trippedResult: LoopGuardTrip | null = null;
 
   constructor(options: LoopGuardOptions = {}) {
+    this.routine = options.routine;
     this.repetitionThreshold = options.repetitionThreshold ?? 5;
     this.pingPongThreshold = options.pingPongThreshold ?? 3;
     this.consecutiveErrorThreshold = options.consecutiveErrorThreshold ?? 2;
@@ -117,8 +120,11 @@ export class LoopGuard {
         (args?.Action === 'list' ||
           args?.action === 'list'));
 
+    const isAnalyticsRoutine = this.routine === 'analytics-review';
+
     const isExemptFromRepetition =
       isStatusPolling ||
+      isAnalyticsRoutine ||
       toolName === 'view_file' ||
       toolName === 'read_file' ||
       toolName === 'replace_file_content' ||
@@ -190,19 +196,21 @@ export class LoopGuard {
     const requiredPingPongLength = this.pingPongThreshold * 2;
     if (this.history.length >= requiredPingPongLength) {
       const pingPongSlice = this.history.slice(-requiredPingPongLength);
-      const hasExemptPingPongAction = pingPongSlice.some(
-        (item) =>
-          (item.toolName === 'manage_task' &&
-            (item.args?.Action === 'status' ||
-              item.args?.action === 'status' ||
-              item.args?.Action === 'list' ||
-              item.args?.action === 'list')) ||
-          (item.toolName === 'manage_subagents' &&
-            (item.args?.Action === 'list' ||
-              item.args?.action === 'list')) ||
-          item.toolName === 'replace_file_content' ||
-          item.toolName === 'write_to_file'
-      );
+      const hasExemptPingPongAction =
+        isAnalyticsRoutine ||
+        pingPongSlice.some(
+          (item) =>
+            (item.toolName === 'manage_task' &&
+              (item.args?.Action === 'status' ||
+                item.args?.action === 'status' ||
+                item.args?.Action === 'list' ||
+                item.args?.action === 'list')) ||
+            (item.toolName === 'manage_subagents' &&
+              (item.args?.Action === 'list' ||
+                item.args?.action === 'list')) ||
+            item.toolName === 'replace_file_content' ||
+            item.toolName === 'write_to_file'
+        );
 
       if (!hasExemptPingPongAction) {
         const hashA = pingPongSlice[0].hash;
