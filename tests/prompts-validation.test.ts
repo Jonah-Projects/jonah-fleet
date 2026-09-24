@@ -261,7 +261,10 @@ describe("Prompt Validation & Invariants", () => {
       "Headless Execution & Asynchronous Non-Yielding Guardrail",
     );
     expect(peerReviewContent).toContain("Verification Command & CI Discipline");
+    expect(peerReviewContent).toContain("In-Progress CI & Zero-Polling Guardrail");
     expect(peerReviewContent).toContain("NEVER call `schedule` or yield the turn");
+
+    expect(orchestrationContent).toContain("In-Progress CI Protocol");
   });
 
   it("validates analytics-review.md defines mandatory post-measurement action directives and product planning bridge", () => {

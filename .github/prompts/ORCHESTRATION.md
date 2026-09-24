@@ -292,6 +292,9 @@ In headless CLI environments (`agy -p` / GitHub Actions), agent sessions termina
 1. **Zero-Yield Waiting Invariant**: Agents MUST NEVER call `schedule` or emit a terminal turn with plain text to "wait" for background commands, timers, or long-running checks. In headless mode, yielding the turn halts the process immediately with exit code 0 before reaching the Definition of Done.
 2. **Active Task Supervision**: If a verification command (`npm test`, `npm run type-check`) is sent to the background by `run_command`, the agent must actively poll `manage_task(Action='status')` or inspect code while waiting within the continuous tool-calling loop.
 3. **CI Trust Bar & Test Discipline**: Peer review routines should trust green passing remote CI checks (GitHub Actions or Vercel preview deployments) on the PR's head commit rather than initiating slow, background-prone full test runs. Run repository verification locally ONLY if CI status is unconfirmed, missing, or failing.
+4. **In-Progress CI Protocol**: When remote CI checks (e.g. GitHub Actions, Vercel deployments) are actively running (`PENDING`, `IN_PROGRESS`, `QUEUED`) during peer review:
+   - If the PR has blocking review findings, bounce to draft immediately (`gh pr ready <N> --undo`) without waiting for CI.
+   - If the PR is clean, NEVER busy-poll `run_command: gh run view` or `gh pr checks` in a loop (which trips the loop guard circuit breaker after 5 calls). Instead, run local verification once synchronously (`WaitMsBeforeAsync: 10000`); if passing, post an approval note confirming code health and defer merging to the next sweep once CI concludes.
 
 ---
 
