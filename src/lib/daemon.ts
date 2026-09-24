@@ -111,31 +111,64 @@ export interface ReviewablePR {
   number: number;
   headRefName: string;
   title: string;
+  statusCheckRollup?: Array<{
+    status?: string;
+    state?: string;
+    conclusion?: string | null;
+  }>;
+}
+
+/**
+ * Checks if a pull request has CI checks that are currently running, queued, or pending.
+ */
+export function isPRCiPending(pr: ReviewablePR): boolean {
+  if (!pr.statusCheckRollup || !Array.isArray(pr.statusCheckRollup) || pr.statusCheckRollup.length === 0) {
+    return false;
+  }
+  return pr.statusCheckRollup.some((check) => {
+    if (check.status && check.status !== 'COMPLETED') {
+      return true;
+    }
+    if (check.state && check.state === 'PENDING') {
+      return true;
+    }
+    return false;
+  });
+}
+
+export interface FilterReviewablePROptions {
+  allowPendingCi?: boolean;
 }
 
 /**
  * Filters a list of pull requests to include only reviewable PRs,
- * excluding automated release-please branches and release PR titles.
+ * excluding automated release-please branches, release PR titles,
+ * and PRs with active CI checks in progress (unless allowPendingCi is true).
  */
-export function filterReviewablePRs(prs: ReviewablePR[]): ReviewablePR[] {
+export function filterReviewablePRs(
+  prs: ReviewablePR[],
+  options: FilterReviewablePROptions = {}
+): ReviewablePR[] {
   return (prs || []).filter(
     (pr) =>
       pr &&
       typeof pr.number === 'number' &&
       !pr.headRefName?.startsWith('release-please--') &&
-      !pr.title?.startsWith('chore(main): release')
+      !pr.title?.startsWith('chore(main): release') &&
+      (options.allowPendingCi || !isPRCiPending(pr))
   );
 }
 
 /**
  * Fast pre-flight check to query open ready PRs in ~100ms with 0 token cost,
- * excluding drafts, automated release-please branches, and release PR titles.
+ * excluding drafts, automated release-please branches, release PR titles,
+ * and PRs with active CI checks still running.
  */
 export async function getOpenReviewablePRs(repoRoot: string): Promise<ReviewablePR[]> {
   try {
     const { stdout } = await execFileAsync(
       'gh',
-      ['pr', 'list', '--state', 'open', '--draft=false', '--json', 'number,headRefName,title'],
+      ['pr', 'list', '--state', 'open', '--draft=false', '--json', 'number,headRefName,title,statusCheckRollup'],
       { cwd: repoRoot }
     );
     const prs = JSON.parse(stdout) as ReviewablePR[];

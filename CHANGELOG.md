@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+* **daemon:** query `statusCheckRollup` in `getOpenReviewablePRs` and filter out PRs with in-progress CI to prevent premature review dispatch and repetition loop trips
 * **peer-review:** add Post-Merge Companion Measurement Issue Filing protocol to `peer-review.md` and `ORCHESTRATION.md` to automatically synthesize `Measure: ...` tracking issues upon merge
 
 ## [1.28.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.1...v1.28.2) (2026-09-24)

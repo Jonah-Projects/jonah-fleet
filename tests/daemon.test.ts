@@ -10,6 +10,7 @@ import {
   isDaemonRunning,
   DaemonState,
   filterReviewablePRs,
+  isPRCiPending,
   drainReviewQueue,
   reconcileOrphanedLocalRuns,
 } from '../src/lib/daemon.js';
@@ -123,6 +124,70 @@ describe('Local Agent Daemon Manager', () => {
     expect(filtered.map((p) => p.number)).toEqual([10, 12]);
     expect(filterReviewablePRs([])).toEqual([]);
     expect(filterReviewablePRs(null as any)).toEqual([]);
+  });
+
+  it('correctly detects pending CI checks and filters out PRs with in-progress CI', () => {
+    const prPendingCheckRun = {
+      number: 1,
+      headRefName: 'feat/test-1',
+      title: 'feat: in progress check run',
+      statusCheckRollup: [
+        { status: 'COMPLETED', conclusion: 'SUCCESS' },
+        { status: 'IN_PROGRESS', conclusion: null },
+      ],
+    };
+
+    const prQueuedCheckRun = {
+      number: 2,
+      headRefName: 'feat/test-2',
+      title: 'feat: queued check run',
+      statusCheckRollup: [{ status: 'QUEUED', conclusion: null }],
+    };
+
+    const prPendingStatusContext = {
+      number: 3,
+      headRefName: 'feat/test-3',
+      title: 'feat: pending status context',
+      statusCheckRollup: [{ state: 'PENDING' }],
+    };
+
+    const prCompletedGreen = {
+      number: 4,
+      headRefName: 'feat/test-4',
+      title: 'feat: completed green',
+      statusCheckRollup: [
+        { status: 'COMPLETED', conclusion: 'SUCCESS' },
+        { state: 'SUCCESS' },
+      ],
+    };
+
+    const prNoChecks = {
+      number: 5,
+      headRefName: 'feat/test-5',
+      title: 'feat: no CI configured',
+    };
+
+    expect(isPRCiPending(prPendingCheckRun)).toBe(true);
+    expect(isPRCiPending(prQueuedCheckRun)).toBe(true);
+    expect(isPRCiPending(prPendingStatusContext)).toBe(true);
+    expect(isPRCiPending(prCompletedGreen)).toBe(false);
+    expect(isPRCiPending(prNoChecks)).toBe(false);
+
+    const prs = [
+      prPendingCheckRun,
+      prQueuedCheckRun,
+      prPendingStatusContext,
+      prCompletedGreen,
+      prNoChecks,
+    ];
+
+    // Default filters out pending CI PRs so daemon does not review premature PRs
+    const reviewable = filterReviewablePRs(prs);
+    expect(reviewable.map((p) => p.number)).toEqual([4, 5]);
+
+    // allowPendingCi preserves them if explicitly configured
+    const all = filterReviewablePRs(prs, { allowPendingCi: true });
+    expect(all.map((p) => p.number)).toEqual([1, 2, 3, 4, 5]);
   });
 
   describe('drainReviewQueue', () => {
