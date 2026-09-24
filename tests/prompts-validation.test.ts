@@ -708,7 +708,10 @@ describe("Prompt Validation & Invariants", () => {
     expect(peerReviewContent).toContain("Question-First Validation");
     expect(peerReviewContent).toContain("Funnel Completeness");
     expect(peerReviewContent).toContain("Post-Merge Companion Measurement Issue Filing");
-    expect(peerReviewContent).toMatch(/gh issue create[\s\S]*--label "measurement"/);
+    expect(peerReviewContent).toMatch(
+      /gh issue create \\\s+--title "Measure: <Feature Name>" \\\s+--label "measurement"/,
+    );
+    expect(peerReviewContent).toMatch(/--body-file - <<'EOF'/);
   });
 
   it("validates Chief of Staff verification discipline, Red Gate protocol, and anti-vacuity invariants", () => {
