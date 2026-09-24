@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.4](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.3...v1.28.4) (2026-09-24)
+
+
+### Bug Fixes
+
+* **daemon:** filter out PRs with pending CI from review queue to avoid premature dispatch ([6344a8e](https://github.com/Jonah-Projects/jonah-fleet/commit/6344a8eeed1c3b992aa7004d51e92fa7cbd665b7))
+
 ## [1.28.3](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.2...v1.28.3) (2026-09-24)
 
 
