@@ -8,6 +8,7 @@ import {
   DaemonOptions,
 } from '../lib/daemon.js';
 import { listActiveWorktrees } from '../lib/worktree.js';
+import { renderFleetBanner } from '../lib/brand.js';
 
 export interface DaemonCommandOptions {
   interval?: string;
@@ -50,13 +51,21 @@ export async function runDaemonCommand(action?: string, options: DaemonCommandOp
 
     try {
       const state = await startBackgroundDaemon(cwd, daemonOpts);
+      console.log(
+        renderFleetBanner({
+          command: 'DAEMON',
+          subtitle: 'BACKGROUND RUNNER STARTED',
+          details: [
+            { label: 'PID', value: String(state.pid) },
+            { label: 'Review Watchdog', value: `Every ${state.reviewIntervalMinutes}m (zero-token preflight)` },
+            { label: 'Autowork Scan', value: `Every ${state.autoworkIntervalMinutes}m` },
+            { label: 'Routines', value: state.routines.join(', ') },
+            { label: 'Log', value: '.jonah-fleet/daemon.log' },
+          ],
+        })
+      );
       console.log(pc.green(`\n✓ Background agent daemon started successfully.`));
-      console.log(pc.dim(`   PID: ${state.pid}`));
-      console.log(pc.dim(`   Peer Review Watchdog: Every ${state.reviewIntervalMinutes} minutes (zero-cost PR preflight)`));
-      console.log(pc.dim(`   Autowork Backlog Scan: Every ${state.autoworkIntervalMinutes} minutes`));
-      console.log(pc.dim(`   Routines: ${state.routines.join(', ')}`));
-      console.log(pc.dim(`   Log file: .jonah-fleet/daemon.log`));
-      console.log(pc.dim(`   Run 'jonah-fleet daemon status' or 'jonah-fleet daemon stop' to manage.`));
+      console.log(pc.dim(`   Run 'jonah-fleet daemon status' or 'jonah-fleet daemon stop' to manage.\n`));
     } catch (err: any) {
       console.error(pc.red(`\n✗ Failed to start daemon: ${err.message}`));
       process.exit(1);
@@ -97,7 +106,27 @@ export async function runDaemonCommand(action?: string, options: DaemonCommandOp
   const state = readDaemonState(cwd);
   const activeWorktrees = await listActiveWorktrees(cwd);
 
-  console.log(pc.cyan(`\n🤖 Jonah Fleet Local Daemon Status\n`));
+  const statusSubtitle = running && state
+    ? state.status === 'working'
+      ? 'LOCAL RUNNER WORKING'
+      : state.status === 'paused'
+        ? 'LOCAL RUNNER PAUSED'
+        : 'LOCAL RUNNER IDLE'
+    : 'LOCAL RUNNER STOPPED';
+
+  console.log(
+    renderFleetBanner({
+      command: 'DAEMON',
+      subtitle: statusSubtitle,
+      details: [
+        { label: 'Status', value: running && state ? state.status.toUpperCase() : 'STOPPED' },
+        ...(running && state ? [{ label: 'PID', value: String(state.pid) }] : []),
+        { label: 'Target', value: cwd },
+      ],
+    })
+  );
+
+  console.log(pc.bold(pc.cyan(`\n⚡ Jonah Fleet Local Daemon Status\n`)));
   if (running && state) {
     console.log(`  Status:               ${pc.green(pc.bold('RUNNING'))}`);
     console.log(`  PID:                  ${state.pid}`);

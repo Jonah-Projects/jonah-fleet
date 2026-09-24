@@ -21,6 +21,7 @@ import {
   formatDaemonStatusLine,
 } from './daemon-keys.js';
 import pc from 'picocolors';
+import { renderFleetBanner } from './brand.js';
 import {
   renderBacklogDiagnosticCard,
   isRoutineRunTitle,
@@ -172,12 +173,23 @@ export function isBotLogin(login?: string | null): boolean {
   );
 }
 
+export interface BacklogPR {
+  number: number;
+  title?: string;
+  body?: string;
+  headRefName?: string;
+  isDraft?: boolean;
+  labels?: Array<{ name: string } | string>;
+  assignees?: Array<{ login: string }>;
+  url?: string;
+}
+
 /**
- * Classifies a list of open GitHub issues according to the Autowork backlog taxonomy.
+ * Classifies a list of open GitHub issues and pull requests according to the Autowork backlog taxonomy.
  */
 export function classifyBacklogIssues(
   issues: BacklogIssue[],
-  openPRs: Array<{ number: number; title?: string; body?: string; headRefName?: string }> = []
+  openPRs: BacklogPR[] = []
 ): BacklogTriageReport {
   const actionable: BacklogIssue[] = [];
   const inProgress: BacklogIssue[] = [];
@@ -186,16 +198,68 @@ export function classifyBacklogIssues(
   const guardrails: BacklogIssue[] = [];
   const routineLogs: BacklogIssue[] = [];
 
-  const prReferencedIssues = new Set<number>();
+  const readyPRReferencedIssues = new Set<number>();
+  const draftPRReferencedIssues = new Set<number>();
+  const gatedDraftPRReferencedIssues = new Set<number>();
+  const humanAssignedDraftPRReferencedIssues = new Set<number>();
+
+  const standaloneActionableDraftPRs: BacklogPR[] = [];
+  const standaloneGatedDraftPRs: BacklogPR[] = [];
+  const standaloneHumanDraftPRs: BacklogPR[] = [];
+
+  const knownIssueNumbers = new Set(issues.map((i) => i.number));
+
   for (const pr of openPRs) {
+    // Skip automated release PRs
+    if (
+      pr.headRefName?.startsWith('release-please--') ||
+      pr.title?.startsWith('chore(main): release')
+    ) {
+      continue;
+    }
+
     const textToScan = `${pr.title || ''} ${pr.body || ''} ${pr.headRefName || ''}`;
     const matches = textToScan.matchAll(/#(\d+)\b/g);
+    const referencedIssues = new Set<number>();
     for (const m of matches) {
-      prReferencedIssues.add(parseInt(m[1], 10));
+      referencedIssues.add(parseInt(m[1], 10));
     }
     const branchMatch = (pr.headRefName || '').match(/(?:^|[-_/])(\d+)(?:[-_/]|$)/);
     if (branchMatch) {
-      prReferencedIssues.add(parseInt(branchMatch[1], 10));
+      referencedIssues.add(parseInt(branchMatch[1], 10));
+    }
+
+    const isDraft = Boolean(pr.isDraft);
+    const prLabelNames = (pr.labels || []).map((l) =>
+      (typeof l === 'string' ? l : l.name).toLowerCase()
+    );
+    const hasNeedsHuman = prLabelNames.includes('needs-human');
+    const hasHumanAssignee = (pr.assignees || []).some((a) => !isBotLogin(a.login));
+
+    let hasKnownIssue = false;
+    for (const issueNum of referencedIssues) {
+      if (knownIssueNumbers.has(issueNum)) {
+        hasKnownIssue = true;
+      }
+      if (!isDraft) {
+        readyPRReferencedIssues.add(issueNum);
+      } else if (hasNeedsHuman) {
+        gatedDraftPRReferencedIssues.add(issueNum);
+      } else if (hasHumanAssignee) {
+        humanAssignedDraftPRReferencedIssues.add(issueNum);
+      } else {
+        draftPRReferencedIssues.add(issueNum);
+      }
+    }
+
+    if (isDraft && !hasKnownIssue) {
+      if (hasNeedsHuman) {
+        standaloneGatedDraftPRs.push(pr);
+      } else if (hasHumanAssignee) {
+        standaloneHumanDraftPRs.push(pr);
+      } else {
+        standaloneActionableDraftPRs.push(pr);
+      }
     }
   }
 
@@ -210,8 +274,8 @@ export function classifyBacklogIssues(
       continue;
     }
 
-    // 2. Gated by human (needs-human)
-    if (labelNames.includes('needs-human')) {
+    // 2. Gated by human (needs-human on issue OR on associated draft PR)
+    if (labelNames.includes('needs-human') || gatedDraftPRReferencedIssues.has(issue.number)) {
       gatedHuman.push(issue);
       continue;
     }
@@ -228,17 +292,51 @@ export function classifyBacklogIssues(
       continue;
     }
 
-    // 5. In progress: active open PR or assigned to non-bot human
-    const hasMatchingPR = prReferencedIssues.has(issue.number);
+    // 5. In progress: active open ready PR awaiting review, or assigned to non-bot human
     const hasHumanAssignee = (issue.assignees || []).some((a) => !isBotLogin(a.login));
+    const hasReadyPR = readyPRReferencedIssues.has(issue.number);
+    const hasHumanDraftPR = humanAssignedDraftPRReferencedIssues.has(issue.number);
 
-    if (hasMatchingPR || hasHumanAssignee) {
+    if (hasReadyPR || hasHumanAssignee || hasHumanDraftPR) {
       inProgress.push(issue);
       continue;
     }
 
-    // 6. Actionable (open, unassigned or bot-assigned, no open PR, no gating labels)
+    // 6. Actionable:
+    // - Issue with an open draft PR needing autowork convergence (bounced to draft or drafted)
+    // - OR unassigned/bot-assigned issue with no open PR and no gating labels
     actionable.push(issue);
+  }
+
+  // Include standalone draft PRs that do not link to any known issue
+  for (const pr of standaloneActionableDraftPRs) {
+    actionable.push({
+      number: pr.number,
+      title: pr.title || `PR #${pr.number}`,
+      labels: (pr.labels || []).map((l) => (typeof l === 'string' ? { name: l } : l)),
+      assignees: pr.assignees,
+      url: pr.url,
+    });
+  }
+
+  for (const pr of standaloneGatedDraftPRs) {
+    gatedHuman.push({
+      number: pr.number,
+      title: pr.title || `PR #${pr.number}`,
+      labels: (pr.labels || []).map((l) => (typeof l === 'string' ? { name: l } : l)),
+      assignees: pr.assignees,
+      url: pr.url,
+    });
+  }
+
+  for (const pr of standaloneHumanDraftPRs) {
+    inProgress.push({
+      number: pr.number,
+      title: pr.title || `PR #${pr.number}`,
+      labels: (pr.labels || []).map((l) => (typeof l === 'string' ? { name: l } : l)),
+      assignees: pr.assignees,
+      url: pr.url,
+    });
   }
 
   return {
@@ -248,7 +346,11 @@ export function classifyBacklogIssues(
     awaitingInfo,
     guardrails,
     routineLogs,
-    total: issues.length,
+    total:
+      issues.length +
+      standaloneActionableDraftPRs.length +
+      standaloneGatedDraftPRs.length +
+      standaloneHumanDraftPRs.length,
   };
 }
 
@@ -269,23 +371,18 @@ export async function getBacklogIssues(repoRoot: string): Promise<BacklogIssue[]
 }
 
 /**
- * Fast GitHub CLI query for open pull requests with titles and bodies.
+ * Fast GitHub CLI query for open pull requests with titles, bodies, and draft status.
  */
 export async function getOpenPRsForBacklog(
   repoRoot: string
-): Promise<Array<{ number: number; title?: string; body?: string; headRefName?: string }>> {
+): Promise<BacklogPR[]> {
   try {
     const { stdout } = await execFileAsync(
       'gh',
-      ['pr', 'list', '--state', 'open', '--json', 'number,title,body,headRefName', '--limit', '30'],
+      ['pr', 'list', '--state', 'open', '--json', 'number,title,body,headRefName,isDraft,labels,assignees,url', '--limit', '50'],
       { cwd: repoRoot, timeout: 5000 }
     );
-    return JSON.parse(stdout || '[]') as Array<{
-      number: number;
-      title?: string;
-      body?: string;
-      headRefName?: string;
-    }>;
+    return JSON.parse(stdout || '[]') as BacklogPR[];
   } catch {
     return [];
   }
@@ -777,12 +874,21 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
   };
   writeDaemonState(repoRoot, state);
 
-  console.log(pc.cyan(`\n🤖 Jonah Fleet Multi-Cadence Local Agent Daemon Started`));
-  console.log(pc.dim(`   PID: ${process.pid}`));
-  console.log(pc.dim(`   Peer Review Watchdog: Every ${reviewInterval} minutes (with zero-cost PR preflight)`));
-  console.log(pc.dim(`   Autowork Backlog Scan: Every ${autoworkInterval} minutes`));
-  console.log(pc.dim(`   Working Directory: ${repoRoot}`));
-  console.log(pc.dim(`   Interactive Hotkeys: 'r' (review), 'a' (autowork), 'p' (pause), 's' (status), 'q' (stop), '?' (help)\n`));
+  console.log(
+    renderFleetBanner({
+      command: 'DAEMON',
+      subtitle: 'LOCAL MULTI-CADENCE RUNNER',
+      details: [
+        { label: 'PID', value: String(process.pid) },
+        { label: 'Review Watchdog', value: `Every ${reviewInterval}m (zero-token preflight)` },
+        { label: 'Autowork Scan', value: `Every ${autoworkInterval}m` },
+        { label: 'Routines', value: routines.join(', ') },
+        { label: 'Target', value: repoRoot },
+        { label: 'Hotkeys', value: "'r' review · 'a' autowork · 'p' pause · 's' status · '?' help" },
+      ],
+    })
+  );
+  console.log(pc.bold(pc.cyan(`\n⚡ Jonah Fleet Local Agent Daemon Active (PID: ${process.pid})\n`)));
 
   let isStopping = false;
   let isGracefulStopping = false;
