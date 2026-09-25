@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.5...v1.29.0) (2026-09-25)
+
+
+### Features
+
+* **daemon:** display active target PR and title in watchdog, state, and spinner during review drain ([#469](https://github.com/Jonah-Projects/jonah-fleet/issues/469)) ([07b5000](https://github.com/Jonah-Projects/jonah-fleet/commit/07b50005041a44e371809b8d185af9db3472bdff))
+
 ## [1.28.5](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.4...v1.28.5) (2026-09-25)
 
 
