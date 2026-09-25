@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.0...v1.30.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* **analytics-review:** forbid staging into or commenting on closed product plans ([e945366](https://github.com/Jonah-Projects/jonah-fleet/commit/e945366f8d645d54b3c3de2c9bf7d8c4aaa8cf5f))
+
 ## [1.30.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.29.0...v1.30.0) (2026-09-25)
 
 
