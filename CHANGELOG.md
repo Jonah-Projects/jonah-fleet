@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Features
+
+* **daemon:** display active target PR number and title in watchdog log, state, and terminal spinner during PR backlog draining
+
 ### Bug Fixes
 
 * **daemon:** query `statusCheckRollup` in `getOpenReviewablePRs` and filter out PRs with in-progress CI to prevent premature review dispatch and repetition loop trips

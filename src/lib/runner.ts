@@ -899,6 +899,10 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     spinner.start(`${targetLabel}: ${activePhase}`);
   }
 
+  if (baseTarget) {
+    options.onTargetDetected?.(targetLabel);
+  }
+
   // If target was supplied via options but without a title, fetch title in background
   if (baseTarget && !targetTitle) {
     fetchTargetTitleAsync(targetDir, baseTarget)
