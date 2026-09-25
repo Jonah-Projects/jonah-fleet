@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.29.0...v1.30.0) (2026-09-25)
+
+
+### Features
+
+* **runner:** stream granular tool evaluation descriptions and subagent progress ([#472](https://github.com/Jonah-Projects/jonah-fleet/issues/472)) ([0327bbf](https://github.com/Jonah-Projects/jonah-fleet/commit/0327bbf353544b60c86817d5f352dd6e1d1e66ce))
+
 ## [1.29.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.5...v1.29.0) (2026-09-25)
 
 
