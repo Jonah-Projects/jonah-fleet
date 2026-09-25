@@ -235,6 +235,38 @@ describe('Local Agent Daemon Manager', () => {
       expect(attempted).toEqual([101, 102]);
     });
 
+    it('passes targeted pr number and title to runRoutine and updates state activeTarget', async () => {
+      const prs = [
+        { number: 101, headRefName: 'feat/pr-1', title: 'feat: add payment gateway' },
+      ];
+
+      const capturedOpts: any[] = [];
+      const stateDuringRun: string[] = [];
+
+      const daemonState: any = {
+        pid: 1234,
+        status: 'idle',
+        routines: ['peer-review'],
+      };
+
+      await drainReviewQueue({
+        repoRoot: tmpRepo,
+        state: daemonState,
+        getPRs: async () => prs,
+        runRoutine: async (opts) => {
+          capturedOpts.push(opts);
+          if (daemonState.activeTarget) {
+            stateDuringRun.push(daemonState.activeTarget);
+          }
+          return { success: true };
+        },
+      });
+
+      expect(capturedOpts[0]?.pr).toBe(101);
+      expect(capturedOpts[0]?.title).toBe('feat: add payment gateway');
+      expect(stateDuringRun[0]).toMatch(/PR #101 \(add payment gateway\)/);
+    });
+
     it('stops review queue draining immediately when isStopping returns true', async () => {
       const prs = [
         { number: 201, headRefName: 'feat/pr-201', title: 'feat: pr 201' },

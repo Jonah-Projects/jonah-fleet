@@ -25,6 +25,7 @@ import { renderFleetBanner } from './brand.js';
 import {
   renderBacklogDiagnosticCard,
   isRoutineRunTitle,
+  formatTargetLabel,
   type BacklogTriageReport,
   type BacklogIssueInfo,
 } from './terminal-card.js';
@@ -700,19 +701,22 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
     }
 
     const totalRemaining = candidatePRs.length;
-    let targetPRStr: string | undefined = undefined;
+    const currentPR = candidatePRs[0];
+    const targetLabel = formatTargetLabel(`PR #${currentPR.number}`, currentPR.title);
+    let targetPRStr: string | undefined = targetLabel;
 
     try {
       if (clearTicker) clearTicker();
       if (state) {
         state.status = 'working';
         state.activeRoutine = 'peer-review';
+        state.activeTarget = targetLabel;
         writeDaemonState(repoRoot, state);
       }
 
       console.log(
         pc.cyan(
-          `\n[${new Date().toLocaleTimeString()}] 🔍 Peer Review Watchdog: Draining PR backlog (${totalRemaining} PR(s) remaining). Starting review session...`
+          `\n[${new Date().toLocaleTimeString()}] 🔍 Peer Review Watchdog: Draining PR backlog (${totalRemaining} PR(s) remaining). Starting review session on ${targetLabel}...`
         )
       );
       await cleanupStaleWorktrees(repoRoot);
@@ -720,6 +724,8 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
       const result = await runRoutine({
         targetDir: repoRoot,
         routine: 'peer-review',
+        pr: currentPR.number,
+        title: currentPR.title,
         model: options.model,
         verbose: options.verbose,
         noWorktree: false,
@@ -735,22 +741,22 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
       // Record attempted PR number from detected target or candidate list
       const activeTargetStr = targetPRStr as string | undefined;
       const match = activeTargetStr?.match(/PR\s*#?([0-9]+)/i);
-      const prNum = match ? parseInt(match[1], 10) : candidatePRs[0]?.number;
+      const prNum = match ? parseInt(match[1], 10) : currentPR.number;
       if (typeof prNum === 'number') {
         attemptedPRNumbers.add(prNum);
         onAttempted?.(prNum);
       }
 
       if (result.success) {
-        console.log(pc.green(`✓ Local peer-review completed successfully.\n`));
+        console.log(pc.green(`✓ Local peer-review on ${targetLabel} completed successfully.\n`));
       } else {
-        console.warn(pc.yellow(`⚠️  Local peer-review completed with code ${result.exitCode}.\n`));
+        console.warn(pc.yellow(`⚠️  Local peer-review on ${targetLabel} completed with code ${result.exitCode}.\n`));
       }
     } catch (err: any) {
-      console.error(pc.red(`✗ Error in peer-review: ${err.message}`));
-      if (candidatePRs[0]) {
-        attemptedPRNumbers.add(candidatePRs[0].number);
-        onAttempted?.(candidatePRs[0].number);
+      console.error(pc.red(`✗ Error in peer-review on ${targetLabel}: ${err.message}`));
+      if (currentPR) {
+        attemptedPRNumbers.add(currentPR.number);
+        onAttempted?.(currentPR.number);
       }
     } finally {
       if (state) {

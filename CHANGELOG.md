@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Features
+
+* **daemon:** display active target PR number and title in watchdog log, state, and terminal spinner during PR backlog draining
+
 ### Bug Fixes
 
 * **autowork:** prevent local and GitHub-hosted autowork runner collisions by excluding bot and self-assignments from `trigger-autowork-on-assign.yml`, enforcing a 2-hour active claim lock in Step 0.5a / Step 11a, and mandating concrete pre-PR collision checks with collision bail in Step 13
