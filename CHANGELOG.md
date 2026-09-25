@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+* **autowork:** prevent local and GitHub-hosted autowork runner collisions by excluding bot and self-assignments from `trigger-autowork-on-assign.yml`, enforcing a 2-hour active claim lock in Step 0.5a / Step 11a, and mandating concrete pre-PR collision checks with collision bail in Step 13
 * **daemon:** query `statusCheckRollup` in `getOpenReviewablePRs` and filter out PRs with in-progress CI to prevent premature review dispatch and repetition loop trips
 * **peer-review:** add Post-Merge Companion Measurement Issue Filing protocol to `peer-review.md` and `ORCHESTRATION.md` to automatically synthesize `Measure: ...` tracking issues upon merge
 

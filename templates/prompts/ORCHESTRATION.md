@@ -278,11 +278,13 @@ How agent routines are partitioned between cloud GitHub Actions (24/7 cloud runn
    - **Cloud Catchup Sweep (48h Fallback)**: If a P2/P3 issue or PR remains unclaimed/unreviewed for $>48\text{ hours}$ (e.g. because local machines were offline), the scheduled cloud Actions scan sweep automatically picks it up to prevent work starvation.
 2. **PR Priority Mirroring**: When Autowork opens a PR, it automatically mirrors the parent issue's priority labels (`priority/P0`..`P3`) onto the pull request so downstream review workflows can filter triggers without extra API overhead.
 3. **Workspace Isolation via Git Worktrees**: Local agents execute inside ephemeral worktrees (`.jonah-fleet/worktrees/<routine>-<issue>`) off `origin/main`, ensuring active editor sessions, uncommitted changes, and local branches are never modified or disturbed.
-4. **Local Claim Protocol**:
+4. **Local Claim Protocol & Dual-Execution Collision Prevention**:
    - Local agent issue claims post: `🔒 Claimed by local autowork session (host: <hostname>) <timestamp>`.
    - Local agent PR convergence claims post: `🔒 Addressing review findings by local autowork session (host: <hostname>) <timestamp>`.
    - Local processes trap `SIGINT`/`SIGTERM` to unassign claims and remove worktrees cleanly on exit.
-   - Standard stale-claim rules (6h for issues, 2h for PRs) safely reclaim orphaned local claims if a machine powers down unexpectedly.
+   - **Sender Filter on Assignment Triggers**: Cloud assignment workflows (`trigger-autowork-on-assign.yml`) explicitly exclude assignments triggered by bot personas or self-assignment (`github.event.sender.login != vars.AGENT_BOT_LOGIN`, `github.event.sender.login != github.event.assignee.login`), guaranteeing that local claims never trigger duplicate cloud runs.
+   - **2-Hour Active Claim Exclusion**: Both local and cloud runners check for active claim comments posted within 2 hours (`🔒 Claimed by...`) before claiming. If an active claim exists, the candidate is ineligible and duplicate claims/runs are prevented.
+   - Standard stale-claim rules (6h for issues, 2h for PRs) safely reclaim orphaned claims if a machine powers down unexpectedly.
 
 ---
 

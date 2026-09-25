@@ -30,6 +30,17 @@ describe('Workflow Validation & Invariants', () => {
     expect(content).toContain('Verify Atomic Handoff Invariant');
   });
 
+  it('ensures trigger-autowork-on-assign.yml ignores bot and self-assignments to prevent local/cloud runner collisions', () => {
+    const templatePath = path.join(workflowsDir, 'trigger-autowork-on-assign.yml');
+    const content = fs.readFileSync(templatePath, 'utf8');
+
+    expect(content).toContain('github.event.sender.login != vars.AGENT_BOT_LOGIN');
+    expect(content).toContain("github.event.sender.login != 'jonah-fleet-bot'");
+    expect(content).toContain("github.event.sender.login != 'github-actions[bot]'");
+    expect(content).toContain("!endsWith(github.event.sender.login, '[bot]')");
+    expect(content).toContain('github.event.sender.login != github.event.assignee.login');
+  });
+
   it('ensures trigger-autowork-on-assign.yml exists in .github/workflows with byte-for-byte parity against template', () => {
     const templatePath = path.join(workflowsDir, 'trigger-autowork-on-assign.yml');
     const githubPath = path.join(process.cwd(), '.github/workflows', 'trigger-autowork-on-assign.yml');

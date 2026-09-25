@@ -6,7 +6,13 @@ on:
 
 jobs:
   fire-autowork:
-    if: github.event.assignee.login == vars.AGENT_BOT_LOGIN || github.event.assignee.login == 'jonah-fleet-bot'
+    if: >-
+      (github.event.assignee.login == vars.AGENT_BOT_LOGIN || github.event.assignee.login == 'jonah-fleet-bot') &&
+      github.event.sender.login != vars.AGENT_BOT_LOGIN &&
+      github.event.sender.login != 'jonah-fleet-bot' &&
+      github.event.sender.login != 'github-actions[bot]' &&
+      !endsWith(github.event.sender.login, '[bot]') &&
+      github.event.sender.login != github.event.assignee.login
     concurrency:
       group: autowork-assign-${{ github.event.issue.number }}
       cancel-in-progress: true

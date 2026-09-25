@@ -530,6 +530,25 @@ describe("Prompt Validation & Invariants", () => {
     expect(orchestrationContent).toMatch(/more than 2 hours/i);
   });
 
+  it("validates autowork.md enforces single-flight issue claim protocol with pre-claim active lock checks, sole ownership tiebreak, and collision bail", () => {
+    const autoworkPath = path.join(promptsDir, "autowork.md");
+    const content = fs.readFileSync(autoworkPath, "utf8");
+
+    // Targeted mode Step 0.5a checks for active claim comments
+    expect(content).toMatch(/no active claim comment.*posted within the last 2 hours/i);
+
+    // Step 11a checks for active claim before posting
+    expect(content).toMatch(/already carries an active claim comment.*posted within the last 2 hours/i);
+
+    // Step 11c defines sole ownership tiebreak with explicit stop in Targeted mode
+    expect(content).toContain("Claim ceded: duplicate race detected, yielding to earlier claim");
+    expect(content).toMatch(/In \*\*Targeted mode\*\*:\s*STOP/i);
+
+    // Step 13 defines concrete PR list check and collision bail
+    expect(content).toContain('gh pr list --state all --search "<TARGET_ISSUE>"');
+    expect(content).toContain("Collision bail: PR #<EXISTING_PR> was opened concurrently");
+  });
+
   it("ensures prompt templates in templates/prompts are strictly synchronized with .github/prompts", () => {
     const githubPromptsDir = path.resolve(process.cwd(), ".github", "prompts");
     expect(fs.existsSync(githubPromptsDir)).toBe(true);
