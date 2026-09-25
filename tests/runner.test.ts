@@ -244,6 +244,36 @@ describe('Local Routine Runner', () => {
       expect(formattedDone).toContain('[tool:done]');
       expect(formattedDone).toContain('view_file');
       expect(formattedDone).toContain('0.3s');
+
+      const toolError = parseStreamJsonEvent(
+        JSON.stringify({
+          event: 'step_update',
+          step_update: {
+            state: 'ERROR',
+            step_type: 'tool',
+            tool_name: 'view_file',
+          },
+        })
+      )!;
+      const formattedError = formatVerboseEvent(toolError);
+      expect(formattedError).toContain('[tool:error]');
+      expect(formattedError).toContain('view_file');
+
+      const subagentDone = parseStreamJsonEvent(
+        JSON.stringify({
+          event: 'step_update',
+          step_update: {
+            state: 'DONE',
+            step_type: 'subagent',
+            tool_name: 'invoke_subagent',
+            duration_seconds: 1.5,
+          },
+        })
+      )!;
+      const formattedSubagent = formatVerboseEvent(subagentDone);
+      expect(formattedSubagent).toContain('[tool:done]');
+      expect(formattedSubagent).toContain('invoke_subagent');
+      expect(formattedSubagent).toContain('1.5s');
     });
 
     it('formats result event with token metrics', () => {

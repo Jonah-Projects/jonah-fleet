@@ -613,6 +613,25 @@ export function formatActionDescription(toolName: string, params?: Record<string
     return `Listing directory ${base}`;
   }
 
+  if (name === 'manage_subagents') {
+    const action = params?.Action || params?.action || 'status';
+    if (action === 'list') return 'Checking subagents progress';
+    if (action === 'kill') return 'Stopping subagent';
+    if (action === 'kill_all') return 'Stopping all subagents';
+    return 'Managing subagents';
+  }
+
+  if (name === 'manage_task') {
+    const action = params?.Action || params?.action || 'status';
+    if (action === 'list') return 'Checking background tasks';
+    if (action === 'kill') return 'Stopping background task';
+    return 'Managing background tasks';
+  }
+
+  if (name === 'schedule') {
+    return 'Scheduling background timer';
+  }
+
   if (name === 'invoke_subagent') {
     const role =
       params?.Subagents?.[0]?.Role ||
@@ -639,6 +658,185 @@ export function formatActionDescription(toolName: string, params?: Record<string
   }
 
   return `Tool: ${name}`;
+}
+
+/**
+ * Parses subagent status arrays from manage_subagents or invoke_subagent outputs.
+ */
+export function parseSubagentsOutput(raw: any): Array<{ role?: string; state?: string; stateDetail?: string }> | null {
+  if (!raw) return null;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'object' && Array.isArray(raw.subagents)) return raw.subagents;
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    const jsonStart = trimmed.indexOf('[');
+    const jsonEnd = trimmed.lastIndexOf(']');
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+      try {
+        const parsed = JSON.parse(trimmed.slice(jsonStart, jsonEnd + 1));
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed && Array.isArray(parsed.subagents)) return parsed.subagents;
+    } catch {}
+  }
+
+  return null;
+}
+
+/**
+ * Formats subagents progress into a concise, informative line for terminal spinner.
+ */
+export function formatSubagentsProgress(outputOrSubagents: any): string | null {
+  const subagents = parseSubagentsOutput(outputOrSubagents);
+  if (!subagents) return null;
+
+  if (subagents.length === 0) {
+    return 'Subagents completed, synthesizing reviews...';
+  }
+
+  const running = subagents.filter(
+    (s) => !s.state || s.state === 'running' || s.state === 'waiting_for_input' || s.state === 'ACTIVE'
+  );
+
+  if (running.length === 0) {
+    return 'Subagents completed, synthesizing reviews...';
+  }
+
+  const cleanDetail = (detail?: string): string => {
+    if (!detail) return '';
+    let d = detail.trim();
+    d = d.replace(/^view_file:\s*/i, 'view ');
+    d = d.replace(/^run_command:\s*/i, '');
+    d = d.replace(/^replace_file_content:\s*/i, 'edit ');
+    d = d.replace(/^write_to_file:\s*/i, 'write ');
+    d = d.replace(/^(?:Read|view)\s+lines\s+\d+-\d+\s+of\s+/i, 'view ');
+    d = d.replace(/^(?:Sed|head|tail|cat)\s+lines?\s+\d+-\d+\s+of\s+/i, 'inspect ');
+    return d.length > 25 ? d.slice(0, 22) + '...' : d;
+  };
+
+  const parts = subagents.map((s) => {
+    const role = s.role || 'subagent';
+    const isRunning = !s.state || s.state === 'running' || s.state === 'waiting_for_input' || s.state === 'ACTIVE';
+    if (!isRunning) {
+      return `${role} (done)`;
+    }
+    const detail = cleanDetail(s.stateDetail);
+    return detail ? `${role} (${detail})` : role;
+  });
+
+  const prefix = running.length === subagents.length ? 'Subagents running: ' : 'Subagents: ';
+  return `${prefix}${parts.join(', ')}`;
+}
+
+/**
+ * Formats granular description when a tool finishes and the agent evaluates its results.
+ */
+export function formatEvaluatingDescription(
+  toolName: string,
+  params?: Record<string, any>,
+  output?: string
+): string {
+  const name = toolName || 'unknown';
+
+  if (name === 'manage_subagents') {
+    if (output) {
+      const progress = formatSubagentsProgress(output);
+      if (progress) return progress;
+    }
+    return 'Evaluating subagents progress...';
+  }
+
+  if (name === 'invoke_subagent') {
+    const roles =
+      params?.Subagents?.map((s: any) => s.Role || s.role || s.TypeName || s.name).filter(Boolean) ||
+      (params?.Role ? [params.Role] : []);
+    if (roles.length > 0) {
+      return `Subagents running: ${roles.join(', ')}...`;
+    }
+    return 'Subagents running...';
+  }
+
+  if (name === 'manage_task') {
+    return 'Evaluating background tasks...';
+  }
+
+  if (name === 'schedule') {
+    return 'Evaluating schedule...';
+  }
+
+  if (name === 'run_command') {
+    const rawCmd = (params?.CommandLine || params?.command || params?.cmd || '').trim();
+    if (/\b(?:vitest|jest)\b/i.test(rawCmd)) return 'Evaluating vitest results...';
+    if (/\bnpm\s+test\b|\bcargo\s+test\b|\bpytest\b/i.test(rawCmd)) return 'Evaluating test suite results...';
+    if (/type-check|\btsc\b/i.test(rawCmd)) return 'Evaluating TypeScript type check results...';
+    if (/\blint\b|\beslint\b/i.test(rawCmd)) return 'Evaluating codebase linter results...';
+    if (/\bbuild\b|\btsup\b|\bnext\s+build\b/i.test(rawCmd)) return 'Evaluating production build results...';
+
+    if (/gh\s+pr\s+list/i.test(rawCmd)) return 'Evaluating open pull requests...';
+    const prMatch = rawCmd.match(/gh\s+pr\s+(?:view|edit|merge|ready)\s+(\d+)/i);
+    if (prMatch) return `Evaluating PR #${prMatch[1]}...`;
+    if (/gh\s+pr\s+create/i.test(rawCmd)) return 'Evaluating pull request creation...';
+
+    if (/gh\s+issue\s+list/i.test(rawCmd)) return 'Evaluating open issues...';
+    const issueMatch = rawCmd.match(/gh\s+issue\s+(?:view|edit|comment)\s+(\d+)/i);
+    if (issueMatch) return `Evaluating issue #${issueMatch[1]}...`;
+
+    if (/git\s+diff/i.test(rawCmd)) return 'Evaluating git diff...';
+    if (/git\s+status/i.test(rawCmd)) return 'Evaluating git status...';
+    if (/git\s+log/i.test(rawCmd)) return 'Evaluating git log...';
+    if (/git\s+commit/i.test(rawCmd)) return 'Verifying commit...';
+    if (/git\s+push/i.test(rawCmd)) return 'Verifying push...';
+    if (/git\s+checkout/i.test(rawCmd)) return 'Evaluating branch checkout...';
+
+    const firstLine = rawCmd.split('\n')[0].trim();
+    if (firstLine) {
+      const shortCmd = firstLine.length > 30 ? firstLine.slice(0, 27) + '...' : firstLine;
+      return `Evaluating "${shortCmd}" output...`;
+    }
+    return 'Evaluating command output...';
+  }
+
+  if (name === 'view_file') {
+    const rawPath = params?.AbsolutePath || params?.TargetFile || params?.path || params?.file || '';
+    if (rawPath) return `Evaluating ${path.basename(rawPath)}...`;
+    return 'Evaluating file content...';
+  }
+
+  if (name === 'replace_file_content' || name === 'write_to_file' || name === 'multi_replace_file_content') {
+    const rawPath = params?.TargetFile || params?.AbsolutePath || params?.path || params?.file || '';
+    if (rawPath) return `Verifying edits to ${path.basename(rawPath)}...`;
+    return 'Verifying file changes...';
+  }
+
+  if (name === 'grep_search') {
+    const query = params?.Query || params?.query || params?.pattern || '';
+    if (query) return `Evaluating search results for "${query}"...`;
+    return 'Evaluating search results...';
+  }
+
+  if (name === 'find_by_name') {
+    const pattern = params?.Pattern || params?.pattern || '';
+    if (pattern) return `Evaluating file matches for "${pattern}"...`;
+    return 'Evaluating file matches...';
+  }
+
+  if (name === 'list_dir') {
+    const dirPath = params?.DirectoryPath || params?.path || '';
+    const base = path.basename(dirPath.replace(/[/\\]+$/, '')) || dirPath;
+    if (base) return `Evaluating directory contents (${base})...`;
+    return 'Evaluating directory contents...';
+  }
+
+  if (name === 'search_web' || name === 'read_url_content') {
+    return 'Evaluating web content...';
+  }
+
+  return `Evaluating ${name} output...`;
 }
 
 /**
@@ -984,6 +1182,7 @@ export class TerminalSpinner {
   private message: string = '';
   private isRunning: boolean = false;
   private isTTY: boolean;
+  private lastPrintedMessage: string = '';
 
   constructor() {
     this.isTTY = Boolean(process.stderr.isTTY);
@@ -995,6 +1194,7 @@ export class TerminalSpinner {
     this.isRunning = true;
 
     if (!this.isTTY) {
+      this.lastPrintedMessage = initialMessage;
       process.stderr.write(`[jonah-fleet] ${initialMessage}\n`);
       return;
     }
@@ -1007,7 +1207,10 @@ export class TerminalSpinner {
   public update(newMessage: string): void {
     this.message = newMessage;
     if (!this.isTTY) {
-      process.stderr.write(`[jonah-fleet] ${newMessage}\n`);
+      if (newMessage !== this.lastPrintedMessage) {
+        this.lastPrintedMessage = newMessage;
+        process.stderr.write(`[jonah-fleet] ${newMessage}\n`);
+      }
     }
   }
 

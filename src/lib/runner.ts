@@ -12,6 +12,8 @@ import {
   detectClaimedIssue,
   detectClaimedPR,
   formatActionDescription,
+  formatEvaluatingDescription,
+  formatSubagentsProgress,
   cleanTargetTitle,
   formatTargetLabel,
   fetchTargetTitleAsync,
@@ -75,6 +77,17 @@ export interface StreamJsonEvent {
       parameters?: Record<string, any>;
       output?: string;
     };
+    subagent_info?: {
+      subagents?: Array<{
+        type_name?: string;
+        role?: string;
+        initial_prompt?: string;
+        conversation_id?: string;
+        log_uri?: string;
+        [key: string]: any;
+      }>;
+      [key: string]: any;
+    };
     text_delta?: string;
     duration_seconds?: number;
     usage?: {
@@ -83,6 +96,7 @@ export interface StreamJsonEvent {
       thinking_tokens?: number;
       total_tokens?: number;
     };
+    [key: string]: any;
   };
   agent_response?: any;
   result?: {
@@ -165,8 +179,8 @@ export function formatVerboseEvent(event: StreamJsonEvent): string | null {
       return `${pc.dim(`[${time}]`)} ${pc.magenta('[user_input]')} Prompt dispatched`;
     }
 
-    if (su.step_type === 'tool') {
-      const toolName = su.tool_name || su.tool_info?.name || 'tool';
+    if (su.step_type === 'tool' || su.step_type === 'subagent') {
+      const toolName = su.tool_name || su.tool_info?.name || (su.step_type === 'subagent' ? 'invoke_subagent' : 'tool');
       const params = su.tool_info?.parameters;
 
       if (su.state === 'ACTIVE') {
@@ -176,6 +190,9 @@ export function formatVerboseEvent(event: StreamJsonEvent): string | null {
       if (su.state === 'DONE') {
         const dur = su.duration_seconds !== undefined ? `${su.duration_seconds.toFixed(1)}s` : 'done';
         return `${pc.dim(`[${time}]`)} ${pc.green('[tool:done]')} ${pc.bold(toolName)} (${dur})`;
+      }
+      if (su.state === 'ERROR') {
+        return `${pc.dim(`[${time}]`)} ${pc.red('[tool:error]')} ${pc.bold(toolName)}`;
       }
     }
 
@@ -1007,8 +1024,8 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
       if (event.event === 'step_update' && event.step_update) {
         const su = event.step_update;
 
-        if (su.step_type === 'tool') {
-          const toolName = su.tool_name || su.tool_info?.name || 'unknown';
+        if (su.step_type === 'tool' || su.step_type === 'subagent') {
+          const toolName = su.tool_name || su.tool_info?.name || (su.step_type === 'subagent' ? 'invoke_subagent' : 'unknown');
           const toolParams = su.tool_info?.parameters;
 
           if (su.state === 'ACTIVE') {
@@ -1028,13 +1045,20 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
           } else if (su.state === 'ERROR') {
             loopGuard.recordAction(toolName, toolParams, true);
             lastActionDesc = null;
+            if (spinner) {
+              activePhase = `Diagnosing tool error (${toolName})...`;
+              spinner.update(`${targetLabel}: ${activePhase}`);
+            }
           } else if (su.state === 'DONE') {
             lastActionDesc = null;
             if (su.tool_info?.output) {
               checkTargetDetection(su.tool_info.output);
             }
             if (spinner) {
-              activePhase = 'Evaluating tool output...';
+              const output =
+                su.tool_info?.output ||
+                (su.subagent_info ? JSON.stringify(su.subagent_info) : undefined);
+              activePhase = formatEvaluatingDescription(toolName, toolParams, output);
               spinner.update(`${targetLabel}: ${activePhase}`);
             }
             if (options.verbose) {
@@ -1046,7 +1070,8 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
           if (su.text_delta) {
             accumulatedOutput += su.text_delta;
             checkTargetDetection(su.text_delta);
-            const newPhase = detectActivePhase(su.text_delta, activePhase);
+            const recentWindow = accumulatedOutput.slice(-300);
+            const newPhase = detectActivePhase(recentWindow, activePhase);
             if (newPhase !== activePhase || lastActionDesc) {
               lastActionDesc = null;
               activePhase = newPhase;
