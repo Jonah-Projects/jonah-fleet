@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.5](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.4...v1.28.5) (2026-09-25)
+
+
+### Bug Fixes
+
+* **autowork:** prevent local and cloud autowork collisions on assignment and enforce active claim exclusion ([1f78443](https://github.com/Jonah-Projects/jonah-fleet/commit/1f784433b58f4523ccff53be0356034515a128c3))
+
 ## [1.28.4](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.28.3...v1.28.4) (2026-09-24)
 
 
