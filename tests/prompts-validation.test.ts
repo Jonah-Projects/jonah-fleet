@@ -344,6 +344,8 @@ describe("Prompt Validation & Invariants", () => {
     );
     expect(content).toContain("🗺️ Product Plan");
     expect(content).toContain("product-planning");
+    expect(content).toMatch(/closed product plan/i);
+    expect(content).toContain("--state open");
   });
 
   it("validates product-planning.md contains feature pruning and deprecation audit in Propose mode", () => {

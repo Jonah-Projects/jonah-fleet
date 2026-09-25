@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+* **analytics-review:** require active product planning staging issues to be strictly open (`--state open`), forbid commenting on or editing closed product plans from past planning sweeps, and make DoD staging conditional on having emitted directives
 * **runner:** introduce granular tool output evaluation descriptions, live subagent progress tracking, and non-TTY spinner deduplication to replace long-running generic `Evaluating tool output...` states
 * **autowork:** prevent local and GitHub-hosted autowork runner collisions by excluding bot and self-assignments from `trigger-autowork-on-assign.yml`, enforcing a 2-hour active claim lock in Step 0.5a / Step 11a, and mandating concrete pre-PR collision checks with collision bail in Step 13
 * **daemon:** query `statusCheckRollup` in `getOpenReviewablePRs` and filter out PRs with in-progress CI to prevent premature review dispatch and repetition loop trips

@@ -20,7 +20,7 @@ The run is SUCCESS only if ALL of these are true:
 - [ ] For conclusive measurement issues: synthesized adoption metrics (CTR, conversion rate, error frequency) against defined success criteria
 - [ ] For sub-threshold features (<2% user adoption or >50% failure rate) or conclusive outcomes, outputted a structured directive: `RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]`
 - [ ] Evaluated UI friction signals (grouping `$rageclick` by URL and element) and applied the Nudge & Banner Fatigue rule for promotional elements exceeding 500 impressions with CTR < 2.0%
-- [ ] Staged the recommendation directly into the current/next `🗺️ Product Plan` staging issue or filed an actionable `roadmap/*` issue for `product-planning` to review
+- [ ] For conclusive measurement trackers or sub-threshold features: staged the recommendation directly into an active, open `🗺️ Product Plan` staging issue or filed an actionable `roadmap/*` issue for `product-planning` to review; if all trackers remain active/healthy with no new directives, logged scan status to the routine run issue
 - [ ] Closed resolved measurement trackers with full analysis summaries and Antigravity run footer
 
 If any criterion cannot be met, stop immediately and log FAILURE with the reason.
@@ -37,6 +37,8 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 - Do not close a measurement tracker with a failed adoption verdict without emitting a mandatory `RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]` directive.
 - Do not treat measurement closure as a terminal dead-end — always bridge outcomes to `product-planning`.
+- Do not comment on, edit, or stage directives into closed product plans (`state: closed`) from past planning sweeps. Once closed, product plans are completed historical records and must never receive new comments.
+- Do not search issues with `--state all` when querying for active product plans; active plans are strictly open issues (`--state open`).
 - Do not file bug tickets or request additional telemetry when users simply lack intent to interact with a feature.
 
 ## Instructions
@@ -96,8 +98,20 @@ When a measurement tracker is conclusive or reaches sub-threshold adoption (<2% 
 
 ### Step 4: Bridge outcome to `product-planning`
 
-1. If an active staging issue `🗺️ Product Plan — {YYYY-MM-DD}` exists, stage the recommendation under `### Feature Pruning & Deprecation Audit` or `### Backlog Re-rankings`.
-2. If no staging issue exists, open an actionable `roadmap/*` issue labeled `needs-design` or `enhancement` detailing the measurement verdict and recommendation for the next product planning sweep.
+When conclusive measurement directives (`RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]`) are emitted:
+1. Search for an **active, OPEN** product planning staging issue:
+   ```bash
+   gh issue list --state open --search "Product Plan"
+   ```
+   **Active Staging Issue Invariant**: A staging issue is active ONLY if its state is currently **OPEN**. If an issue is closed, it is a historical plan from a past cycle and MUST be ignored. **NEVER comment on, reopen, or edit closed product plan issues (`state: closed`).**
+2. If an open staging issue exists (e.g. `🗺️ Product Plan — {YYYY-MM-DD}`):
+   - Stage the recommendation under its `### Feature Pruning & Deprecation Audit` or `### Backlog Re-rankings` section.
+3. If no open staging issue exists (the expected state between planning sweeps):
+   - Do NOT comment on past closed product plans.
+   - For actionable pivots, deprecations, or feature modifications requiring planning review, open an actionable `roadmap/*` issue labeled `needs-design` or `enhancement` detailing the measurement verdict and recommendation for the next product planning sweep.
+4. If no trackers reached a conclusive state during this run and all evaluated trackers remain healthy/within measurement horizon:
+   - Do not stage redundant directives or file unnecessary roadmap issues.
+   - Record tracker evaluation progress in the routine run issue (`$ROUTINE_ISSUE_NUMBER`) and `.jonah-fleet/run-report.md`.
 
 ### Step 5: Close conclusive measurement trackers
 
