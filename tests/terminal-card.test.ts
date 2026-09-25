@@ -14,6 +14,8 @@ import {
   renderErrorCard,
   TerminalSpinner,
   formatActionDescription,
+  formatEvaluatingDescription,
+  formatSubagentsProgress,
   cleanTargetTitle,
   formatTargetLabel,
   fetchTargetTitleAsync,
@@ -452,9 +454,110 @@ The build is completing. Continuing shortly.
       expect(formatActionDescription('invoke_subagent', {})).toBe('Running subagent');
     });
 
+    it('formats manage_subagents and manage_task', () => {
+      expect(formatActionDescription('manage_subagents', { Action: 'list' })).toBe('Checking subagents progress');
+      expect(formatActionDescription('manage_subagents', { Action: 'kill' })).toBe('Stopping subagent');
+      expect(formatActionDescription('manage_task', { Action: 'list' })).toBe('Checking background tasks');
+      expect(formatActionDescription('schedule', {})).toBe('Scheduling background timer');
+    });
+
     it('handles fallback for custom or unknown tools', () => {
       expect(formatActionDescription('ask_question', { prompt: 'Choose option' })).toBe('Tool: ask_question');
       expect(formatActionDescription('custom_tool')).toBe('Tool: custom_tool');
+    });
+  });
+
+  describe('formatSubagentsProgress', () => {
+    it('formats active subagents with state details', () => {
+      const output = JSON.stringify([
+        {
+          role: 'Standards Reviewer',
+          state: 'running',
+          stateDetail: 'run_command: Git status check',
+        },
+        {
+          role: 'Spec Reviewer',
+          state: 'running',
+          stateDetail: 'run_command: Git diff',
+        },
+      ]);
+      const progress = formatSubagentsProgress(output);
+      expect(progress).toContain('Subagents running');
+      expect(progress).toContain('Standards Reviewer');
+      expect(progress).toContain('Git status check');
+      expect(progress).toContain('Spec Reviewer');
+      expect(progress).toContain('Git diff');
+    });
+
+    it('formats mixed completed and running subagents', () => {
+      const rawText = `You have 2 active subagent(s):
+[
+  {"role":"Standards Reviewer","state":"idle"},
+  {"role":"Spec Reviewer","state":"running","stateDetail":"view_file: AGENTS.md"}
+]`;
+      const progress = formatSubagentsProgress(rawText);
+      expect(progress).toContain('Subagents:');
+      expect(progress).toContain('Standards Reviewer (done)');
+      expect(progress).toContain('Spec Reviewer (view AGENTS.md)');
+    });
+
+    it('reports subagents completed when all subagents finished', () => {
+      const output = JSON.stringify([
+        { role: 'Standards Reviewer', state: 'idle' },
+        { role: 'Spec Reviewer', state: 'idle' },
+      ]);
+      expect(formatSubagentsProgress(output)).toBe('Subagents completed, synthesizing reviews...');
+      expect(formatSubagentsProgress('[]')).toBe('Subagents completed, synthesizing reviews...');
+    });
+
+    it('returns null for non-subagent output', () => {
+      expect(formatSubagentsProgress('')).toBeNull();
+      expect(formatSubagentsProgress('random output')).toBeNull();
+    });
+  });
+
+  describe('formatEvaluatingDescription', () => {
+    it('formats manage_subagents evaluating description with live progress', () => {
+      const output = JSON.stringify([
+        {
+          role: 'Standards Reviewer',
+          state: 'running',
+          stateDetail: 'run_command: Git diff',
+        },
+      ]);
+      const desc = formatEvaluatingDescription('manage_subagents', { Action: 'list' }, output);
+      expect(desc).toContain('Standards Reviewer');
+      expect(desc).toContain('Git diff');
+    });
+
+    it('formats run_command evaluating description by command type', () => {
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'npx vitest run' })).toBe('Evaluating vitest results...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'npm test' })).toBe('Evaluating test suite results...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'npm run type-check' })).toBe('Evaluating TypeScript type check results...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'npm run lint' })).toBe('Evaluating codebase linter results...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'npm run build' })).toBe('Evaluating production build results...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'gh pr list --state open' })).toBe('Evaluating open pull requests...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'gh pr view 42' })).toBe('Evaluating PR #42...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'gh issue list --state open' })).toBe('Evaluating open issues...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'gh issue view 96' })).toBe('Evaluating issue #96...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'git diff origin/main' })).toBe('Evaluating git diff...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'git status' })).toBe('Evaluating git status...');
+      expect(formatEvaluatingDescription('run_command', { CommandLine: 'git log -n 5' })).toBe('Evaluating git log...');
+    });
+
+    it('formats file operations with target file basename', () => {
+      expect(formatEvaluatingDescription('view_file', { AbsolutePath: '/repo/src/lib/runner.ts' })).toBe('Evaluating runner.ts...');
+      expect(formatEvaluatingDescription('replace_file_content', { TargetFile: '/repo/src/index.ts' })).toBe('Verifying edits to index.ts...');
+      expect(formatEvaluatingDescription('write_to_file', { TargetFile: '/repo/tests/test.ts' })).toBe('Verifying edits to test.ts...');
+      expect(formatEvaluatingDescription('grep_search', { Query: 'activePhase' })).toBe('Evaluating search results for "activePhase"...');
+    });
+
+    it('formats invoke_subagent evaluating description', () => {
+      expect(
+        formatEvaluatingDescription('invoke_subagent', {
+          Subagents: [{ Role: 'Standards Reviewer' }, { Role: 'Spec Reviewer' }],
+        })
+      ).toBe('Subagents running: Standards Reviewer, Spec Reviewer...');
     });
   });
 
@@ -474,6 +577,29 @@ The build is completing. Continuing shortly.
       const formatted = spinner.formatLine(longMessage, 60);
       expect(stripAnsi(formatted).length).toBeLessThanOrEqual(60);
       expect(formatted).toContain('PR #96:');
+    });
+
+    it('deduplicates consecutive identical messages in non-TTY mode', () => {
+      const writes: string[] = [];
+      const origWrite = process.stderr.write;
+      process.stderr.write = ((chunk: any) => {
+        writes.push(String(chunk));
+        return true;
+      }) as any;
+      try {
+        const spinner = new TerminalSpinner();
+        (spinner as any).isTTY = false;
+        spinner.start('Initializing...');
+        spinner.update('Same message');
+        spinner.update('Same message');
+        spinner.update('Same message');
+        spinner.update('New message');
+        spinner.stop();
+        expect(writes.filter((w) => w.includes('Same message')).length).toBe(1);
+        expect(writes.filter((w) => w.includes('New message')).length).toBe(1);
+      } finally {
+        process.stderr.write = origWrite;
+      }
     });
   });
 
