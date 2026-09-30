@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.1...v1.30.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* **workflows:** respect routine toggle flags in agents-manifest.json during scheduled cron runs ([#509](https://github.com/Jonah-Projects/jonah-fleet/issues/509)) ([dfb188a](https://github.com/Jonah-Projects/jonah-fleet/commit/dfb188a7a4189875e6fb61efb8ea0f0093bbed65))
+
 ## [1.30.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.0...v1.30.1) (2026-09-25)
 
 
