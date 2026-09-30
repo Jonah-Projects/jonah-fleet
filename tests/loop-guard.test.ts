@@ -622,4 +622,41 @@ describe('Wrapper Script Execution Integration', () => {
     const reportPath = path.join(tmpDir, '.jonah-fleet', 'run-report.md');
     expect(fs.existsSync(reportPath)).toBe(false);
   });
+
+  it('surfaces stream-json error events to stderr so quota and diagnostic messages are preserved', async () => {
+    const mockRunnerPath = path.join(tmpDir, 'mock-error-runner.js');
+    const mockCode = `
+      const errorLine = JSON.stringify({
+        event: 'error',
+        error: { message: 'Individual quota reached. Resets in 45m.' }
+      });
+      console.log(errorLine);
+      process.exit(1);
+    `;
+    fs.writeFileSync(mockRunnerPath, mockCode, 'utf8');
+
+    let stderrOutput = '';
+    await new Promise<void>((resolve) => {
+      const child = spawn(process.execPath, [scriptPath], {
+        cwd: tmpDir,
+        env: {
+          ...process.env,
+          ROUTINE: 'autowork',
+          RUNNER_BIN: `${process.execPath} ${mockRunnerPath}`,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      child.stderr?.on('data', (d) => {
+        stderrOutput += d.toString();
+      });
+
+      child.on('close', () => {
+        resolve();
+      });
+    });
+
+    expect(stderrOutput).toContain('Individual quota reached');
+    expect(stderrOutput).toContain('[agent:error]');
+  });
 });

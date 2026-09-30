@@ -379,6 +379,26 @@ describe('Workflow Validation & Invariants', () => {
     // Positive control: exactly 10 active repository workflows configure Git author identity
     expect(githubMatchCount).toBeGreaterThanOrEqual(10);
   });
+
+  it('ensures scheduled routine workflows inspect agents-manifest.json routines toggle and skip execution when disabled', () => {
+    const scheduledWorkflows = [
+      'autowork-cron.yml',
+      'dependency-check-cron.yml',
+      'issues-housekeeping-cron.yml',
+      'prompt-optimizer-cron.yml',
+      'analytics-review-cron.yml',
+    ];
+
+    for (const file of scheduledWorkflows) {
+      const templatePath = path.join(workflowsDir, file);
+      expect(fs.existsSync(templatePath), `Template ${file} should exist`).toBe(true);
+      const content = fs.readFileSync(templatePath, 'utf8');
+
+      expect(content, `${file} must extract enabled status from agents-manifest.json`).toContain('m.routines?.[r] !== false');
+      expect(content, `${file} must export enabled output from routine-config`).toContain('echo "enabled=$ENABLED" >> "$GITHUB_OUTPUT"');
+      expect(content, `${file} must guard Initialize Routine Run Issue with enabled check`).toContain("steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule'");
+    }
+  });
 });
 
 

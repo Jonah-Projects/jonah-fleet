@@ -453,6 +453,11 @@ async function main() {
           }
         } else if (parsed.event === 'result' && parsed.result?.response) {
           console.log(`\n${parsed.result.response}\n`);
+        } else if (parsed.event === 'error' || parsed.error) {
+          const errMsg =
+            parsed.error?.message ||
+            (typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error || parsed));
+          console.error(`\n[agent:error] ${errMsg}`);
         }
         return;
       }
