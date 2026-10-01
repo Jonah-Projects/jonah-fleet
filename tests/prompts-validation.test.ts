@@ -382,6 +382,15 @@ describe("Prompt Validation & Invariants", () => {
     expect(content).toMatch(/img\.shields\.io\/badge\/Fleet-Autonomous_Command/);
   });
 
+  it("validates design-review.md streams audit directives into open staging container and files token punchlists for autowork", () => {
+    const templatePath = path.join(promptsDir, "design-review.md");
+    const content = fs.readFileSync(templatePath, "utf8");
+
+    expect(content).toMatch(/gh issue comment.*(?:staging|Product Plan)/i);
+    expect(content).toMatch(/status:staging/);
+    expect(content).toMatch(/DESIGN_DIRECTIVE:/);
+    expect(content).toMatch(/design\/polish|autowork-candidate/);
+  });
 
   it("validates autowork.md and diagnosing-bugs contain Intent vs. Defect Guardrail to prevent telemetry rabbit holes", () => {
     const autoworkPath = path.join(promptsDir, "autowork.md");

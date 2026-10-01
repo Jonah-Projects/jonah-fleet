@@ -19,7 +19,7 @@ This routine runs behind a **human approval gate**: it **never files autowork-re
 This routine runs in two modes: **Propose** (scheduled cron sweep / unapproved fire) and **Promote** (operator-approved fire).
 
 In **Propose mode**, SUCCESS requires:
-- [ ] Located or initialized the active open staging issue (`routine:product-planning`, `status:staging`) and ingested all accumulated comment directives streamed by `analytics-review`
+- [ ] Located or initialized the active open staging issue (`routine:product-planning`, `status:staging`) and ingested all accumulated comment directives streamed by `analytics-review` and `design-review`
 - [ ] Read current roadmap, domain documentation, closed measurement trackers across the trailing cycle lookback window (`closed:>=$(date -u -d '16 days ago' +%Y-%m-%d)`), recent analytics reviews (`routine:analytics-review`), and the latest open `🎨 Design Review` issue / recent design-review routine run issues
 - [ ] Performed Feature Pruning & Deprecation Audit: evaluated shipped features, measurement outcomes (<2% user adoption or >50% failure rate), and Design Review pruning/clutter directives, drafting deprecation, removal, or simplification proposals
 - [ ] Synthesized all accumulated directives into exactly one dated staging issue (`🗺️ Product Plan — {date}`) containing:
@@ -68,13 +68,13 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
      gh issue list --state open --label "routine:product-planning" --limit 1
      ```
      If no open staging container exists (e.g. unseeded first run), create one: `🗺️ Product Plan — {YYYY-MM-DD} (Staging)` labeled `routine:product-planning,status:staging`.
-   - Ingest all accumulated comment directives from the staging issue (`gh issue view <issue> --comments`) to ingest daily telemetry directives streamed by `analytics-review`.
+   - Ingest all accumulated comment directives from the staging issue (`gh issue view <issue> --comments`) to ingest daily telemetry directives streamed by `analytics-review` and visual critique / clutter / pruning directives streamed by `design-review`.
    - Ingest all measurement trackers closed across the trailing 16-day cycle lookback window:
      ```bash
      gh issue list --state closed --label "measurement" --search "closed:>=$(date -u -d '16 days ago' +%Y-%m-%d)" --limit 30
      gh issue list --state closed --label "routine:analytics-review" --search "created:>=$(date -u -d '16 days ago' +%Y-%m-%d)" --limit 20
      ```
-   - Read `ROADMAP.md`, `AGENTS.md`, and the latest open `🎨 Design Review` issue (and recent run issues with `gh issue list --label "routine:design-review"`).
+   - Read `ROADMAP.md`, `AGENTS.md`, and any recent design-review run reports (`gh issue list --label "routine:design-review"`).
 2. **Feature Pruning & Deprecation Audit**:
    - Audit shipped features, closed measurement tracker verdicts, and `🎨 Design Review` clutter/pruning findings.
    - For any feature with <2% user adoption, sub-threshold CTR, >50% failure rate, or persistent UI clutter flagged by Design Review, draft explicit deprecation, removal, or pivot proposals to keep the codebase lean and eliminate maintenance waste.

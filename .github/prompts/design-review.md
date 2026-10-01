@@ -21,8 +21,8 @@ The run is SUCCESS only if ALL of these are true:
 - [ ] Performed Tier 2 Headless Browser & Visual Critique: launched the dev environment and captured viewports at mobile (390px) and desktop (1280px) via `run` and `design-critique` skills, auditing whitespace consistency, visual hierarchy, touch targets, and viewport density (enforcing the mobile fold budget: max 1 banner/nudge)
 - [ ] Cross-referenced UI friction and telemetry signals: checked for recurring rage clicks (`$rageclick`) and identified low-interaction (<2% CTR) secondary elements or persistent nudges suitable for pruning
 - [ ] Executed Hybrid Handoff:
-  - If self-contained token, class, or contrast violations were found, filed or updated exactly one grouped punchlist issue titled `🎨 Design Polish & Token Cleanup — {YYYY-MM-DD}` labeled `design/polish` for Autowork
-  - Created or updated exactly one tracking issue titled `🎨 Design Review — {YYYY-MM-DD}` documenting: Surfaces Reviewed (with any `[NEW SURFACE]` highlighted), Next Surfaces in Rotation, Visual Critique & Clutter Analysis, Feature Pruning & Deprecation Recommendations, and Experience Enhancement Opportunities
+  - If self-contained token, class, or contrast violations were found, filed or updated exactly one grouped punchlist issue titled `🎨 Design Polish & Token Cleanup — {YYYY-MM-DD}` labeled `design/polish`, `autowork-candidate` for Autowork
+  - Streamed the overarching design audit, visual critique, clutter analysis, pruning recommendations, and experience enhancement opportunities directly as a comment into the active, open `🗺️ Product Plan` staging container (`routine:product-planning`, `status:staging`)
 - [ ] Emitted structured design directives in the run report (`DESIGN_DIRECTIVE: [PRUNE | REDESIGN | POLISH]`) and recorded the next queued surfaces for the subsequent run
 - [ ] Recorded the final execution report to `.jonah-fleet/run-report.md` following `ORCHESTRATION.md`
 
@@ -39,9 +39,9 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 ## Negative examples (DO NOT do these)
 
 - Do not open multiple separate issues for individual token mismatches — group all simple token and contrast cleanup items into a single grouped punchlist issue for Autowork.
-- Do not file unapproved structural redesigns or feature removals as direct Autowork issues — stage them in the `🎨 Design Review — {date}` tracking issue for Product Planning to review.
+- Do not create separate standalone tracking issues that stay open indefinitely — stream design review audit findings, clutter analyses, and pruning recommendations directly into the open `🗺️ Product Plan` staging container.
 - Do not review the admin back-office (`src/app/[locale]/admin/**`) — it is deliberately utilitarian and exempt from the player-facing design system polish bar.
-- Do not blindly repeat the same surface review order every run — dynamically discover routes and check previous review issues to resume rotation and fast-track unreviewed new surfaces.
+- Do not blindly repeat the same surface review order every run — dynamically discover routes and check previous review logs to resume rotation and fast-track unreviewed new surfaces.
 
 ## Instructions
 
@@ -53,7 +53,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
    - Scan the filesystem for all active player-facing page routes: `src/app/[locale]/**/page.tsx` (ignoring any `admin/**` directories).
    - Normalize the discovered paths into canonical route identifiers (e.g. `Home` (`/`), `Predictions` (`/pronostics`), `Episode Predictions` (`/pronostics/episode/[id]`), `Groups` (`/groupes`), `Group Detail` (`/groupes/[id]`), `Presenter` (`/groupes/[id]/presentateur`), `Leaderboard` (`/classements`), `Profile` (`/profil`), `Account` (`/compte`), `Auth` (`/auth/*`), `Season Overview` (`/saisons/[slug]`), `Share` (`/partage`)).
 3. **Reconcile with Previous Rotation State**:
-   - Locate the most recent `🎨 Design Review` issue or run issue labeled `routine:design-review`.
+   - Locate the most recent run issue labeled `routine:design-review` or prior design review comment in the open staging container.
    - Read the `Surfaces Reviewed` and `Next Surfaces in Rotation` fields.
    - Any discovered route on disk that has never appeared in prior review logs is flagged as **`[NEW SURFACE]`** and placed at **Priority 0** (Fast-Track).
    - Remaining surfaces are sequenced based on `Next Surfaces in Rotation` (resuming rotation where the previous run stopped).
@@ -105,23 +105,34 @@ For the surfaces being audited:
 2. Formulate **Pruning Recommendations**:
    - Any persistent card, teaser, or secondary control with near-zero interaction, high rage-click density, or severe visual clutter is recommended for deprecation (`RECOMMENDATION: DEPRECATE`) or simplification (`RECOMMENDATION: PRUNE`).
 
-### Step 5: Hybrid Handoff & Issue Generation
+### Step 5: Hybrid Handoff & Staging Stream
 
 1. **Direct Autowork Punchlist Issue**:
    - If concrete, self-contained token violations, contrast bugs, or duplicate `.btn-primary` classes are found, compile them into a single grouped punchlist issue:
      - Title: `🎨 Design Polish & Token Cleanup — {YYYY-MM-DD}`
      - Labels: `design/polish`, `autowork-candidate`
      - Content: Structured task list with target files, line references, current violation, and suggested replacement token/class.
-2. **Overarching Design Review Tracking Issue**:
-   - Create or update a single tracking issue:
-     - Title: `🎨 Design Review — {YYYY-MM-DD}`
-     - Labels: `area/design`, `review`
-     - Content:
-       - **Surfaces Reviewed**: list audited routes, noting any `[NEW SURFACE]`
-       - **Next Surfaces in Rotation**: list unreviewed routes queued for the subsequent run
-       - **Visual Critique & Clutter Analysis**: mobile fold density, hierarchy, and layout observations
-       - **Pruning & Deprecation Candidates**: specific features/elements recommended to be pruned or consolidated
-       - **Experience Enhancement Opportunities**: structural UX improvements staged for Product Planning
+2. **Bridge to Product Planning (Continuous Staging Container Stream)**:
+   - Search for the active, OPEN product planning staging issue:
+     ```bash
+     gh issue list --state open --label "routine:product-planning" --limit 1
+     ```
+   - Stream and append the visual critique, clutter analysis, pruning recommendations, and experience enhancement opportunities directly as a comment into the open staging issue:
+     ```bash
+     gh issue comment "$STAGING_ISSUE_NUMBER" --body "### 🎨 Design Review Audit & Directives ($(date -u +%Y-%m-%d))
+     - **Directive**: \`DESIGN_DIRECTIVE: [PRUNE | REDESIGN | POLISH]\`
+     - **Surfaces Reviewed**: (list audited routes)
+     - **Next Surfaces in Rotation**: (list next queued routes)
+     - **Mobile Viewport Density & Nudge Budget**: Mobile fold observations (390px)
+     - **Visual Critique & Clutter Analysis**: Hierarchy, whitespace, and touch targets
+     - **Feature Pruning & Deprecation Recommendations**: Elements flagged for removal/simplification
+     - **Experience Enhancement Opportunities**: Structural UX improvements for roadmap
+     - **Autowork Punchlist**: #N (if token violations were found)
+
+     ---
+     _Generated by [Antigravity](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_"
+     ```
+   - **Self-Healing Fallback (Lazy Seed)**: If NO open staging container exists, lazily initialize the upcoming staging issue labeled `routine:product-planning,status:staging` and post the comment to it.
 3. **Structured Directives**:
    - Output clear directives: `DESIGN_DIRECTIVE: [PRUNE | REDESIGN | POLISH]` to be consumed downstream by `product-planning.md`.
 
@@ -135,7 +146,7 @@ Follow the Routine Issue Logging Protocol in `ORCHESTRATION.md`:
    - Result: `SUCCESS` or `FAILURE`
    - Every Definition of Done criterion with YES/NO and evidence
    - Surfaces Reviewed and Next Surfaces in Rotation
-   - Created issues (`🎨 Design Polish & Token Cleanup`, `🎨 Design Review`)
+   - Created issues / streams (`🎨 Design Polish & Token Cleanup`, streamed to `🗺️ Product Plan`)
    - If FAILURE: root cause, category, and suggested fix
 3. The surrounding execution harness will reconcile the corresponding GitHub issue.
 
