@@ -274,7 +274,7 @@ describe('Workflow Validation & Invariants', () => {
       expect(fs.existsSync(templatePath), `Template ${file} should exist`).toBe(true);
       const content = fs.readFileSync(templatePath, 'utf8');
 
-      expect(content).toContain('Individual quota reached|quota reached');
+      expect(content).toContain('Individual quota reached|quota reached|RESOURCE_EXHAUSTED|code 429|Resource has been exhausted|rate_limit_exceeded');
       expect(content).toContain('QUOTA_PAUSED=true');
       expect(content).toContain('status:quota-paused');
       expect(content).toContain('Milestone: Routine Execution Quota-Paused');
@@ -361,6 +361,16 @@ describe('Workflow Validation & Invariants', () => {
     const res2 = detectQuotaExceeded(quotaError, '');
     expect(res2.isQuota).toBe(true);
     expect(res2.resetInfo).toBe('Resets in 33m45s');
+
+    const agyQuotaError =
+      'error: RESOURCE_EXHAUSTED (code 429): Resource has been exhausted (e.g. check quota).\n' +
+      'AGY_ERROR: {"short_error":"RESOURCE_EXHAUSTED (code 429): Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED","error_code":429,"code_kind":"http","retryable":true,"error_id":"972bc248-4f9c-4fde-a562-1f6a81c7c831-9-2008"}';
+    const resAgy = detectQuotaExceeded('', agyQuotaError);
+    expect(resAgy.isQuota).toBe(true);
+
+    const rateLimitError = 'Error: rate_limit_exceeded (code 429)';
+    const resRateLimit = detectQuotaExceeded('', rateLimitError);
+    expect(resRateLimit.isQuota).toBe(true);
 
     const normalError = 'Error: Command failed with exit code 1';
     const res3 = detectQuotaExceeded('', normalError);

@@ -7,6 +7,7 @@ import {
   runLocalRoutine,
   tryReconcileLocalRunIssueAsync,
   tryMarkLocalRunInterruptedAsync,
+  detectQuotaExceeded,
 } from './runner.js';
 import { cleanupStaleWorktrees, listActiveWorktrees } from './worktree.js';
 import {
@@ -53,6 +54,8 @@ export interface DaemonOptions {
   interval?: number; // legacy fallback interval (minutes)
   reviewInterval?: number; // minutes (default: 3)
   autoworkInterval?: number; // minutes (default: 30)
+  quotaCooldownMinutes?: number; // minutes to pause checks on quota exhaustion (default: 15)
+  prFailureCooldownMinutes?: number; // minutes to cooldown a failing PR before retrying (default: 15)
   routines?: string[];
   model?: string;
   foreground?: boolean;
@@ -60,7 +63,14 @@ export interface DaemonOptions {
   stdin?: any;
   getPRs?: (repoRoot: string) => Promise<ReviewablePR[]>;
   getBacklog?: (repoRoot: string) => Promise<BacklogTriageReport>;
-  runRoutine?: (opts: any) => Promise<{ success: boolean; exitCode?: number }>;
+  runRoutine?: (opts: any) => Promise<{
+    success: boolean;
+    exitCode?: number;
+    quotaPaused?: boolean;
+    quotaResetInfo?: string;
+    output?: string;
+    stderr?: string;
+  }>;
 }
 
 export function getDaemonStatePath(repoRoot: string): string {
@@ -636,6 +646,11 @@ export async function reconcileOrphanedLocalRuns(
   }
 }
 
+export interface PRFailureRecord {
+  failedAt: number;
+  count: number;
+}
+
 export interface DrainReviewQueueOptions {
   repoRoot: string;
   state?: DaemonState;
@@ -643,8 +658,17 @@ export interface DrainReviewQueueOptions {
   isStopping?: () => boolean;
   clearTicker?: () => void;
   getPRs?: (repoRoot: string) => Promise<ReviewablePR[]>;
-  runRoutine?: (opts: any) => Promise<{ success: boolean; exitCode?: number }>;
+  runRoutine?: (opts: any) => Promise<{
+    success: boolean;
+    exitCode?: number;
+    quotaPaused?: boolean;
+    quotaResetInfo?: string;
+    output?: string;
+    stderr?: string;
+  }>;
   onAttempted?: (prNumber: number) => void;
+  failureCooldowns?: Map<number, PRFailureRecord>;
+  onQuotaExhausted?: (resetInfo?: string) => void;
 }
 
 /**
@@ -661,6 +685,8 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
     getPRs = getOpenReviewablePRs,
     runRoutine = runLocalRoutine,
     onAttempted,
+    failureCooldowns,
+    onQuotaExhausted,
   } = drainOptions;
 
   if (isStopping()) return;
@@ -678,7 +704,6 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
   }
 
   if (reviewablePRs.length === 0) {
-
     if (options.verbose) {
       console.log(pc.dim(`[${new Date().toLocaleTimeString()}] Peer Review Watchdog: 0 ready PRs found (0 tokens used).`));
     }
@@ -686,14 +711,24 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
   }
 
   const attemptedPRNumbers = new Set<number>();
+  const cooldownDurationMs = (options.prFailureCooldownMinutes ?? 15) * 60 * 1000;
 
   while (!isStopping() && reviewablePRs.length > 0) {
-    const candidatePRs = reviewablePRs.filter((pr) => !attemptedPRNumbers.has(pr.number));
+    const now = Date.now();
+    const candidatePRs = reviewablePRs.filter((pr) => {
+      if (attemptedPRNumbers.has(pr.number)) return false;
+      const cooldown = failureCooldowns?.get(pr.number);
+      if (cooldown && now - cooldown.failedAt < cooldownDurationMs) {
+        return false;
+      }
+      return true;
+    });
+
     if (candidatePRs.length === 0) {
       if (options.verbose) {
         console.log(
           pc.dim(
-            `[${new Date().toLocaleTimeString()}] All ${reviewablePRs.length} remaining ready PR(s) were already evaluated in this drain pass.`
+            `[${new Date().toLocaleTimeString()}] All ${reviewablePRs.length} remaining ready PR(s) were already evaluated or in failure cooldown in this drain pass.`
           )
         );
       }
@@ -747,16 +782,47 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
         onAttempted?.(prNum);
       }
 
+      const isQuota =
+        result.quotaPaused ||
+        (!result.success &&
+          detectQuotaExceeded(result.output || '', result.stderr || '').isQuota);
+
+      if (isQuota) {
+        const resetInfo =
+          result.quotaResetInfo ||
+          detectQuotaExceeded(result.output || '', result.stderr || '').resetInfo;
+        console.warn(
+          pc.yellow(
+            `\n⚠️  Peer Review on ${targetLabel} paused due to LLM quota exhaustion (${resetInfo || 'RESOURCE_EXHAUSTED / 429'}).`
+          )
+        );
+        if (typeof prNum === 'number') {
+          const prev = failureCooldowns?.get(prNum);
+          failureCooldowns?.set(prNum, { failedAt: Date.now(), count: (prev?.count || 0) + 1 });
+        }
+        onQuotaExhausted?.(resetInfo);
+        break;
+      }
+
       if (result.success) {
         console.log(pc.green(`✓ Local peer-review on ${targetLabel} completed successfully.\n`));
+        if (typeof prNum === 'number') {
+          failureCooldowns?.delete(prNum);
+        }
       } else {
         console.warn(pc.yellow(`⚠️  Local peer-review on ${targetLabel} completed with code ${result.exitCode}.\n`));
+        if (typeof prNum === 'number') {
+          const prev = failureCooldowns?.get(prNum);
+          failureCooldowns?.set(prNum, { failedAt: Date.now(), count: (prev?.count || 0) + 1 });
+        }
       }
     } catch (err: any) {
       console.error(pc.red(`✗ Error in peer-review on ${targetLabel}: ${err.message}`));
       if (currentPR) {
         attemptedPRNumbers.add(currentPR.number);
         onAttempted?.(currentPR.number);
+        const prev = failureCooldowns?.get(currentPR.number);
+        failureCooldowns?.set(currentPR.number, { failedAt: Date.now(), count: (prev?.count || 0) + 1 });
       }
     } finally {
       if (state) {
@@ -786,8 +852,18 @@ export interface PerformAutoworkScanOptions {
   clearTicker?: () => void;
   getPRs?: (repoRoot: string) => Promise<ReviewablePR[]>;
   getBacklog?: (repoRoot: string) => Promise<BacklogTriageReport>;
-  runRoutine?: (opts: any) => Promise<{ success: boolean; exitCode?: number }>;
+  runRoutine?: (opts: any) => Promise<{
+    success: boolean;
+    exitCode?: number;
+    quotaPaused?: boolean;
+    quotaResetInfo?: string;
+    output?: string;
+    stderr?: string;
+  }>;
   onDiagnosticCard?: (card: string) => void;
+  onAttempted?: (prNumber: number) => void;
+  failureCooldowns?: Map<number, PRFailureRecord>;
+  onQuotaExhausted?: (resetInfo?: string) => void;
 }
 
 /**
@@ -831,6 +907,9 @@ export async function performAutoworkScan(
         clearTicker,
         getPRs,
         runRoutine,
+        onAttempted: scanOptions.onAttempted,
+        failureCooldowns: scanOptions.failureCooldowns,
+        onQuotaExhausted: scanOptions.onQuotaExhausted,
       });
 
       const remainingPRs = (await getPRs(repoRoot)).length;
@@ -885,6 +964,23 @@ export async function performAutoworkScan(
       }
     },
   });
+
+  const isQuota =
+    result.quotaPaused ||
+    (!result.success && detectQuotaExceeded(result.output || '', result.stderr || '').isQuota);
+
+  if (isQuota) {
+    const resetInfo =
+      result.quotaResetInfo ||
+      detectQuotaExceeded(result.output || '', result.stderr || '').resetInfo;
+    console.warn(
+      pc.yellow(
+        `\n⚠️  Autowork paused due to LLM quota exhaustion (${resetInfo || 'RESOURCE_EXHAUSTED / 429'}).`
+      )
+    );
+    scanOptions.onQuotaExhausted?.(resetInfo);
+    return { executed: true, reason: 'quota_exhausted' };
+  }
 
   if (result.success) {
     console.log(pc.green(`✓ Local autowork completed successfully.\n`));
@@ -942,6 +1038,23 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
   // Set up decoupled intervals
   const reviewIntervalMs = reviewInterval * 60 * 1000;
   const autoworkIntervalMs = autoworkInterval * 60 * 1000;
+
+  const failureCooldowns = new Map<number, PRFailureRecord>();
+  const quotaCooldownMs = (options.quotaCooldownMinutes ?? 15) * 60 * 1000;
+  let quotaCooldownUntil: number | undefined;
+
+  const handleQuotaPause = (resetInfo?: string) => {
+    const until = Date.now() + quotaCooldownMs;
+    quotaCooldownUntil = until;
+    nextReviewCheckTime = until;
+    nextAutoworkCheckTime = Math.max(nextAutoworkCheckTime, until);
+    const resetMsg = resetInfo || 'RESOURCE_EXHAUSTED / 429';
+    console.warn(
+      pc.yellow(
+        `\n[${new Date().toLocaleTimeString()}] ⏸️  LLM quota exhausted (${resetMsg}). Deferring checks for ${Math.round(quotaCooldownMs / 60000)}m...`
+      )
+    );
+  };
 
   let nextReviewCheckTime = Date.now() + (routines.includes('peer-review') ? reviewIntervalMs : Infinity);
   let nextAutoworkCheckTime = Date.now() + (routines.includes('autowork') ? autoworkIntervalMs : Infinity);
@@ -1005,6 +1118,8 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         clearTicker,
         getPRs: getPRsFn,
         runRoutine: runRoutineFn,
+        failureCooldowns,
+        onQuotaExhausted: handleQuotaPause,
       });
       try {
         const prs = await getPRsFn(repoRoot);
@@ -1020,7 +1135,11 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
       state.activeRoutine = undefined;
       state.activeTarget = undefined;
       writeDaemonState(repoRoot, state);
-      nextReviewCheckTime = Date.now() + reviewIntervalMs;
+      if (quotaCooldownUntil && Date.now() < quotaCooldownUntil) {
+        nextReviewCheckTime = quotaCooldownUntil;
+      } else {
+        nextReviewCheckTime = Date.now() + reviewIntervalMs;
+      }
       updateTicker();
 
       if (isGracefulStopping) {
@@ -1062,6 +1181,8 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         getPRs: getPRsFn,
         getBacklog: options.getBacklog || getBacklogTriageReport,
         runRoutine: runRoutineFn,
+        failureCooldowns,
+        onQuotaExhausted: handleQuotaPause,
       });
 
       try {
@@ -1078,7 +1199,11 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
       state.activeRoutine = undefined;
       state.activeTarget = undefined;
       writeDaemonState(repoRoot, state);
-      nextAutoworkCheckTime = Date.now() + autoworkIntervalMs;
+      if (quotaCooldownUntil && Date.now() < quotaCooldownUntil) {
+        nextAutoworkCheckTime = quotaCooldownUntil;
+      } else {
+        nextAutoworkCheckTime = Date.now() + autoworkIntervalMs;
+      }
       updateTicker();
 
       // Immediate post-autowork convergence sweep: if autowork opened/readied a PR, drain it immediately!

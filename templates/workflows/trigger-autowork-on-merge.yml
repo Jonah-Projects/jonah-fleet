@@ -221,7 +221,7 @@ jobs:
           set -e
 
           if [ "$AGY_EXIT_CODE" -ne 0 ]; then
-            if grep -qiE "Individual quota reached|quota reached" /tmp/agy.log; then
+            if grep -qiE "Individual quota reached|quota reached|RESOURCE_EXHAUSTED|code 429|Resource has been exhausted|rate_limit_exceeded" /tmp/agy.log; then
               RESET_INFO=$(grep -oE "Resets in [^.]+" /tmp/agy.log | head -n 1 || echo "Resets in future window")
               echo "QUOTA_PAUSED=true" >> "$GITHUB_ENV"
               echo "QUOTA_RESET_INFO=$RESET_INFO" >> "$GITHUB_ENV"

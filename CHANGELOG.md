@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+* **daemon:** add LLM quota exhaustion backoff (15m cooldown) and PR failure tracking to prevent infinite retry loops on exhausted or failing PRs
+* **runner:** expand detectQuotaExceeded to match RESOURCE_EXHAUSTED, code 429, and rate_limit_exceeded CLI errors
+* **workflows:** expand quota-pause regex to detect RESOURCE_EXHAUSTED and code 429 across all routine workflows
 * **workflows:** mark quota-paused workflow runs as failed (`exit 1`) with an error annotation and keep routine issues open with `status:quota-paused` instead of falsely reporting success
 
 ## [1.30.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.1...v1.30.2) (2026-09-30)
