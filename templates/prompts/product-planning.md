@@ -23,7 +23,7 @@ In **Propose mode**, SUCCESS requires:
 - [ ] Read current roadmap, domain documentation, closed measurement trackers across the trailing cycle lookback window (`closed:>=$(date -u -d '16 days ago' +%Y-%m-%d)`), recent analytics reviews (`routine:analytics-review`), and the latest open `🎨 Design Review` issue / recent design-review routine run issues
 - [ ] Performed Feature Pruning & Deprecation Audit: evaluated shipped features, measurement outcomes (<2% user adoption or >50% failure rate), and Design Review pruning/clutter directives, drafting deprecation, removal, or simplification proposals
 - [ ] Synthesized all accumulated directives into exactly one dated staging issue (`🗺️ Product Plan — {date}`) containing:
-  - Up to 3 well-scoped proposals (Summary/Tasks/Why/Complexity), covering additions, pivots, or deprecations
+  - All relevant well-scoped proposals (Summary/Tasks/Why/Complexity) warranted by evidence, covering additions, pivots, or deprecations (the operator owns deciding which proposals get promoted)
   - Backlog re-ranking recommendations
   - Formal `/to-spec` PRD drafts for any proposal above `size/M`
   - Proposed `ROADMAP.md` updates
@@ -78,7 +78,9 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 2. **Feature Pruning & Deprecation Audit**:
    - Audit shipped features, closed measurement tracker verdicts, and `🎨 Design Review` clutter/pruning findings.
    - For any feature with <2% user adoption, sub-threshold CTR, >50% failure rate, or persistent UI clutter flagged by Design Review, draft explicit deprecation, removal, or pivot proposals to keep the codebase lean and eliminate maintenance waste.
-3. Draft up to 3 high-impact proposals (including additions, pivots, or deprecations) based on roadmap priorities, accumulated measurement outcomes, and user feedback.
+3. **Draft All Relevant Proposals**:
+   - Draft as many well-scoped proposals (including additions, pivots, or deprecations) as are relevant and justified by roadmap priorities, accumulated measurement outcomes, design review directives, and user feedback. Do not artificially cap proposals to 3 — stage all relevant, high-leverage initiatives so the maintainer has a complete view of candidate work.
+   - The operator owns deciding which proposals get approved and promoted into active work.
 4. For proposals sized `size/M` or above, draft a formal specification using `/to-spec`.
 5. **Finalize Staging Issue for Human Review**:
    - Update the staging issue title to `🗺️ Product Plan — {YYYY-MM-DD}` (drop `(Staging)` suffix if present).
