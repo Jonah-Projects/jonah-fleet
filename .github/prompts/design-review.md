@@ -87,7 +87,15 @@ For the surfaces being audited:
    - **Viewport Density & Nudge Budget**: On mobile (390px), do sticky headers, promotional banners, and teasers crowd the viewport above the fold? Enforce: max 1 banner/nudge visible concurrently.
    - **Visual Hierarchy & Clutter**: Are cards nested redundantly? Is there visual noise from excessive borders, conflicting accents, or dense text blocks?
    - **Touch Targets & Spacing**: Are tap targets at least 44x44px? Is whitespace rhythmic and intentional?
-4. Shut down the dev server cleanly after capture.
+4. **Clean Dev Server Teardown (CRITICAL)**:
+   - Terminate the dev server process immediately after captures complete.
+   - If spawned as a background process or subshell, kill it explicitly:
+     ```bash
+     npx --yes kill-port 3000 2>/dev/null || fuser -k 3000/tcp 2>/dev/null || true
+     pkill -f "next dev" 2>/dev/null || true
+     ```
+   - If launched via agent background task manager (`run_command`), explicitly call `manage_task(Action='kill')` on the task ID before ending the turn.
+   - In headless CLI sessions (`agy -p`), unkilled background tasks cause the CLI to wait indefinitely until the `--print-timeout` expires, causing step timeouts.
 
 ### Step 4: Telemetry & Friction Cross-Reference
 
