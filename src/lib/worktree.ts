@@ -45,18 +45,25 @@ export async function createWorktree(
     }
   }
 
-  // Determine base ref (try origin/main, main, or HEAD)
+  // Determine base ref (try refs/remotes/origin/main, refs/heads/main, main, or HEAD)
   let baseRef = options.baseRef;
-  if (!baseRef) {
+  if (!baseRef || baseRef === 'origin/main') {
     try {
-      await execFileAsync('git', ['rev-parse', '--verify', 'origin/main'], { cwd: repoRoot });
-      baseRef = 'origin/main';
+      await execFileAsync('git', ['rev-parse', '--verify', 'refs/remotes/origin/main'], { cwd: repoRoot });
+      baseRef = 'refs/remotes/origin/main';
     } catch {
-      try {
-        await execFileAsync('git', ['rev-parse', '--verify', 'main'], { cwd: repoRoot });
-        baseRef = 'main';
-      } catch {
-        baseRef = 'HEAD';
+      if (!baseRef) {
+        try {
+          await execFileAsync('git', ['rev-parse', '--verify', 'refs/heads/main'], { cwd: repoRoot });
+          baseRef = 'refs/heads/main';
+        } catch {
+          try {
+            await execFileAsync('git', ['rev-parse', '--verify', 'main'], { cwd: repoRoot });
+            baseRef = 'main';
+          } catch {
+            baseRef = 'HEAD';
+          }
+        }
       }
     }
   }

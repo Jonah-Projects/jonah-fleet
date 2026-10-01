@@ -157,5 +157,24 @@ describe('Git Worktree Isolation', () => {
     expect(fs.existsSync(siblingDir)).toBe(true);
     expect(fs.existsSync(path.join(siblingDir, 'important.txt'))).toBe(true);
   });
+
+  it('handles ambiguous origin/main ref when local branch origin/main exists', async () => {
+    // Set up a fake remote tracking branch refs/remotes/origin/main
+    execSync('git update-ref refs/remotes/origin/main HEAD', { cwd: tmpRepo });
+    // Intentionally create a local branch named 'origin/main'
+    execSync('git branch origin/main HEAD', { cwd: tmpRepo });
+
+    // Positive control: verify that bare "origin/main" is indeed ambiguous in this repo state
+    expect(() => {
+      execSync(`git worktree add "${path.join(tmpRepo, 'sub')}" -b test-ambig origin/main`, {
+        cwd: tmpRepo,
+        stdio: 'pipe',
+      });
+    }).toThrow(/ambiguous/i);
+
+    // createWorktree should safely create worktree using unambiguous ref
+    const result = await createWorktree(tmpRepo, { branchName: 'agent/test-unambiguous' });
+    expect(fs.existsSync(result.worktreePath)).toBe(true);
+  });
 });
 
