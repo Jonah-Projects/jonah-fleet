@@ -159,9 +159,16 @@ describe('Git Worktree Isolation', () => {
   });
 
   it('handles ambiguous origin/main ref when local branch origin/main exists', async () => {
-    // Set up a fake remote tracking branch refs/remotes/origin/main
+    // Set up a fake remote tracking branch refs/remotes/origin/main pointing to initial commit
     execSync('git update-ref refs/remotes/origin/main HEAD', { cwd: tmpRepo });
-    // Intentionally create a local branch named 'origin/main'
+    const remoteOriginMainCommit = execSync('git rev-parse refs/remotes/origin/main', { cwd: tmpRepo }).toString().trim();
+
+    // Make a second commit on main so HEAD diverges from refs/remotes/origin/main
+    fs.writeFileSync(path.join(tmpRepo, 'file2.txt'), 'second commit\n', 'utf8');
+    execSync('git add file2.txt', { cwd: tmpRepo });
+    execSync('git commit -m "second commit on main"', { cwd: tmpRepo });
+
+    // Intentionally create a local branch named 'origin/main' pointing to HEAD
     execSync('git branch origin/main HEAD', { cwd: tmpRepo });
 
     // Positive control: verify that bare "origin/main" is indeed ambiguous in this repo state
@@ -172,9 +179,42 @@ describe('Git Worktree Isolation', () => {
       });
     }).toThrow(/ambiguous/i);
 
-    // createWorktree should safely create worktree using unambiguous ref
-    const result = await createWorktree(tmpRepo, { branchName: 'agent/test-unambiguous' });
+    // 1. createWorktree with baseRef omitted: resolves to refs/remotes/origin/main
+    const resultOmitted = await createWorktree(tmpRepo, { branchName: 'agent/test-unambiguous' });
+    expect(fs.existsSync(resultOmitted.worktreePath)).toBe(true);
+    const actualCommitOmitted = execSync('git rev-parse HEAD', { cwd: resultOmitted.worktreePath }).toString().trim();
+    expect(actualCommitOmitted).toBe(remoteOriginMainCommit);
+
+    // 2. createWorktree with explicit baseRef: 'origin/main': also resolves to refs/remotes/origin/main
+    const resultExplicit = await createWorktree(tmpRepo, {
+      branchName: 'agent/test-explicit-origin-main',
+      baseRef: 'origin/main',
+    });
+    expect(fs.existsSync(resultExplicit.worktreePath)).toBe(true);
+    const actualCommitExplicit = execSync('git rev-parse HEAD', { cwd: resultExplicit.worktreePath }).toString().trim();
+    expect(actualCommitExplicit).toBe(remoteOriginMainCommit);
+  });
+
+  it('falls back cleanly to refs/heads/main when baseRef is origin/main but remote tracking branch does not exist', async () => {
+    // Initial commit is on main; create a distinct commit on main
+    fs.writeFileSync(path.join(tmpRepo, 'main-commit.txt'), 'main commit\n', 'utf8');
+    execSync('git add main-commit.txt', { cwd: tmpRepo });
+    execSync('git commit -m "distinct main commit"', { cwd: tmpRepo });
+    const mainCommit = execSync('git rev-parse refs/heads/main', { cwd: tmpRepo }).toString().trim();
+
+    // Create an older local branch named 'origin/main' pointing to initial commit (HEAD~1)
+    execSync('git branch origin/main HEAD~1', { cwd: tmpRepo });
+    // Note: refs/remotes/origin/main does NOT exist in tmpRepo
+
+    // When baseRef is 'origin/main' and refs/remotes/origin/main does not exist,
+    // it should fall back to refs/heads/main (not check out local origin/main)
+    const result = await createWorktree(tmpRepo, {
+      branchName: 'agent/test-fallback-origin-main',
+      baseRef: 'origin/main',
+    });
     expect(fs.existsSync(result.worktreePath)).toBe(true);
+    const actualCommit = execSync('git rev-parse HEAD', { cwd: result.worktreePath }).toString().trim();
+    expect(actualCommit).toBe(mainCommit);
   });
 });
 
