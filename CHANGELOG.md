@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.5...v1.31.0) (2026-10-01)
+
+
+### Features
+
+* **product-planning:** establish Continuous Staging Container lifecycle and cycle lookback ([#526](https://github.com/Jonah-Projects/jonah-fleet/issues/526)) ([2bfd318](https://github.com/Jonah-Projects/jonah-fleet/commit/2bfd31897c7a32f359b2b6ba8dd4d87b7c6b9b5c))
+
 ## [1.30.5](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.4...v1.30.5) (2026-10-01)
 
 
