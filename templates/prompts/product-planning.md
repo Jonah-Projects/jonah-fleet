@@ -20,7 +20,7 @@ This routine runs in two modes: **Propose** (scheduled cron sweep / unapproved f
 
 In **Propose mode**, SUCCESS requires:
 - [ ] Located or initialized the active open staging issue (`routine:product-planning`, `status:staging`) and ingested all accumulated comment directives streamed by `analytics-review` and `design-review`
-- [ ] Read current roadmap, domain documentation, closed measurement trackers across the trailing cycle lookback window (`closed:>=$(date -u -d '16 days ago' +%Y-%m-%d)`), recent analytics reviews (`routine:analytics-review`), and the latest open `🎨 Design Review` issue / recent design-review routine run issues
+- [ ] Read current roadmap, domain documentation, closed measurement trackers across the trailing cycle lookback window (`closed:>=$(date -u -d '16 days ago' +%Y-%m-%d)`), recent analytics reviews (`routine:analytics-review`), and recent design-review routine run issues (`routine:design-review`)
 - [ ] Performed Feature Pruning & Deprecation Audit: evaluated shipped features, measurement outcomes (<2% user adoption or >50% failure rate), and Design Review pruning/clutter directives, drafting deprecation, removal, or simplification proposals
 - [ ] Synthesized all accumulated directives into exactly one dated staging issue (`🗺️ Product Plan — {date}`) containing:
   - All relevant well-scoped proposals (Summary/Tasks/Why/Complexity) warranted by evidence, covering additions, pivots, or deprecations (the operator owns deciding which proposals get promoted)
