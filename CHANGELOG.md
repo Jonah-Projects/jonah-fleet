@@ -5,6 +5,20 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.4](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.3...v1.30.4) (2026-10-01)
+
+
+### Bug Fixes
+
+* **prompts:** enforce explicit dev server teardown in design-review prompt ([#520](https://github.com/Jonah-Projects/jonah-fleet/issues/520)) ([cc9b761](https://github.com/Jonah-Projects/jonah-fleet/commit/cc9b761199d11f70e3264057958837a35965c942))
+
+## [1.30.3](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.2...v1.30.3) (2026-10-01)
+
+
+### Bug Fixes
+
+* **workflows:** mark quota-paused runs as failed and keep routine issues open ([#523](https://github.com/Jonah-Projects/jonah-fleet/issues/523)) ([3115bf8](https://github.com/Jonah-Projects/jonah-fleet/commit/3115bf856f3efa261b29ec33af4e3493e87e4be2))
+
 ## [Unreleased] - 2026-10-01
 
 ### Features
@@ -12,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **product-planning:** establish Continuous Staging Container lifecycle (`status:staging`) and 16-day cycle lookback window so daily telemetry directives stream continuously without mid-sprint loss
 * **analytics-review:** stream daily measurement directives directly as comments into active product plan staging containers with self-healing lazy initialization
 * **labels:** add `status:staging` to default fleet label taxonomy for upcoming product planning containers
+
+### Bug Fixes
+
+* **workflows:** mark quota-paused workflow runs as failed (`exit 1`) with an error annotation and keep routine issues open with `status:quota-paused` instead of falsely reporting success
 
 ## [1.30.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.1...v1.30.2) (2026-09-30)
 
