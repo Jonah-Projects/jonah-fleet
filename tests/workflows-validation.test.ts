@@ -278,6 +278,9 @@ describe('Workflow Validation & Invariants', () => {
       expect(content).toContain('QUOTA_PAUSED=true');
       expect(content).toContain('status:quota-paused');
       expect(content).toContain('Milestone: Routine Execution Quota-Paused');
+      expect(content).toContain('Routine run issue #$ISSUE_NUMBER marked with status:quota-paused (kept open).');
+      expect(content).toContain('::error::Routine execution quota-paused');
+      expect(content).not.toContain('closed with status:quota-paused');
     }
   });
 

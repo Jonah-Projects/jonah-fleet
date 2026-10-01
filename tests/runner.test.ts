@@ -319,6 +319,18 @@ describe('Local Routine Runner', () => {
           'test-host'
         );
       }).not.toThrow();
+
+      expect(() => {
+        tryReconcileLocalRunIssue(
+          '/dev/null/invalid-dir',
+          9999,
+          '# Report',
+          1,
+          'test-host',
+          'autowork',
+          { isQuota: true, resetInfo: 'Resets in 1h' }
+        );
+      }).not.toThrow();
     });
 
     it('gracefully handles errors in tryReconcileLocalRunIssueAsync without throwing', async () => {
@@ -330,6 +342,17 @@ describe('Local Routine Runner', () => {
         'test-host'
       );
       expect(result).toBe(false);
+
+      const quotaResult = await tryReconcileLocalRunIssueAsync(
+        '/dev/null/invalid-dir',
+        9999,
+        '# Report',
+        1,
+        'test-host',
+        'autowork',
+        { isQuota: true, resetInfo: 'Resets in 1h' }
+      );
+      expect(quotaResult).toBe(false);
     });
 
     it('gracefully handles errors in tryMarkLocalRunInterruptedAsync without throwing', async () => {
