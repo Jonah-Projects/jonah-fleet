@@ -254,7 +254,7 @@ describe('Workflow Validation & Invariants', () => {
     expect(githubScriptContent).toContain('loop_circuit_breaker');
   });
 
-  it('ensures all routine workflows implement graceful quota-pause handling', () => {
+  it('ensures all routine workflows implement graceful quota-pause handling with exit 1 and non-closure in reconcile block', () => {
     const routineWorkflows = [
       'autowork-cron.yml',
       'dependency-check-cron.yml',
@@ -281,6 +281,37 @@ describe('Workflow Validation & Invariants', () => {
       expect(content).toContain('Routine run issue #$ISSUE_NUMBER marked with status:quota-paused (kept open).');
       expect(content).toContain('::error::Routine execution quota-paused');
       expect(content).not.toContain('closed with status:quota-paused');
+
+      // Locate Reconcile Routine Run Issue step
+      const reconcileStepIndex = content.indexOf('name: Reconcile Routine Run Issue');
+      expect(reconcileStepIndex, `${file} must contain 'Reconcile Routine Run Issue' step`).toBeGreaterThan(-1);
+      const reconcileStep = content.slice(reconcileStepIndex);
+
+      // Extract the QUOTA_PAUSED handling block within Reconcile Routine Run Issue
+      const quotaBlockMatch = reconcileStep.match(/if\s*\[\s*"\$QUOTA_PAUSED"\s*=\s*"true"\s*\];\s*then([\s\S]*?)(?=REPORT_FILE=)/);
+      expect(quotaBlockMatch, `${file} must contain a quota-paused reconciliation block`).not.toBeNull();
+      const quotaBlock = quotaBlockMatch![1];
+
+      // Explicitly verify exit 1, label application, and absence of gh issue close within the quota block
+      expect(quotaBlock, `${file} quota block must exit 1`).toMatch(/\bexit 1\b/);
+      expect(quotaBlock, `${file} quota block must update status:quota-paused label`).toContain('--add-label "status:quota-paused" --remove-label "status:running"');
+      expect(quotaBlock, `${file} quota block must not call gh issue close`).not.toContain('gh issue close');
+
+      // Verify active workflow in .github/workflows if it exists
+      const githubWorkflowPath = path.join(process.cwd(), '.github/workflows', file);
+      if (fs.existsSync(githubWorkflowPath)) {
+        const githubContent = fs.readFileSync(githubWorkflowPath, 'utf8');
+        const ghReconcileIdx = githubContent.indexOf('name: Reconcile Routine Run Issue');
+        expect(ghReconcileIdx, `.github/workflows/${file} must contain 'Reconcile Routine Run Issue' step`).toBeGreaterThan(-1);
+        const ghReconcileStep = githubContent.slice(ghReconcileIdx);
+        const ghQuotaBlockMatch = ghReconcileStep.match(/if\s*\[\s*"\$QUOTA_PAUSED"\s*=\s*"true"\s*\];\s*then([\s\S]*?)(?=REPORT_FILE=)/);
+        expect(ghQuotaBlockMatch, `.github/workflows/${file} must contain a quota-paused reconciliation block`).not.toBeNull();
+        const ghQuotaBlock = ghQuotaBlockMatch![1];
+
+        expect(ghQuotaBlock, `.github/workflows/${file} quota block must exit 1`).toMatch(/\bexit 1\b/);
+        expect(ghQuotaBlock, `.github/workflows/${file} quota block must update status:quota-paused label`).toContain('--add-label "status:quota-paused" --remove-label "status:running"');
+        expect(ghQuotaBlock, `.github/workflows/${file} quota block must not call gh issue close`).not.toContain('gh issue close');
+      }
     }
   });
 
