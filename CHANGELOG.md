@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.31.0...v1.31.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* **daemon:** add quota exhaustion cooldown and PR failure backoff ([#549](https://github.com/Jonah-Projects/jonah-fleet/issues/549)) ([9806a28](https://github.com/Jonah-Projects/jonah-fleet/commit/9806a283900c81769a2d565b88dd9e6486eee9e5))
+
 ## [1.31.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.5...v1.31.0) (2026-10-01)
 
 
