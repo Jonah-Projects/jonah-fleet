@@ -454,6 +454,62 @@ describe('Local Agent Daemon Manager', () => {
         })
       ).resolves.not.toThrow();
     });
+
+    it('terminates drain pass immediately and invokes onQuotaExhausted when routine hits quota exhaustion', async () => {
+      let quotaInvoked = false;
+      let secondPRInvoked = false;
+
+      await drainReviewQueue({
+        repoRoot: tmpRepo,
+        getPRs: async () => [
+          { number: 4773, headRefName: 'feat/test1', title: 'PR 4773' },
+          { number: 4774, headRefName: 'feat/test2', title: 'PR 4774' },
+        ],
+        runRoutine: async (opts: any) => {
+          if (opts.pr === 4773) {
+            return {
+              success: false,
+              exitCode: 3,
+              quotaPaused: true,
+              quotaResetInfo: 'Resets in 15m',
+              output: 'error: RESOURCE_EXHAUSTED (code 429)',
+            };
+          }
+          secondPRInvoked = true;
+          return { success: true, exitCode: 0 };
+        },
+        onQuotaExhausted: () => {
+          quotaInvoked = true;
+        },
+      });
+
+      expect(quotaInvoked).toBe(true);
+      expect(secondPRInvoked).toBe(false);
+    });
+
+    it('skips PRs currently in failure cooldown on subsequent drain passes', async () => {
+      const failureCooldowns = new Map<number, { failedAt: number; count: number }>();
+      let executionCount = 0;
+
+      const runOpts = {
+        repoRoot: tmpRepo,
+        getPRs: async () => [{ number: 4773, headRefName: 'feat/test1', title: 'PR 4773' }],
+        runRoutine: async () => {
+          executionCount++;
+          return { success: false, exitCode: 1 };
+        },
+        failureCooldowns,
+      };
+
+      // First pass: PR 4773 runs and fails, recording failure cooldown
+      await drainReviewQueue(runOpts);
+      expect(executionCount).toBe(1);
+      expect(failureCooldowns.has(4773)).toBe(true);
+
+      // Second pass immediately after: PR 4773 should be skipped due to cooldown
+      await drainReviewQueue(runOpts);
+      expect(executionCount).toBe(1); // not incremented
+    });
   });
 });
 

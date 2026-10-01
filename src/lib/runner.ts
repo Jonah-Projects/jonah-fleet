@@ -56,6 +56,8 @@ export interface RunLocalRoutineResult {
   worktreePath?: string;
   branchName?: string;
   issueNumber?: number;
+  quotaPaused?: boolean;
+  quotaResetInfo?: string;
 }
 
 export interface StreamJsonEvent {
@@ -447,8 +449,12 @@ export interface QuotaDetectionResult {
  */
 export function detectQuotaExceeded(output: string, stderr: string): QuotaDetectionResult {
   const combined = `${output}\n${stderr}`;
-  if (/individual quota reached|quota reached/i.test(combined)) {
-    const match = combined.match(/Resets in ([^.\n]+)/i);
+  if (
+    /individual quota reached|quota reached|RESOURCE_EXHAUSTED|resource has been exhausted|rate_limit_exceeded|rate limit exceeded|code 429|check quota/i.test(
+      combined
+    )
+  ) {
+    const match = combined.match(/(?:Resets in|resets in|retry after)\s+([^.\n]+)/i);
     return {
       isQuota: true,
       resetInfo: match ? `Resets in ${match[1].trim()}` : undefined,
@@ -1353,5 +1359,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     worktreePath,
     branchName,
     issueNumber: routineIssueNumber,
+    quotaPaused: quotaInfo.isQuota,
+    quotaResetInfo: quotaInfo.resetInfo,
   };
 }
