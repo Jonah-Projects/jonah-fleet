@@ -67,7 +67,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
      ```bash
      gh issue list --state open --label "routine:product-planning" --limit 1
      ```
-     If no open staging container exists, create one: `🗺️ Product Plan — {YYYY-MM-DD}` labeled `routine:product-planning,needs-human`.
+     If no open staging container exists (e.g. unseeded first run), create one: `🗺️ Product Plan — {YYYY-MM-DD} (Staging)` labeled `routine:product-planning,status:staging`.
    - Ingest all accumulated comment directives from the staging issue (`gh issue view <issue> --comments`) to ingest daily telemetry directives streamed by `analytics-review`.
    - Ingest all measurement trackers closed across the trailing 16-day cycle lookback window:
      ```bash
@@ -109,6 +109,8 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
    - Daily directives are streamed below as comments.
 
    ---
+   [![Fleet](https://img.shields.io/badge/Fleet-Autonomous_Command-BBF65D?style=flat&logo=githubactions)](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})
+
    _Seeded autonomously by Product Planning Promote routine._"
 
    gh issue create --title "$TITLE" --body "$BODY" --label "routine:product-planning,status:staging"

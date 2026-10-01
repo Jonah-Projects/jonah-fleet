@@ -369,14 +369,17 @@ describe("Prompt Validation & Invariants", () => {
     expect(content).toMatch(/accumulated.*(?:comment|directiv|stream)/i);
   });
 
-  it("validates analytics-review.md streams directives into open staging container and lazily seeds if missing", () => {
+  it("validates analytics-review.md streams directives and UI friction into open staging container and lazily seeds if missing", () => {
     const templatePath = path.join(promptsDir, "analytics-review.md");
     const content = fs.readFileSync(templatePath, "utf8");
 
-    // Appending directives into open staging container as comments
-    expect(content).toMatch(/gh issue comment.*(?:staging|Product Plan)/i);
+    // Appending directives and UI friction into open staging container as comments
+    expect(content).toMatch(/gh issue comment "\$STAGING_ISSUE_NUMBER"/);
+    expect(content).toMatch(/UI Friction & Fatigue Signal/i);
     // Self-healing lazy seed if no open staging issue exists
     expect(content).toMatch(/lazily|initialize.*staging|seed.*staging/i);
+    // Fleet badge in comment directive
+    expect(content).toMatch(/img\.shields\.io\/badge\/Fleet-Autonomous_Command/);
   });
 
 
