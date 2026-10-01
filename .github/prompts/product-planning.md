@@ -19,13 +19,15 @@ This routine runs behind a **human approval gate**: it **never files autowork-re
 This routine runs in two modes: **Propose** (scheduled cron sweep / unapproved fire) and **Promote** (operator-approved fire).
 
 In **Propose mode**, SUCCESS requires:
-- [ ] Read current roadmap, domain documentation, closed measurement trackers, recent feedback/analytics findings, and the latest open `🎨 Design Review` issue / recent design-review routine run issues
+- [ ] Located or initialized the active open staging issue (`routine:product-planning`, `status:staging`) and ingested all accumulated comment directives streamed by `analytics-review`
+- [ ] Read current roadmap, domain documentation, closed measurement trackers across the trailing cycle lookback window (`closed:>=$(date -u -d '16 days ago' +%Y-%m-%d)`), recent analytics reviews (`routine:analytics-review`), and the latest open `🎨 Design Review` issue / recent design-review routine run issues
 - [ ] Performed Feature Pruning & Deprecation Audit: evaluated shipped features, measurement outcomes (<2% user adoption or >50% failure rate), and Design Review pruning/clutter directives, drafting deprecation, removal, or simplification proposals
-- [ ] Created or updated exactly one dated staging issue (`🗺️ Product Plan — {date}`) containing:
+- [ ] Synthesized all accumulated directives into exactly one dated staging issue (`🗺️ Product Plan — {date}`) containing:
   - Up to 3 well-scoped proposals (Summary/Tasks/Why/Complexity), covering additions, pivots, or deprecations
   - Backlog re-ranking recommendations
   - Formal `/to-spec` PRD drafts for any proposal above `size/M`
   - Proposed `ROADMAP.md` updates
+- [ ] Updated staging issue labels from `status:staging` to `needs-human` for operator review
 - [ ] Filed ZERO autowork-ready issues without approval
 
 In **Promote mode**, SUCCESS requires:
@@ -33,7 +35,8 @@ In **Promote mode**, SUCCESS requires:
 - [ ] Created real, labeled GitHub issues for approved proposals using `/to-tickets` for epic decomposition
 - [ ] Applied approved backlog re-rankings
 - [ ] Committed approved changes to `ROADMAP.md` if explicitly approved
-- [ ] Annotated the staging issue with created issue numbers (`✅ Created → #N`)
+- [ ] Annotated the staging issue with created issue numbers (`✅ Created → #N`) and closed it as completed
+- [ ] Seeded next staging issue: immediately created the NEXT upcoming staging container (`🗺️ Product Plan — {Next Date} (Staging)`) labeled `routine:product-planning,status:staging` so daily analytics runs have an active container to deposit findings
 
 If any criterion cannot be met, stop immediately and log FAILURE with the reason.
 
@@ -57,24 +60,59 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 - **Promote mode**: Payload contains approval tokens (e.g. `Approve #1, #2`, `Approve roadmap`). Proceed to Step 4 (Promote).
 - **Propose mode**: Scheduled sweep or no approval directives. Proceed to Steps 1–3 (Propose).
 
-### Steps 1–3: Propose Mode (Staging Proposals)
+### Steps 1–3: Propose Mode (Synthesizing Staging Proposals)
 
-1. Read `ROADMAP.md`, `AGENTS.md`, closed measurement trackers with `RECOMMENDATION: [PIVOT | DEPRECATE | ITERATE]`, the latest open `🎨 Design Review` issue (and recent run issues with `gh issue list --label "routine:design-review"`), and open issues.
+1. **Continuous Staging Container Intake & Lookback Query**:
+   - Locate the active open staging issue:
+     ```bash
+     gh issue list --state open --label "routine:product-planning" --limit 1
+     ```
+     If no open staging container exists, create one: `🗺️ Product Plan — {YYYY-MM-DD}` labeled `routine:product-planning,needs-human`.
+   - Ingest all accumulated comment directives from the staging issue (`gh issue view <issue> --comments`) to ingest daily telemetry directives streamed by `analytics-review`.
+   - Ingest all measurement trackers closed across the trailing 16-day cycle lookback window:
+     ```bash
+     gh issue list --state closed --label "measurement" --search "closed:>=$(date -u -d '16 days ago' +%Y-%m-%d)" --limit 30
+     gh issue list --state closed --label "routine:analytics-review" --search "created:>=$(date -u -d '16 days ago' +%Y-%m-%d)" --limit 20
+     ```
+   - Read `ROADMAP.md`, `AGENTS.md`, and the latest open `🎨 Design Review` issue (and recent run issues with `gh issue list --label "routine:design-review"`).
 2. **Feature Pruning & Deprecation Audit**:
    - Audit shipped features, closed measurement tracker verdicts, and `🎨 Design Review` clutter/pruning findings.
    - For any feature with <2% user adoption, sub-threshold CTR, >50% failure rate, or persistent UI clutter flagged by Design Review, draft explicit deprecation, removal, or pivot proposals to keep the codebase lean and eliminate maintenance waste.
-3. Draft up to 3 high-impact proposals (including additions, pivots, or deprecations) based on roadmap priorities, measurement outcomes, and user feedback.
+3. Draft up to 3 high-impact proposals (including additions, pivots, or deprecations) based on roadmap priorities, accumulated measurement outcomes, and user feedback.
 4. For proposals sized `size/M` or above, draft a formal specification using `/to-spec`.
-5. Stage all proposals in a dedicated staging issue: `🗺️ Product Plan — {YYYY-MM-DD}` assigned to the repo maintainer.
+5. **Finalize Staging Issue for Human Review**:
+   - Update the staging issue title to `🗺️ Product Plan — {YYYY-MM-DD}` (drop `(Staging)` suffix if present).
+   - Populate the body with executive summary, feature pruning & deprecation audit, proposals, PRDs, backlog re-rankings, and proposed roadmap updates.
+   - Update labels: remove `status:staging` and add `needs-human`. Assign to the repo maintainer for review.
 
-### Step 4: Promote Mode (Approved Execution)
+### Step 4: Promote Mode (Approved Execution & Next Staging Container Seed)
 
 1. For each approved proposal in the staging issue:
    - Create a GitHub issue with the full specification and appropriate labels (`type/*`, `size/*`, `priority/*`).
    - If the proposal is an epic, decompose into child tickets using `/to-tickets`.
 2. Apply approved backlog re-rankings.
 3. If roadmap edits were approved, update `ROADMAP.md` directly on `main`.
-4. Update the staging issue checklist with references to created issues.
+4. Update the staging issue checklist with references to created issues and close the staging issue as completed.
+5. **Seed Next Staging Container**:
+   Immediately create the staging container issue for the next cycle (+15 days out, e.g. next 1st or 15th):
+   ```bash
+   NEXT_DATE=$(date -u -d '+15 days' +%Y-%m-%d)
+   TITLE="🗺️ Product Plan — ${NEXT_DATE} (Staging)"
+   BODY="## 🗺️ Upcoming Product Plan (Continuous Staging Container)
+
+   This staging container accumulates daily telemetry findings, feature audits, and measurement directives between planning sweeps.
+
+   ### Feature Pruning, Deprecation & Pivot Audit
+   - (Accumulating from daily analytics-review runs)
+
+   ### Accumulated Directives & Telemetry Stream
+   - Daily directives are streamed below as comments.
+
+   ---
+   _Seeded autonomously by Product Planning Promote routine._"
+
+   gh issue create --title "$TITLE" --body "$BODY" --label "routine:product-planning,status:staging"
+   ```
 
 ## Logging
 

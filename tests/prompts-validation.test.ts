@@ -358,6 +358,28 @@ describe("Prompt Validation & Invariants", () => {
     expect(content).toContain("RECOMMENDATION:");
   });
 
+  it("validates continuous product plan staging container lifecycle and lookback window in product-planning.md", () => {
+    const templatePath = path.join(promptsDir, "product-planning.md");
+    const content = fs.readFileSync(templatePath, "utf8");
+
+    // Continuous staging container lifecycle & lookback
+    expect(content).toMatch(/seed.*next.*staging|create.*next.*staging/i);
+    expect(content).toMatch(/status:staging/);
+    expect(content).toMatch(/closed:>=/);
+    expect(content).toMatch(/accumulated.*(?:comment|directiv|stream)/i);
+  });
+
+  it("validates analytics-review.md streams directives into open staging container and lazily seeds if missing", () => {
+    const templatePath = path.join(promptsDir, "analytics-review.md");
+    const content = fs.readFileSync(templatePath, "utf8");
+
+    // Appending directives into open staging container as comments
+    expect(content).toMatch(/gh issue comment.*(?:staging|Product Plan)/i);
+    // Self-healing lazy seed if no open staging issue exists
+    expect(content).toMatch(/lazily|initialize.*staging|seed.*staging/i);
+  });
+
+
   it("validates autowork.md and diagnosing-bugs contain Intent vs. Defect Guardrail to prevent telemetry rabbit holes", () => {
     const autoworkPath = path.join(promptsDir, "autowork.md");
     const autoworkContent = fs.readFileSync(autoworkPath, "utf8");

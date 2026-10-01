@@ -5,6 +5,14 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-10-01
+
+### Features
+
+* **product-planning:** establish Continuous Staging Container lifecycle (`status:staging`) and 16-day cycle lookback window so daily telemetry directives stream continuously without mid-sprint loss
+* **analytics-review:** stream daily measurement directives directly as comments into active product plan staging containers with self-healing lazy initialization
+* **labels:** add `status:staging` to default fleet label taxonomy for upcoming product planning containers
+
 ## [1.30.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.30.1...v1.30.2) (2026-09-30)
 
 

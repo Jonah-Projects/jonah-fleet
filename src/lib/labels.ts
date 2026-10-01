@@ -312,6 +312,7 @@ export const FLEET_CORE_LABELS: FleetLabelDefinition[] = [
   { name: 'status:success', color: '0e8a16', description: 'Routine execution succeeded' },
   { name: 'status:failure', color: 'd93f0b', description: 'Routine execution failed' },
   { name: 'status:quota-paused', color: 'e4e669', description: 'Routine execution paused due to API quota limits' },
+  { name: 'status:staging', color: 'fbca04', description: 'Staging container for upcoming product proposals' },
   { name: 'needs-attention', color: 'e11d48', description: 'Requires maintainer triage' },
   { name: 'runner:github-actions', color: '1f883d', description: 'Executed via GitHub Actions' },
   { name: 'runner:local', color: 'bfd4f2', description: 'Executed via local machine daemon' },
