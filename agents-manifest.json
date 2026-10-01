@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/Jonah-Projects/jonah-fleet/main/schema.json",
   "version": "1.30.2",
-  "preset": "custom",
+  "preset": "standard",
   "dualExecution": {
     "enabled": true,
     "cloudPriorities": [
@@ -11,11 +11,11 @@
     "cloudCatchupHours": 48
   },
   "routines": {
-    "autowork": false,
+    "autowork": true,
     "peer-review": true,
-    "optimizer": false,
-    "issues-housekeeping": false,
-    "dependency-update-security-check": false,
+    "optimizer": true,
+    "issues-housekeeping": true,
+    "dependency-update-security-check": true,
     "product-planning": false,
     "analytics-review": false
   },
