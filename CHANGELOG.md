@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-01
 
+### Features
+
+* **product-planning:** establish Continuous Staging Container lifecycle (`status:staging`) and 16-day cycle lookback window so daily telemetry directives stream continuously without mid-sprint loss
+* **product-planning:** remove artificial 3-proposal cap so planning stages all relevant proposals for operator review
+* **analytics-review:** stream daily measurement directives directly as comments into active product plan staging containers with self-healing lazy initialization
+* **design-review:** stream visual critique, clutter analysis, and pruning directives directly into active product plan staging containers instead of creating standalone open tracking issues
+* **labels:** add `status:staging` to default fleet label taxonomy for upcoming product planning containers
+
 ### Bug Fixes
 
 * **workflows:** mark quota-paused workflow runs as failed (`exit 1`) with an error annotation and keep routine issues open with `status:quota-paused` instead of falsely reporting success
