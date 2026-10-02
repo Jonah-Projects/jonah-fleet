@@ -38,6 +38,37 @@ export function computeActionHash(toolName, args) {
   return crypto.createHash('sha256').update(`${toolName}:${canonicalArgs}`).digest('hex');
 }
 
+export function isStatusPollingAction(toolName, args) {
+  if (
+    toolName === 'manage_task' &&
+    (args?.Action === 'status' ||
+      args?.action === 'status' ||
+      args?.Action === 'list' ||
+      args?.action === 'list')
+  ) {
+    return true;
+  }
+
+  if (
+    toolName === 'manage_subagents' &&
+    (args?.Action === 'list' || args?.action === 'list')
+  ) {
+    return true;
+  }
+
+  if (
+    toolName === 'run_command' &&
+    typeof (args?.CommandLine || args?.command) === 'string' &&
+    /^\s*(?:gh\s+(?:run\s+(?:view|watch|list)|pr\s+(?:view|checks|status|list))|git\s+(?:status|log))\b/i.test(
+      args?.CommandLine || args?.command || ''
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export class LoopGuard {
   constructor(options = {}) {
     this.routine = options.routine;
@@ -64,15 +95,7 @@ export class LoopGuard {
   recordAction(toolName, args, isError = false) {
     if (this.trippedResult) return this.trippedResult;
 
-    const isStatusPolling =
-      (toolName === 'manage_task' &&
-        (args?.Action === 'status' ||
-          args?.action === 'status' ||
-          args?.Action === 'list' ||
-          args?.action === 'list')) ||
-      (toolName === 'manage_subagents' &&
-        (args?.Action === 'list' ||
-          args?.action === 'list'));
+    const isStatusPolling = isStatusPollingAction(toolName, args);
 
     const isAnalyticsRoutine = this.routine === 'analytics-review';
 
@@ -151,14 +174,7 @@ export class LoopGuard {
         isAnalyticsRoutine ||
         pingPongSlice.some(
           (item) =>
-            (item.toolName === 'manage_task' &&
-              (item.args?.Action === 'status' ||
-                item.args?.action === 'status' ||
-                item.args?.Action === 'list' ||
-                item.args?.action === 'list')) ||
-            (item.toolName === 'manage_subagents' &&
-              (item.args?.Action === 'list' ||
-                item.args?.action === 'list')) ||
+            isStatusPollingAction(item.toolName, item.args) ||
             item.toolName === 'replace_file_content' ||
             item.toolName === 'write_to_file'
         );

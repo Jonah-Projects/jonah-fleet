@@ -138,6 +138,49 @@ describe('LoopGuard & Action Repetition Circuit Breaker', () => {
       expect(guard.isTripped()).toBe(false);
     });
 
+    it('exempts read-only status and CI polling commands from repetition trip', () => {
+      const guard = new LoopGuard({ repetitionThreshold: 5, slidingWindowSize: 20 });
+      // Calling gh run view 10 times in a row should NOT trip repetition
+      for (let i = 0; i < 10; i++) {
+        expect(
+          guard.recordAction('run_command', {
+            CommandLine: 'gh run view 36977749773 --json status,conclusion',
+          })
+        ).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+
+      // Calling gh pr view 10 times in a row should NOT trip repetition
+      for (let i = 0; i < 10; i++) {
+        expect(
+          guard.recordAction('run_command', {
+            CommandLine: 'gh pr view 4815 --json state,reviewDecision',
+          })
+        ).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+
+      // Calling gh pr checks 10 times in a row should NOT trip repetition
+      for (let i = 0; i < 10; i++) {
+        expect(
+          guard.recordAction('run_command', {
+            CommandLine: 'gh pr checks 4815',
+          })
+        ).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+
+      // Calling git status 10 times in a row should NOT trip repetition
+      for (let i = 0; i < 10; i++) {
+        expect(
+          guard.recordAction('run_command', {
+            CommandLine: 'git status',
+          })
+        ).toBeNull();
+      }
+      expect(guard.isTripped()).toBe(false);
+    });
+
     it('exempts run_command and multiple tool calls in analytics-review from repetition trip', () => {
       const guard = new LoopGuard({
         routine: 'analytics-review',
