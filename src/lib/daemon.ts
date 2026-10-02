@@ -8,6 +8,7 @@ import {
   tryReconcileLocalRunIssueAsync,
   tryMarkLocalRunInterruptedAsync,
   detectQuotaExceeded,
+  detectTransientServiceError,
 } from './runner.js';
 import { cleanupStaleWorktrees, listActiveWorktrees } from './worktree.js';
 import {
@@ -68,6 +69,7 @@ export interface DaemonOptions {
     exitCode?: number;
     quotaPaused?: boolean;
     quotaResetInfo?: string;
+    transientServiceError?: boolean;
     output?: string;
     stderr?: string;
   }>;
@@ -663,6 +665,7 @@ export interface DrainReviewQueueOptions {
     exitCode?: number;
     quotaPaused?: boolean;
     quotaResetInfo?: string;
+    transientServiceError?: boolean;
     output?: string;
     stderr?: string;
   }>;
@@ -804,6 +807,20 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
         break;
       }
 
+      const isTransient =
+        result.transientServiceError ||
+        (!result.success &&
+          detectTransientServiceError(result.output || '', result.stderr || ''));
+
+      if (isTransient) {
+        console.warn(
+          pc.yellow(
+            `\n⚠️  Peer Review on ${targetLabel} encountered transient service error (503 UNAVAILABLE). PR will remain eligible for next sweep without failure cooldown.\n`
+          )
+        );
+        break;
+      }
+
       if (result.success) {
         console.log(pc.green(`✓ Local peer-review on ${targetLabel} completed successfully.\n`));
         if (typeof prNum === 'number') {
@@ -817,6 +834,15 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
         }
       }
     } catch (err: any) {
+      const isTransientErr = detectTransientServiceError(err.message || '', '');
+      if (isTransientErr) {
+        console.warn(
+          pc.yellow(
+            `\n⚠️  Peer Review on ${targetLabel} encountered transient service error (${err.message}). PR will remain eligible for next sweep without failure cooldown.\n`
+          )
+        );
+        break;
+      }
       console.error(pc.red(`✗ Error in peer-review on ${targetLabel}: ${err.message}`));
       if (currentPR) {
         attemptedPRNumbers.add(currentPR.number);
@@ -857,6 +883,7 @@ export interface PerformAutoworkScanOptions {
     exitCode?: number;
     quotaPaused?: boolean;
     quotaResetInfo?: string;
+    transientServiceError?: boolean;
     output?: string;
     stderr?: string;
   }>;
@@ -980,6 +1007,19 @@ export async function performAutoworkScan(
     );
     scanOptions.onQuotaExhausted?.(resetInfo);
     return { executed: true, reason: 'quota_exhausted' };
+  }
+
+  const isTransient =
+    result.transientServiceError ||
+    (!result.success && detectTransientServiceError(result.output || '', result.stderr || ''));
+
+  if (isTransient) {
+    console.warn(
+      pc.yellow(
+        `\n⚠️  Autowork encountered transient service error (503 UNAVAILABLE). Routine will retry on next cycle without failure penalty.\n`
+      )
+    );
+    return { executed: true, reason: 'transient_service_error' };
   }
 
   if (result.success) {

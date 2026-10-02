@@ -68,6 +68,7 @@ import {
   formatFallbackRunReport,
   detectPrematureRoutineExit,
   preserveUncommittedWork,
+  detectTransientServiceError,
 } from '../src/lib/runner.js';
 
 describe('Local Routine Runner', () => {
@@ -183,6 +184,43 @@ describe('Local Routine Runner', () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toContain('[DRY RUN]');
+  });
+
+  describe('detectTransientServiceError', () => {
+    it('detects UNAVAILABLE 503 from stderr or output', () => {
+      expect(
+        detectTransientServiceError(
+          '',
+          'error: Eligibility check failed: UNAVAILABLE (code 503): The service is currently unavailable.'
+        )
+      ).toBe(true);
+      expect(
+        detectTransientServiceError(
+          'Singleflight refresh failed: UNAVAILABLE (code 503): The service is currently unavailable.',
+          ''
+        )
+      ).toBe(true);
+    });
+
+    it('detects handshake EOF and service unavailable patterns', () => {
+      expect(
+        detectTransientServiceError(
+          '',
+          'Print mode: eligibility check failed: Post "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchUserInfo": EOF'
+        )
+      ).toBe(true);
+      expect(
+        detectTransientServiceError(
+          '',
+          'HTTP status: 503 Service Unavailable'
+        )
+      ).toBe(true);
+    });
+
+    it('returns false for normal non-503 errors', () => {
+      expect(detectTransientServiceError('Build error: exit code 1', '')).toBe(false);
+      expect(detectTransientServiceError('', 'Error: git rebase failed')).toBe(false);
+    });
   });
 
   describe('LineBufferedStreamParser', () => {

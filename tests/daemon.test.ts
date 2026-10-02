@@ -13,6 +13,7 @@ import {
   isPRCiPending,
   drainReviewQueue,
   reconcileOrphanedLocalRuns,
+  performAutoworkScan,
 } from '../src/lib/daemon.js';
 
 describe('Local Agent Daemon Manager', () => {
@@ -509,6 +510,58 @@ describe('Local Agent Daemon Manager', () => {
       // Second pass immediately after: PR 4773 should be skipped due to cooldown
       await drainReviewQueue(runOpts);
       expect(executionCount).toBe(1); // not incremented
+    });
+
+    it('does NOT place PR into failureCooldowns when routine fails due to transient service error (503 UNAVAILABLE)', async () => {
+      const failureCooldowns = new Map<number, { failedAt: number; count: number }>();
+      let executionCount = 0;
+
+      const runOpts = {
+        repoRoot: tmpRepo,
+        getPRs: async () => [{ number: 4811, headRefName: 'feat/test', title: 'PR 4811' }],
+        runRoutine: async () => {
+          executionCount++;
+          return {
+            success: false,
+            exitCode: 1,
+            transientServiceError: true,
+            output: 'error: Eligibility check failed: UNAVAILABLE (code 503): The service is currently unavailable.',
+          };
+        },
+        failureCooldowns,
+      };
+
+      // First pass: PR 4811 runs and encounters transient 503 error
+      await drainReviewQueue(runOpts);
+      expect(executionCount).toBe(1);
+      expect(failureCooldowns.has(4811)).toBe(false);
+
+      // Second pass immediately after: PR 4811 should NOT be skipped and can retry
+      await drainReviewQueue(runOpts);
+      expect(executionCount).toBe(2);
+    });
+
+    it('handles transient service error (503) in autowork scan without failure penalty', async () => {
+      const res = await performAutoworkScan({
+        repoRoot: tmpRepo,
+        options: { routines: ['autowork'] },
+        getBacklog: async () => ({
+          total: 1,
+          actionable: [{ number: 10, title: 'Fix bug', priority: 'P1' } as any],
+          blocked: [],
+          inFlight: [],
+          done: [],
+        }),
+        runRoutine: async () => ({
+          success: false,
+          exitCode: 1,
+          transientServiceError: true,
+          output: 'error: Eligibility check failed: UNAVAILABLE (code 503)',
+        }),
+      });
+
+      expect(res.executed).toBe(true);
+      expect(res.reason).toBe('transient_service_error');
     });
   });
 });

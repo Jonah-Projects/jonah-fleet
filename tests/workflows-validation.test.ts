@@ -378,6 +378,26 @@ describe('Workflow Validation & Invariants', () => {
     expect(res3.resetInfo).toBeUndefined();
   });
 
+  it('verifies detectTransientServiceError detects 503 and unavailable errors correctly', async () => {
+    const { detectTransientServiceError } = await import('../src/lib/runner.js');
+
+    const err1 = 'error: Eligibility check failed: UNAVAILABLE (code 503): The service is currently unavailable.';
+    expect(detectTransientServiceError('', err1)).toBe(true);
+    expect(detectTransientServiceError(err1, '')).toBe(true);
+
+    const err2 = 'Singleflight refresh failed: UNAVAILABLE (code 503): The service is currently unavailable.';
+    expect(detectTransientServiceError('', err2)).toBe(true);
+
+    const err3 = 'Print mode: eligibility check failed: Eligibility check failed: Post "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchUserInfo": EOF';
+    expect(detectTransientServiceError('', err3)).toBe(true);
+
+    const err4 = 'error: UNAVAILABLE (code 503): The service is currently unavailable.';
+    expect(detectTransientServiceError('', err4)).toBe(true);
+
+    const normalErr = 'Error: Command failed with exit code 1';
+    expect(detectTransientServiceError('', normalErr)).toBe(false);
+  });
+
   it('ensures agents-manifest.json points to Jonah-Projects schema URL', () => {
     const manifestPath = path.join(process.cwd(), 'agents-manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
