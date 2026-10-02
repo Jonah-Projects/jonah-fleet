@@ -864,6 +864,30 @@ describe('Local Routine Runner', () => {
       expect(report).toContain('| Exit Code | `1` |');
       expect(report).not.toContain('### Error Output');
     });
+
+    it('includes Decision row when peer-review succeeds and outcome is detected from output', () => {
+      const reportMerged = formatFallbackRunReport({
+        routine: 'peer-review',
+        timestamp: '2026-10-02T07-21-17Z',
+        exitCode: 0,
+        hostname: 'penguin',
+        targetLabel: 'PR #4815 (eliminate duplicate...)',
+        durationSec: 416,
+        output: 'Ran gh pr merge 4815 --squash --delete-branch. Squash-merged PR #4815.',
+      });
+      expect(reportMerged).toContain('| Decision | `MERGE` |');
+
+      const reportBounced = formatFallbackRunReport({
+        routine: 'peer-review',
+        timestamp: '2026-10-02T07-21-17Z',
+        exitCode: 0,
+        hostname: 'penguin',
+        targetLabel: 'PR #4815 (eliminate duplicate...)',
+        durationSec: 416,
+        output: 'Ran gh pr ready 4815 --undo. Bounced PR #4815 back to draft.',
+      });
+      expect(reportBounced).toContain('| Decision | `BOUNCE` |');
+    });
   });
 
   describe('detectPrematureRoutineExit', () => {

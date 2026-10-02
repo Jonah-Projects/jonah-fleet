@@ -22,6 +22,8 @@ import {
   isRoutineRunTitle,
   stripAnsi,
   truncateAnsi,
+  detectPeerReviewOutcome,
+  formatPeerReviewOutcomeMessage,
 } from '../src/lib/terminal-card.js';
 
 describe('Terminal UI & Card Primitives', () => {
@@ -331,7 +333,7 @@ The build is completing. Continuing shortly.
       expect(card).toContain('└');
       expect(card).toContain('PEER-REVIEW');
       expect(card).toContain('PR #3783');
-      expect(card).toContain('MERGED');
+      expect(card).toContain('Merged into main');
       expect(card).toContain('45s');
     });
 
@@ -356,7 +358,7 @@ The build is completing. Continuing shortly.
       expect(card).toContain('PR #3783');
       expect(card).toContain('Title:');
       expect(card).toContain('feat(predictions): show instant group creation nudge');
-      expect(card).toContain('MERGED');
+      expect(card).toContain('Merged into main');
       expect(card).toContain('503s');
       expect(card).not.toContain('...');
     });
@@ -614,6 +616,131 @@ The build is completing. Continuing shortly.
       const truncated = truncateAnsi(formatted, 10);
       expect(stripAnsi(truncated)).toBe('Error: Som');
       expect(truncated.endsWith('\x1b[0m')).toBe(true);
+    });
+  });
+
+  describe('detectPeerReviewOutcome', () => {
+    it('detects merged outcome from gh pr merge in output', () => {
+      const output = 'Ran gh pr merge 4815 --squash --delete-branch\nSquash-merged PR #4815.';
+      expect(detectPeerReviewOutcome({ output })).toBe('merged');
+    });
+
+    it('detects merged outcome from decision table in logContent', () => {
+      const logContent = '## Run Summary\n\n| Metric | Value |\n|---|---|\n| Routine | `peer-review` |\n| Decision | `MERGE` |\n';
+      expect(detectPeerReviewOutcome({ logContent })).toBe('merged');
+    });
+
+    it('detects bounced outcome from gh pr ready --undo in output', () => {
+      const output = 'Executed gh pr ready 4815 --undo\nConverted PR #4815 to draft for author fixes.';
+      expect(detectPeerReviewOutcome({ output })).toBe('bounced');
+    });
+
+    it('detects bounced outcome from decision table in logContent', () => {
+      const logContent = '## Run Summary\n\n| Metric | Value |\n|---|---|\n| Routine | `peer-review` |\n| Decision | `BOUNCE` |\n';
+      expect(detectPeerReviewOutcome({ logContent })).toBe('bounced');
+    });
+
+    it('detects deferred CI outcome from waiting text in output', () => {
+      const output = 'Waiting for in-progress remote CI checks to conclude before merge.\nReview clean.';
+      expect(detectPeerReviewOutcome({ output })).toBe('deferred_ci');
+    });
+
+    it('detects deferred CI outcome from decision table in logContent', () => {
+      const logContent = '## Run Summary\n\n| Metric | Value |\n|---|---|\n| Routine | `peer-review` |\n| Decision | `DEFER_CI` |\n';
+      expect(detectPeerReviewOutcome({ logContent })).toBe('deferred_ci');
+    });
+
+    it('detects escalated outcome from needs-human in output', () => {
+      const output = 'Applied needs-human label.\n🛑 Escalation: Human Decision Required';
+      expect(detectPeerReviewOutcome({ output })).toBe('escalated');
+    });
+
+    it('detects no PRs outcome when 0 ready PRs found', () => {
+      const output = 'No PRs to review (0 ready PRs found).';
+      expect(detectPeerReviewOutcome({ output })).toBe('no_prs');
+    });
+
+    it('returns unknown when no outcome indicators exist', () => {
+      const output = 'Agent was working on something unrelated.';
+      expect(detectPeerReviewOutcome({ output })).toBe('unknown');
+    });
+  });
+
+  describe('formatPeerReviewOutcomeMessage', () => {
+    it('formats merged outcome message clearly', () => {
+      const msg = formatPeerReviewOutcomeMessage('PR #4815 (eliminate duplicate episode...)', 'merged', 'Local');
+      expect(stripAnsi(msg)).toBe('✓ Local peer-review on PR #4815 (eliminate duplicate episode...): merged into main.\n');
+    });
+
+    it('formats bounced outcome message clearly with warning indicator', () => {
+      const msg = formatPeerReviewOutcomeMessage('PR #4815 (eliminate duplicate episode...)', 'bounced', 'Local');
+      expect(stripAnsi(msg)).toBe('⚠️  Local peer-review on PR #4815 (eliminate duplicate episode...): bounced to draft.\n');
+    });
+
+    it('formats deferred CI outcome message with clock indicator', () => {
+      const msg = formatPeerReviewOutcomeMessage('PR #4815', 'deferred_ci', 'Local');
+      expect(stripAnsi(msg)).toBe('⏳ Local peer-review on PR #4815: approved (deferred merge pending CI).\n');
+    });
+
+    it('formats escalated outcome message with alert indicator', () => {
+      const msg = formatPeerReviewOutcomeMessage('PR #4815', 'escalated', 'Targeted');
+      expect(stripAnsi(msg)).toBe('🚨 Targeted peer-review on PR #4815: escalated to human.\n');
+    });
+
+    it('formats no_prs outcome message', () => {
+      const msg = formatPeerReviewOutcomeMessage('PR', 'no_prs', 'Local');
+      expect(stripAnsi(msg)).toBe('✓ Local peer-review: no PRs to review.\n');
+    });
+
+    it('falls back to completed successfully when outcome is unknown', () => {
+      const msg = formatPeerReviewOutcomeMessage('PR #4815', 'unknown', 'Local');
+      expect(stripAnsi(msg)).toBe('✓ Local peer-review on PR #4815 completed successfully.\n');
+    });
+  });
+
+  describe('renderSummaryCard Peer Review Outcome & Divider Cleanliness', () => {
+    it('displays Action: Merged into main when merged is detected from output', () => {
+      const card = renderSummaryCard({
+        routine: 'peer-review',
+        pr: 4815,
+        title: 'fix(pronostics): eliminate duplicate episode number on untitled active cards (#4691)',
+        durationMs: 416000,
+        output: 'Squash-merged PR #4815 into main.',
+      });
+
+      expect(card).toContain('PR #4815');
+      expect(card).toContain('Action:');
+      expect(card).toContain('Merged into main');
+      expect(card).toContain('PR approved and squash-merged into main');
+      expect(card).not.toMatch(/├[─]+┤\s*\n\s*├[─]+┤/);
+    });
+
+    it('displays Action: Bounced to draft when bounce is detected from output', () => {
+      const card = renderSummaryCard({
+        routine: 'peer-review',
+        pr: 4815,
+        title: 'fix(pronostics): eliminate duplicate episode number on untitled active cards (#4691)',
+        durationMs: 416000,
+        output: 'Executed gh pr ready 4815 --undo. Bounced PR #4815 back to draft.',
+      });
+
+      expect(card).toContain('PR #4815');
+      expect(card).toContain('Action:');
+      expect(card).toContain('Bounced to draft');
+      expect(card).toContain('PR converted to draft for author/autowork fixes');
+      expect(card).not.toMatch(/├[─]+┤\s*\n\s*├[─]+┤/);
+    });
+
+    it('never renders duplicate adjacent divider lines even when body summary is absent', () => {
+      const card = renderSummaryCard({
+        routine: 'peer-review',
+        pr: 4815,
+        title: 'fix(pronostics): eliminate duplicate episode number on untitled active cards (#4691)',
+        durationMs: 416000,
+        output: 'Some generic output without summary block or known outcome',
+      });
+
+      expect(card).not.toMatch(/├[─]+┤\s*\n\s*├[─]+┤/);
     });
   });
 });

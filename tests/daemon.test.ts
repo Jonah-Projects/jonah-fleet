@@ -268,6 +268,64 @@ describe('Local Agent Daemon Manager', () => {
       expect(stateDuringRun[0]).toMatch(/PR #101 \(add payment gateway\)/);
     });
 
+    it('logs explicit outcome when peer-review merges a PR or bounces it to draft', async () => {
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: any[]) => {
+        logs.push(args.join(' '));
+        origLog(...args);
+      };
+
+      try {
+        let callCount = 0;
+        await drainReviewQueue({
+          repoRoot: tmpRepo,
+          state: { pid: 1234, status: 'idle', routines: ['peer-review'] },
+          getPRs: async () => {
+            callCount++;
+            if (callCount === 1) {
+              return [{ number: 4815, headRefName: 'fix/dup', title: 'fix: eliminate duplicate episode' }];
+            }
+            return [];
+          },
+          runRoutine: async () => {
+            return {
+              success: true,
+              outcome: 'merged',
+              output: 'Squash-merged PR #4815 into main.',
+            };
+          },
+        });
+
+        expect(logs.some((l) => l.includes('PR #4815') && l.includes('merged into main'))).toBe(true);
+
+        logs.length = 0;
+        callCount = 0;
+        await drainReviewQueue({
+          repoRoot: tmpRepo,
+          state: { pid: 1234, status: 'idle', routines: ['peer-review'] },
+          getPRs: async () => {
+            callCount++;
+            if (callCount === 1) {
+              return [{ number: 4816, headRefName: 'fix/dup-2', title: 'fix: duplicate episode 2' }];
+            }
+            return [];
+          },
+          runRoutine: async () => {
+            return {
+              success: true,
+              outcome: 'bounced',
+              output: 'gh pr ready 4816 --undo. Converted PR #4816 to draft.',
+            };
+          },
+        });
+
+        expect(logs.some((l) => l.includes('PR #4816') && l.includes('bounced to draft'))).toBe(true);
+      } finally {
+        console.log = origLog;
+      }
+    });
+
     it('stops review queue draining immediately when isStopping returns true', async () => {
       const prs = [
         { number: 201, headRefName: 'feat/pr-201', title: 'feat: pr 201' },

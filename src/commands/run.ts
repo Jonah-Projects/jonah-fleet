@@ -2,6 +2,7 @@ import path from 'node:path';
 import pc from 'picocolors';
 import { runLocalRoutine } from '../lib/runner.js';
 import { loadManifest } from '../lib/manifest.js';
+import { detectPeerReviewOutcome, formatPeerReviewOutcomeMessage } from '../lib/terminal-card.js';
 
 export interface RunCommandOptions {
   issue?: string;
@@ -68,7 +69,19 @@ export async function runRoutineCommand(routine: string, options: RunCommandOpti
     }
 
     if (result.success) {
-      console.log(pc.green(`\n✓ Local agent session for '${routine}' completed successfully.`));
+      if (routine === 'peer-review') {
+        const targetStr = options.pr ? `PR #${options.pr}` : 'PR';
+        const outcome =
+          result.outcome ||
+          detectPeerReviewOutcome({
+            output: result.output,
+            prNumber: options.pr,
+            repoRoot: cwd,
+          });
+        console.log('\n' + formatPeerReviewOutcomeMessage(targetStr, outcome, 'Local').trimEnd());
+      } else {
+        console.log(pc.green(`\n✓ Local agent session for '${routine}' completed successfully.`));
+      }
     } else {
       console.error(pc.red(`\n✗ Local agent session for '${routine}' failed with exit code ${result.exitCode}.`));
       process.exit(result.exitCode);

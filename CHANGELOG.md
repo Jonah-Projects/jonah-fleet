@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **daemon:** exempt transient service errors (503 UNAVAILABLE) from PR failure cooldowns to avoid penalizing PR review schedules on momentary upstream cloud blips
 * **loop-guard:** exempt read-only CLI status polling commands (`gh run view`, `gh run watch`, `gh pr view`, `gh pr checks`, `git status`) from repetition and ping-pong loop circuit breakers
 * **prompts:** clarify fast autonomous handoff in autowork Step 15 for local daemon runs so completed PRs hand off cleanly to peer-review without 12-minute polling wait
+* **terminal-card,daemon:** clarify peer-review outcome in terminal cards and watchdog completion logs with explicit states (`merged into main`, `bounced to draft`, `approved (deferred merge pending CI)`, `escalated to human`) and eliminate duplicate adjacent card divider lines
 
 ## [1.31.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.31.0...v1.31.1) (2026-10-01)
 

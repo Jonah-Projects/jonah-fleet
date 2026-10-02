@@ -21,6 +21,8 @@ import {
   renderSummaryCard,
   renderErrorCard,
   stripAnsi,
+  detectPeerReviewOutcome,
+  type PeerReviewOutcome,
 } from './terminal-card.js';
 import {
   LoopGuard,
@@ -59,6 +61,8 @@ export interface RunLocalRoutineResult {
   quotaPaused?: boolean;
   quotaResetInfo?: string;
   transientServiceError?: boolean;
+  durationMs?: number;
+  outcome?: PeerReviewOutcome;
 }
 
 export interface StreamJsonEvent {
@@ -808,6 +812,23 @@ export function formatFallbackRunReport(options: FallbackReportOptions): string 
   const result = options.exitCode === 0 ? 'SUCCESS' : 'FAILURE';
   let reportContent = `## Run Summary\n\n| Metric | Value |\n|---|---|\n| Routine | \`${options.routine}\` |\n| Timestamp | \`${options.timestamp}\` |\n| Result | \`${result}\` |\n| Exit Code | \`${options.exitCode}\` |\n| Host | \`${options.hostname}\` |\n| Target | \`${options.targetLabel}\` |\n| Duration | \`${options.durationSec}s\` |\n`;
 
+  if (options.routine === 'peer-review' && options.exitCode === 0) {
+    const outcome = detectPeerReviewOutcome({ output: options.output });
+    const decisionMap: Record<string, string> = {
+      merged: 'MERGE',
+      bounced: 'BOUNCE',
+      deferred_ci: 'DEFER_CI',
+      escalated: 'ESCALATE',
+      no_prs: 'NO_PRS',
+    };
+    if (decisionMap[outcome]) {
+      reportContent = reportContent.replace(
+        `| Duration | \`${options.durationSec}s\` |\n`,
+        `| Duration | \`${options.durationSec}s\` |\n| Decision | \`${decisionMap[outcome]}\` |\n`
+      );
+    }
+  }
+
   if (options.exitCode !== 0) {
     const errorChunks = [options.output?.trim(), options.stderr?.trim()].filter(Boolean);
     const combinedError = errorChunks.join('\n');
@@ -1369,15 +1390,15 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     tryReconcileLocalRunIssue(targetDir, routineIssueNumber, reportContent, exitCode, hostname, routine, quotaInfo);
   }
 
+  const prMatch = targetLabel.match(/PR\s*#?(\d+)/i);
+  const issueMatch = targetLabel.match(/Issue\s*#?(\d+)/i);
+  const effectiveIssue =
+    options.issue || (issueMatch ? issueMatch[1] : undefined);
+  const effectivePR =
+    options.pr || (prMatch ? prMatch[1] : undefined);
+
   // Render Card if not in verbose mode and showCard is not disabled
   if (options.showCard !== false && !options.verbose) {
-    const prMatch = targetLabel.match(/PR\s*#?(\d+)/i);
-    const issueMatch = targetLabel.match(/Issue\s*#?(\d+)/i);
-    const effectiveIssue =
-      options.issue || (issueMatch ? issueMatch[1] : undefined);
-    const effectivePR =
-      options.pr || (prMatch ? prMatch[1] : undefined);
-
     if (exitCode === 0) {
       console.log(
         '\n' +
@@ -1422,5 +1443,14 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     quotaPaused: quotaInfo.isQuota,
     quotaResetInfo: quotaInfo.resetInfo,
     transientServiceError,
+    durationMs,
+    outcome:
+      routine === 'peer-review' && exitCode === 0
+        ? detectPeerReviewOutcome({
+            output,
+            prNumber: effectivePR,
+            repoRoot: targetDir,
+          })
+        : undefined,
   };
 }
