@@ -55,6 +55,40 @@ export function computeActionHash(toolName: string, args: any): string {
 }
 
 /**
+ * Checks whether an action is a read-only status or task polling action exempt from repetition / ping-pong loops.
+ */
+export function isStatusPollingAction(toolName: string, args: any): boolean {
+  if (
+    toolName === 'manage_task' &&
+    (args?.Action === 'status' ||
+      args?.action === 'status' ||
+      args?.Action === 'list' ||
+      args?.action === 'list')
+  ) {
+    return true;
+  }
+
+  if (
+    toolName === 'manage_subagents' &&
+    (args?.Action === 'list' || args?.action === 'list')
+  ) {
+    return true;
+  }
+
+  if (
+    toolName === 'run_command' &&
+    typeof (args?.CommandLine || args?.command) === 'string' &&
+    /^\s*(?:gh\s+(?:run\s+(?:view|watch|list)|pr\s+(?:view|checks|status|list))|git\s+(?:status|log))\b/i.test(
+      args?.CommandLine || args?.command || ''
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Deterministic Loop Guard & Circuit Breaker monitoring tool calls and execution events.
  */
 export class LoopGuard {
@@ -110,15 +144,7 @@ export class LoopGuard {
       return this.trippedResult;
     }
 
-    const isStatusPolling =
-      (toolName === 'manage_task' &&
-        (args?.Action === 'status' ||
-          args?.action === 'status' ||
-          args?.Action === 'list' ||
-          args?.action === 'list')) ||
-      (toolName === 'manage_subagents' &&
-        (args?.Action === 'list' ||
-          args?.action === 'list'));
+    const isStatusPolling = isStatusPollingAction(toolName, args);
 
     const isAnalyticsRoutine = this.routine === 'analytics-review';
 
@@ -200,14 +226,7 @@ export class LoopGuard {
         isAnalyticsRoutine ||
         pingPongSlice.some(
           (item) =>
-            (item.toolName === 'manage_task' &&
-              (item.args?.Action === 'status' ||
-                item.args?.action === 'status' ||
-                item.args?.Action === 'list' ||
-                item.args?.action === 'list')) ||
-            (item.toolName === 'manage_subagents' &&
-              (item.args?.Action === 'list' ||
-                item.args?.action === 'list')) ||
+            isStatusPollingAction(item.toolName, item.args) ||
             item.toolName === 'replace_file_content' ||
             item.toolName === 'write_to_file'
         );
