@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.3](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.31.2...v1.31.3) (2026-10-02)
+
+
+### Bug Fixes
+
+* **loop-guard,prompts:** exempt read-only status polling from loop guard and streamline local autowork handoff ([#580](https://github.com/Jonah-Projects/jonah-fleet/issues/580)) ([ff38bdb](https://github.com/Jonah-Projects/jonah-fleet/commit/ff38bdb6bc3ffccde890df958a2feda0db1effd6))
+
 ## [1.31.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.31.1...v1.31.2) (2026-10-02)
 
 
