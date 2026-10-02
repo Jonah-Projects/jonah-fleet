@@ -11,6 +11,7 @@ import {
   DaemonState,
   filterReviewablePRs,
   isPRCiPending,
+  isPRApproved,
   drainReviewQueue,
   reconcileOrphanedLocalRuns,
   performAutoworkScan,
@@ -505,6 +506,55 @@ describe('Local Agent Daemon Manager', () => {
       expect(daemonState.evaluatedPRs[501].headRefOid).toBe('sha-501');
       expect(daemonState.evaluatedPRs[501].success).toBe(true);
       expect(daemonState.evaluatedPRs[501].outcome).toBe('approved');
+    });
+
+    it('identifies approved PRs via reviewDecision or commit reviews', () => {
+      expect(isPRApproved({ number: 1, headRefName: 'f1', title: 't1', reviewDecision: 'APPROVED' })).toBe(true);
+      expect(isPRApproved({ number: 2, headRefName: 'f2', title: 't2', reviewDecision: 'REVIEW_REQUIRED' })).toBe(false);
+      expect(
+        isPRApproved({
+          number: 3,
+          headRefName: 'f3',
+          title: 't3',
+          headRefOid: 'sha-3',
+          reviews: [{ state: 'APPROVED' }],
+        })
+      ).toBe(true);
+      expect(
+        isPRApproved({
+          number: 4,
+          headRefName: 'f4',
+          title: 't4',
+          headRefOid: 'sha-4',
+          reviews: [{ commit: { oid: 'sha-4' }, body: 'LGTM! Approved for squash-merge.' }],
+        })
+      ).toBe(true);
+    });
+
+    it('passes fastPathMerge: true to runRoutine when PR is approved and CI is green', async () => {
+      let passedFastPath: boolean | undefined = undefined;
+
+      const prs = [
+        {
+          number: 601,
+          headRefName: 'feat/fast-path',
+          headRefOid: 'sha-601',
+          title: 'Fast Path PR',
+          reviewDecision: 'APPROVED',
+          statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'SUCCESS' }],
+        },
+      ];
+
+      await drainReviewQueue({
+        repoRoot: tmpRepo,
+        getPRs: async () => prs,
+        runRoutine: async (opts) => {
+          passedFastPath = opts.fastPathMerge;
+          return { success: true, outcome: 'merged' };
+        },
+      });
+
+      expect(passedFastPath).toBe(true);
     });
   });
 

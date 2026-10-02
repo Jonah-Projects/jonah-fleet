@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-03
 
+### Features
+
+* **runner,daemon:** scope skill discovery by routine to eliminate context bloat, add fast-path merge mode for approved PRs with green CI, and calibrate `peer-review` and `optimizer` to `gemini-3.8-flash-medium`
+
 ### Bug Fixes
 
 * **daemon:** persist evaluated PR review states and failure cooldowns across watchdog cycles in `daemon.json` and filter out already-reviewed commits in `filterReviewablePRs` to prevent repetitive re-review loops

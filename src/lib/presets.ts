@@ -97,8 +97,8 @@ export interface LessonsConfig {
 
 export const DEFAULT_ROUTINE_MODELS: Record<string, string> = {
   autowork: 'gemini-3.8-flash-high',
-  'peer-review': 'gemini-3.8-flash-high',
-  optimizer: 'gemini-3.8-flash-high',
+  'peer-review': 'gemini-3.8-flash-medium',
+  optimizer: 'gemini-3.8-flash-medium',
   'issues-housekeeping': 'gemini-3.8-flash-medium',
   'dependency-update-security-check': 'gemini-3.8-flash-medium',
   'product-planning': 'gemini-3.8-flash-high',
@@ -130,6 +130,8 @@ export const DEFAULT_ROUTINE_MAX_ITERATIONS: Record<string, number> = {
 
 export const DEFAULT_MODELS_CONFIG: RoutineModels = {
   default: 'gemini-3.8-flash-high',
+  'peer-review': 'gemini-3.8-flash-medium',
+  optimizer: 'gemini-3.8-flash-medium',
   'issues-housekeeping': 'gemini-3.8-flash-medium',
   'dependency-update-security-check': 'gemini-3.8-flash-medium',
   'analytics-review': 'gemini-3.8-flash-medium',

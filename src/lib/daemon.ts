@@ -143,6 +143,7 @@ export interface ReviewablePR {
   headRefName: string;
   headRefOid?: string;
   title: string;
+  reviewDecision?: string;
   statusCheckRollup?: Array<{
     status?: string;
     state?: string;
@@ -247,6 +248,26 @@ export function isPRCiFailed(pr: ReviewablePR): boolean {
       state === 'ERROR'
     );
   });
+}
+
+/**
+ * Checks if a pull request has already received approval either through reviewDecision
+ * or an APPROVED review from a reviewer/bot on its current head commit.
+ */
+export function isPRApproved(pr: ReviewablePR): boolean {
+  if (pr.reviewDecision?.toUpperCase() === 'APPROVED') return true;
+  if (pr.reviews && Array.isArray(pr.reviews)) {
+    const hasApproved = pr.reviews.some((r) => {
+      const state = (r.state || '').toUpperCase();
+      if (state === 'APPROVED') return true;
+      if (pr.headRefOid && r.commit?.oid === pr.headRefOid && /Approved for squash-merge/i.test(r.body || '')) {
+        return true;
+      }
+      return false;
+    });
+    if (hasApproved) return true;
+  }
+  return false;
 }
 
 export interface FilterReviewablePROptions {
@@ -989,6 +1010,7 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
       );
       await cleanupStaleWorktrees(repoRoot);
 
+      const isFastPath = isPRCiGreen(currentPR) && isPRApproved(currentPR);
       const result = await runRoutine({
         targetDir: repoRoot,
         routine: 'peer-review',
@@ -997,6 +1019,7 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
         model: options.model,
         verbose: options.verbose,
         noWorktree: false,
+        fastPathMerge: isFastPath,
         onTargetDetected: (target: string) => {
           targetPRStr = target;
           if (state) {

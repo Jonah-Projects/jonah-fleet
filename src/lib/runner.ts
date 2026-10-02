@@ -31,6 +31,7 @@ import {
   LoopGuardTrip,
 } from './loop-guard.js';
 import pc from 'picocolors';
+import { DEFAULT_ROUTINE_MODELS } from './presets.js';
 
 export interface RunLocalRoutineOptions {
   targetDir: string;
@@ -45,6 +46,7 @@ export interface RunLocalRoutineOptions {
   dryRun?: boolean;
   verbose?: boolean;
   showCard?: boolean;
+  fastPathMerge?: boolean;
   env?: Record<string, string>;
   onLog?: (chunk: string) => void;
   onTargetDetected?: (target: string) => void;
@@ -243,17 +245,32 @@ export function buildAgyArgs(prompt: string, model: string, printTimeout: string
 }
 
 /**
- * Discovers domain skills in .agents/skills and formats instruction string.
+ * Routine-to-relevant-skills mapping to prevent context token bloat in autonomous sub-sessions.
  */
-export function discoverSkillsPrompt(targetDir: string): string {
+export const ROUTINE_RELEVANT_SKILLS: Record<string, string[]> = {
+  'peer-review': ['code-review', 'resolving-merge-conflicts', 'tdd'],
+  autowork: ['tdd', 'resolving-merge-conflicts', 'diagnosing-bugs', 'codebase-design'],
+  optimizer: ['code-review', 'codebase-design', 'writing-for-agents'],
+};
+
+/**
+ * Discovers domain skills in .agents/skills and formats instruction string.
+ * Optionally filtered by routine to prevent prompt context bloat.
+ */
+export function discoverSkillsPrompt(targetDir: string, routine?: string): string {
   const skillsDir = path.join(targetDir, '.agents', 'skills');
   if (!fs.existsSync(skillsDir)) return '';
+
+  const relevantList = routine ? ROUTINE_RELEVANT_SKILLS[routine] : undefined;
 
   let skillsPrompt = '';
   try {
     const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isDirectory()) {
+        if (relevantList && !relevantList.includes(entry.name)) {
+          continue;
+        }
         const skillPath = path.join('.agents', 'skills', entry.name, 'SKILL.md');
         const fullPath = path.join(targetDir, skillPath);
         if (fs.existsSync(fullPath)) {
@@ -273,15 +290,25 @@ export function discoverSkillsPrompt(targetDir: string): string {
 export function buildRoutinePrompt(
   targetDir: string,
   routine: string,
-  options: { issue?: string | number; pr?: string | number; routineIssueNumber?: number } = {}
+  options: {
+    issue?: string | number;
+    pr?: string | number;
+    routineIssueNumber?: number;
+    fastPathMerge?: boolean;
+  } = {}
 ): string {
-  const skillsPrompt = discoverSkillsPrompt(targetDir);
-  const promptFile = `.github/prompts/${routine}.md`;
   const repoContext = `Working repository is located at ${targetDir}. All git, gh, and workspace commands must execute strictly within this repository.`;
   const logPrompt = options.routineIssueNumber
     ? ` Tracking run log issue: #${options.routineIssueNumber}.`
     : '';
   const headlessGuardrail = ` Execution Guardrail: You are executing in a headless autonomous session. You MUST NEVER call schedule or yield your turn with plain text to wait on background tasks or verification checks. If a verification command (tests, type-check, lint) runs in the background, inspect its completion with manage_task(Action='status') or manage_subagents(Action='list') (status polling with these tools is explicitly exempted from loop guard circuit breakers), or execute commands with sufficient WaitMsBeforeAsync (up to 10000 ms). DO NOT busy-wait by repeatedly calling read tools (such as view_file) on unchanged files to pass time while waiting, as calling non-polling tools with identical parameters will trip the loop circuit breaker. Read-only status commands (gh run view, gh pr view, gh pr checks, git status) are also exempted from loop guard repetition limits. Never stop calling tools or yield your turn until the routine's terminal Definition of Done is fully reached.`;
+
+  if (routine === 'peer-review' && options.pr && options.fastPathMerge) {
+    return `You are the Peer Review routine for this repository. ${repoContext} Fast-Path Merge Mode: PR #${options.pr} has already received clean code review approval and remote CI has passed. Verify final PR status with gh pr checks ${options.pr} and execute the merge immediately: gh pr merge ${options.pr} --squash --delete-branch. Post the final merge confirmation or milestone card to conclude.${logPrompt}${headlessGuardrail}`;
+  }
+
+  const skillsPrompt = discoverSkillsPrompt(targetDir, routine);
+  const promptFile = `.github/prompts/${routine}.md`;
 
   if (routine === 'autowork') {
     if (options.issue) {
@@ -874,7 +901,7 @@ export async function preserveUncommittedWork(
 export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<RunLocalRoutineResult> {
   const targetDir = path.resolve(options.targetDir);
   const routine = options.routine;
-  const model = options.model || 'gemini-3.8-flash-high';
+  const model = options.model || (DEFAULT_ROUTINE_MODELS as Record<string, string>)[routine] || 'gemini-3.8-flash-medium';
   const printTimeout = options.printTimeout || '30m';
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const hostname = os.hostname();
@@ -923,6 +950,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     issue: options.issue,
     pr: options.pr,
     routineIssueNumber,
+    fastPathMerge: options.fastPathMerge,
   });
 
   if (options.dryRun) {
