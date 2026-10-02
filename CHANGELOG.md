@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-10-02
+
+### Bug Fixes
+
+* **runner:** introduce `detectTransientServiceError` and add startup retry loop (up to 2 retries with backoff) when `agy` encounters transient 503 UNAVAILABLE or handshake EOF during initialization
+* **daemon:** exempt transient service errors (503 UNAVAILABLE) from PR failure cooldowns to avoid penalizing PR review schedules on momentary upstream cloud blips
+
 ## [1.31.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.31.0...v1.31.1) (2026-10-01)
 
 

@@ -58,6 +58,7 @@ export interface RunLocalRoutineResult {
   issueNumber?: number;
   quotaPaused?: boolean;
   quotaResetInfo?: string;
+  transientServiceError?: boolean;
 }
 
 export interface StreamJsonEvent {
@@ -461,6 +462,23 @@ export function detectQuotaExceeded(output: string, stderr: string): QuotaDetect
     };
   }
   return { isQuota: false };
+}
+
+/**
+ * Detects whether routine runner stdout/stderr failed due to transient upstream service unavailability (e.g. 503, handshake EOF).
+ */
+export function detectTransientServiceError(output: string, stderr: string): boolean {
+  const combined = `${output}\n${stderr}`;
+  return (
+    /UNAVAILABLE\s*\((?:code\s*)?503\)/i.test(combined) ||
+    /\bcode\s*503\b/i.test(combined) ||
+    /The service is currently unavailable/i.test(combined) ||
+    /Eligibility check failed/i.test(combined) ||
+    /status(?:\s*code)?\s*[:=]?\s*503\b/i.test(combined) ||
+    /503\s+Service\s+Unavailable/i.test(combined) ||
+    /daily-cloudcode-pa\.googleapis\.com.*EOF/i.test(combined) ||
+    /oauth2\/v2\/userinfo.*EOF/i.test(combined)
+  );
 }
 
 /**
@@ -1052,6 +1070,8 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     },
   });
 
+  let executedAnyTool = false;
+
   const stdoutParser = new LineBufferedStreamParser((line: string) => {
     const event = parseStreamJsonEvent(line);
     if (event) {
@@ -1084,6 +1104,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
               spinner.update(`${targetLabel}: ${activePhase}`);
             }
           } else if (su.state === 'DONE') {
+            executedAnyTool = true;
             lastActionDesc = null;
             if (su.tool_info?.output) {
               checkTargetDetection(su.tool_info.output);
@@ -1191,33 +1212,71 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     }
   };
 
+  const maxStartupAttempts = 3;
+  let attempt = 0;
+
   try {
-    exitCode = await new Promise<number>((resolve, reject) => {
-      const child = spawn('agy', args, {
-        cwd: executionDir,
-        env: childEnv,
-        stdio: ['inherit', 'pipe', 'pipe'],
-      });
-      activeChild = child;
+    while (attempt < maxStartupAttempts) {
+      attempt++;
+      if (attempt > 1) {
+        accumulatedOutput = '';
+        accumulatedStderr = '';
+        finalResponseText = '';
+        lastActionDesc = null;
+        executedAnyTool = false;
+        loopGuardTrip = null;
+      }
 
-      child.stdout?.on('data', (data) => {
-        processChunk(data.toString(), false);
+      exitCode = await new Promise<number>((resolve, reject) => {
+        const child = spawn('agy', args, {
+          cwd: executionDir,
+          env: childEnv,
+          stdio: ['inherit', 'pipe', 'pipe'],
+        });
+        activeChild = child;
+
+        child.stdout?.on('data', (data) => {
+          processChunk(data.toString(), false);
+        });
+
+        child.stderr?.on('data', (data) => {
+          processChunk(data.toString(), true);
+        });
+
+        child.on('error', (err) => {
+          spinner?.stop();
+          reject(err);
+        });
+
+        child.on('close', (code, signal) => {
+          spinner?.stop();
+          resolve(resolveExitCode(code, signal));
+        });
       });
 
-      child.stderr?.on('data', (data) => {
-        processChunk(data.toString(), true);
-      });
+      stdoutParser.flush();
+      stderrParser.flush();
 
-      child.on('error', (err) => {
-        spinner?.stop();
-        reject(err);
-      });
+      const isTransient = detectTransientServiceError(
+        finalResponseText || accumulatedOutput,
+        accumulatedStderr
+      );
 
-      child.on('close', (code, signal) => {
-        spinner?.stop();
-        resolve(resolveExitCode(code, signal));
-      });
-    });
+      // If exited non-zero with transient upstream service error during startup (< 1 tool executed), retry
+      if (exitCode !== 0 && isTransient && !executedAnyTool && attempt < maxStartupAttempts) {
+        const delaySec = attempt * 2;
+        const retryMsg = `Transient service error (503 UNAVAILABLE). Retrying startup in ${delaySec}s (attempt ${attempt + 1}/${maxStartupAttempts})...`;
+        if (spinner) {
+          spinner.update(`${targetLabel}: ${retryMsg}`);
+        } else {
+          console.warn(pc.yellow(`\n[runner] ${retryMsg}`));
+        }
+        await new Promise((r) => setTimeout(r, delaySec * 1000));
+        continue;
+      }
+
+      break;
+    }
   } finally {
     spinner?.stop();
     process.removeListener('SIGINT', sigintHandler);
@@ -1227,8 +1286,6 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     }
   }
 
-  stdoutParser.flush();
-  stderrParser.flush();
   output = finalResponseText || accumulatedOutput;
 
   const durationMs = Date.now() - startTime;
@@ -1351,6 +1408,9 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     }
   }
 
+  const transientServiceError =
+    exitCode !== 0 && detectTransientServiceError(output, accumulatedStderr);
+
   return {
     success: exitCode === 0,
     exitCode,
@@ -1361,5 +1421,6 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     issueNumber: routineIssueNumber,
     quotaPaused: quotaInfo.isQuota,
     quotaResetInfo: quotaInfo.resetInfo,
+    transientServiceError,
   };
 }
