@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.31.1...v1.31.2) (2026-10-02)
+
+
+### Bug Fixes
+
+* **runner,daemon:** add startup transient 503 retry and exempt from PR failure cooldown ([#575](https://github.com/Jonah-Projects/jonah-fleet/issues/575)) ([c6f37eb](https://github.com/Jonah-Projects/jonah-fleet/commit/c6f37ebd4bc7072f267c77c42eba255aa71b2d78))
+
 ## [Unreleased] - 2026-10-02
 
 ### Bug Fixes
