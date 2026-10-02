@@ -28,6 +28,8 @@ import {
   renderBacklogDiagnosticCard,
   isRoutineRunTitle,
   formatTargetLabel,
+  detectPeerReviewOutcome,
+  formatPeerReviewOutcomeMessage,
   type BacklogTriageReport,
   type BacklogIssueInfo,
 } from './terminal-card.js';
@@ -822,7 +824,14 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
       }
 
       if (result.success) {
-        console.log(pc.green(`✓ Local peer-review on ${targetLabel} completed successfully.\n`));
+        const outcome =
+          (result as any).outcome ||
+          detectPeerReviewOutcome({
+            output: result.output,
+            prNumber: prNum,
+            repoRoot,
+          });
+        console.log(formatPeerReviewOutcomeMessage(targetLabel, outcome, 'Local'));
         if (typeof prNum === 'number') {
           failureCooldowns?.delete(prNum);
         }
@@ -1315,7 +1324,14 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
       });
 
       if (result.success) {
-        console.log(pc.green(`✓ Targeted peer-review on PR #${prNumber} completed successfully.\n`));
+        const outcome =
+          (result as any).outcome ||
+          detectPeerReviewOutcome({
+            output: result.output,
+            prNumber,
+            repoRoot,
+          });
+        console.log(formatPeerReviewOutcomeMessage(`PR #${prNumber}`, outcome, 'Targeted'));
       } else {
         console.warn(pc.yellow(`⚠️  Targeted peer-review on PR #${prNumber} completed with code ${result.exitCode}.\n`));
       }

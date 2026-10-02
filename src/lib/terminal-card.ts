@@ -217,6 +217,10 @@ export function extractExecutionSummary(output: string): string | null {
   // Strip trailing completion messages if any leaked into the summary
   const trailingSeparators = [
     '✓ Local peer-review completed',
+    '✓ Local peer-review on',
+    '⚠️  Local peer-review on',
+    '✓ Targeted peer-review on',
+    '⚠️  Targeted peer-review on',
     '✓ Local autowork completed',
     '✓ Local agent session',
     'Peer Review Watchdog:',
@@ -839,6 +843,144 @@ export function formatEvaluatingDescription(
   return `Evaluating ${name} output...`;
 }
 
+export type PeerReviewOutcome = 'merged' | 'bounced' | 'deferred_ci' | 'escalated' | 'no_prs' | 'unknown';
+
+export interface DetectPeerReviewOutcomeOptions {
+  output?: string;
+  logContent?: string;
+  prNumber?: number | string;
+  repoRoot?: string;
+}
+
+/**
+ * Detects the specific outcome of a peer-review routine run:
+ * - 'merged': PR was approved and squash-merged into main
+ * - 'bounced': PR had blocking findings and was converted back to draft
+ * - 'deferred_ci': PR is clean but merge is deferred awaiting in-progress remote CI checks
+ * - 'escalated': PR reached round cap or stalled and was escalated to human with needs-human
+ * - 'no_prs': Scan mode found 0 eligible PRs to review
+ * - 'unknown': No decisive outcome detected
+ */
+export function detectPeerReviewOutcome(options: DetectPeerReviewOutcomeOptions): PeerReviewOutcome {
+  const { output, logContent, prNumber, repoRoot } = options;
+  const contentToCheck = [logContent, output].filter(Boolean).join('\n');
+
+  if (contentToCheck) {
+    // 1. Structured table decision in run log or report: | Decision | `MERGE` |
+    const tableDecisionMatch = contentToCheck.match(/\|\s*Decision\s*\|\s*`?([A-Z_]+)`?\s*\|/i);
+    if (tableDecisionMatch) {
+      const d = tableDecisionMatch[1].toUpperCase();
+      if (d === 'MERGE' || d === 'MERGED') return 'merged';
+      if (d === 'BOUNCE' || d === 'BOUNCED' || d === 'DRAFT') return 'bounced';
+      if (d === 'DEFER_CI' || d === 'DEFERRED_CI' || d === 'DEFERRED') return 'deferred_ci';
+      if (d === 'ESCALATE' || d === 'ESCALATED') return 'escalated';
+      if (d === 'NO_PRS') return 'no_prs';
+    }
+
+    // 2. Milestone card: Review completed with decision <MERGE | BOUNCE | ESCALATE | DEFER_CI>
+    const milestoneMatch = contentToCheck.match(
+      /Review completed with decision\s+`?<?(MERGE|BOUNCE|ESCALATE|DEFER_CI)>?`?/i
+    );
+    if (milestoneMatch) {
+      const d = milestoneMatch[1].toUpperCase();
+      if (d === 'MERGE') return 'merged';
+      if (d === 'BOUNCE') return 'bounced';
+      if (d === 'DEFER_CI') return 'deferred_ci';
+      if (d === 'ESCALATE') return 'escalated';
+    }
+
+    // 3. Final Action: **MERGED** / Bounce to draft
+    const finalActionMatch = contentToCheck.match(/\*\*Final Action\*\*:\s*([^\n]+)/i);
+    if (finalActionMatch) {
+      const fa = finalActionMatch[1];
+      if (/merge/i.test(fa)) return 'merged';
+      if (/bounce|draft/i.test(fa)) return 'bounced';
+      if (/defer|ci/i.test(fa)) return 'deferred_ci';
+      if (/escalat/i.test(fa)) return 'escalated';
+    }
+
+    // 4. Executed commands or status lines
+    const hasMergeCommand =
+      /gh\s+pr\s+merge\s+\d+/i.test(contentToCheck) ||
+      /gh\s+pr\s+merge[^\n]*--squash/i.test(contentToCheck) ||
+      /(?:Squash-merged|Merged)\s+PR\s*#?\d+/i.test(contentToCheck) ||
+      /Closed via PR\s*#?\d+\s*\(merged into main\)/i.test(contentToCheck);
+
+    const hasBounceCommand =
+      /gh\s+pr\s+ready\s+\d+\s+--undo/i.test(contentToCheck) ||
+      /gh\s+pr\s+ready\s+--undo/i.test(contentToCheck) ||
+      /(?:converted|bounced)\s+PR\s*#?\d+\s+(?:back\s+)?to draft/i.test(contentToCheck) ||
+      /converted\s+(?:the\s+)?PR\s+to draft/i.test(contentToCheck) ||
+      /bounced\s+(?:the\s+)?PR\s+back to draft/i.test(contentToCheck);
+
+    const hasDeferredCI =
+      /Waiting for in-progress remote CI checks/i.test(contentToCheck) ||
+      /awaiting completion of in-progress remote CI checks/i.test(contentToCheck);
+
+    const hasEscalate =
+      /needs-human/i.test(contentToCheck) ||
+      /🛑 Escalation: Human Decision Required/i.test(contentToCheck);
+
+    const hasNoPRs =
+      /No PRs to review/i.test(contentToCheck) ||
+      /0 ready PRs found/i.test(contentToCheck);
+
+    if (hasMergeCommand && !hasBounceCommand) return 'merged';
+    if (hasBounceCommand && !hasMergeCommand) return 'bounced';
+    if (hasDeferredCI && !hasBounceCommand) return 'deferred_ci';
+    if (hasEscalate) return 'escalated';
+    if (hasNoPRs) return 'no_prs';
+  }
+
+  // 5. Query GitHub CLI directly as authoritative check if repoRoot and prNumber are available
+  if (repoRoot && prNumber) {
+    try {
+      const cleanPr = String(prNumber).replace(/\D/g, '');
+      if (cleanPr) {
+        const stdout = execFileSync('gh', ['pr', 'view', cleanPr, '--json', 'state,isDraft'], {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          timeout: 2500,
+        });
+        const data = JSON.parse(stdout);
+        if (data.state === 'MERGED') return 'merged';
+        if (data.isDraft === true) return 'bounced';
+        if (data.state === 'OPEN' && data.isDraft === false) return 'deferred_ci';
+      }
+    } catch {
+      // Ignore network / gh failure
+    }
+  }
+
+  return 'unknown';
+}
+
+/**
+ * Formats a clear, informative peer-review completion line for terminal output.
+ */
+export function formatPeerReviewOutcomeMessage(
+  targetLabel: string,
+  outcome: PeerReviewOutcome,
+  prefix: 'Local' | 'Targeted' = 'Local'
+): string {
+  switch (outcome) {
+    case 'merged':
+      return pc.green(`✓ ${prefix} peer-review on ${targetLabel}: merged into main.\n`);
+    case 'bounced':
+      return pc.yellow(`⚠️  ${prefix} peer-review on ${targetLabel}: bounced to draft.\n`);
+    case 'deferred_ci':
+      return pc.cyan(`⏳ ${prefix} peer-review on ${targetLabel}: approved (deferred merge pending CI).\n`);
+    case 'escalated':
+      return pc.red(`🚨 ${prefix} peer-review on ${targetLabel}: escalated to human.\n`);
+    case 'no_prs':
+      return pc.dim(`✓ ${prefix} peer-review: no PRs to review.\n`);
+    case 'unknown':
+    default:
+      return pc.green(`✓ ${prefix} peer-review on ${targetLabel} completed successfully.\n`);
+  }
+}
+
 /**
  * Renders a styled Unicode summary card.
  */
@@ -907,6 +1049,31 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
     if (decisionMatch) decision = decisionMatch[1].replace(/[`*]/g, '').trim();
   }
 
+  if (options.routine === 'peer-review') {
+    const prMatch = target.match(/PR\s*#?(\d+)/i);
+    const cleanPrNum = options.pr || (prMatch ? prMatch[1] : undefined);
+    const detectedOutcome = detectPeerReviewOutcome({
+      output: options.output,
+      prNumber: cleanPrNum,
+      repoRoot: options.repoRoot,
+    });
+
+    if (!decision) {
+      if (detectedOutcome === 'merged') decision = 'Merged into main';
+      else if (detectedOutcome === 'bounced') decision = 'Bounced to draft';
+      else if (detectedOutcome === 'deferred_ci') decision = 'Approved (deferred merge pending CI)';
+      else if (detectedOutcome === 'escalated') decision = 'Escalated to human';
+      else if (detectedOutcome === 'no_prs') decision = 'No PRs to review';
+    } else {
+      const dUpper = decision.toUpperCase();
+      if (dUpper === 'MERGE' || dUpper === 'MERGED') decision = 'Merged into main';
+      else if (dUpper === 'BOUNCE' || dUpper === 'BOUNCED') decision = 'Bounced to draft';
+      else if (dUpper === 'DEFER_CI' || dUpper === 'DEFERRED_CI') decision = 'Approved (deferred merge pending CI)';
+      else if (dUpper === 'ESCALATE' || dUpper === 'ESCALATED') decision = 'Escalated to human';
+      else if (dUpper === 'NO_PRS') decision = 'No PRs to review';
+    }
+  }
+
   const durationStr = options.durationMs
     ? `${Math.round(options.durationMs / 1000)}s`
     : parsedFromLog?.duration || '';
@@ -951,8 +1118,12 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
     let decisionBadge = pc.green(`✔ ${decision}`);
     if (/bounce|draft|reject|fail/i.test(decision)) {
       decisionBadge = pc.yellow(`⚠️  ${decision}`);
+    } else if (/defer|pending|wait/i.test(decision)) {
+      decisionBadge = pc.cyan(`⏳ ${decision}`);
     } else if (/escalat/i.test(decision)) {
       decisionBadge = pc.red(`🚨 ${decision}`);
+    } else if (/no prs/i.test(decision)) {
+      decisionBadge = pc.dim(decision);
     }
     const decisionPlain = ` Action: ${decision}`;
     lines.push(
@@ -963,9 +1134,9 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
     );
   }
 
-  lines.push(border(`├${horizontal}┤`));
+  // Format body content (Summary or Fallback Passes or Peer Review Detail)
+  const bodyLines: string[] = [];
 
-  // Format body content (Summary or Fallback Passes)
   if (rawSummary) {
     const summaryLines = rawSummary.split('\n');
 
@@ -980,7 +1151,7 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
 
       if (line.startsWith('### ')) {
         const heading = line.replace('### ', '').trim();
-        lines.push(
+        bodyLines.push(
           border('│') +
             ` ${pc.bold(pc.cyan(heading))}` +
             ' '.repeat(Math.max(1, width - 3 - heading.length)) +
@@ -998,14 +1169,14 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
           const wLine = wrapped[i];
           const wPlain = stripAnsi(wLine);
           if (i === 0) {
-            lines.push(
+            bodyLines.push(
               border('│') +
                 `  • ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
                 border('│')
             );
           } else {
-            lines.push(
+            bodyLines.push(
               border('│') +
                 `    ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
@@ -1025,14 +1196,14 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
           const wLine = wrapped[i];
           const wPlain = stripAnsi(wLine);
           if (i === 0) {
-            lines.push(
+            bodyLines.push(
               border('│') +
                 `  ✔ ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
                 border('│')
             );
           } else {
-            lines.push(
+            bodyLines.push(
               border('│') +
                 `    ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
@@ -1043,7 +1214,7 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
       }
     }
   } else if (parsedFromLog && parsedFromLog.passes && parsedFromLog.passes.length > 0) {
-    lines.push(border('│') + ` ${pc.bold('Verification Passes:')}` + ' '.repeat(Math.max(1, width - 23)) + border('│'));
+    bodyLines.push(border('│') + ` ${pc.bold('Verification Passes:')}` + ' '.repeat(Math.max(1, width - 23)) + border('│'));
     for (const pass of parsedFromLog.passes.slice(0, 6)) {
       const icon = pass.status === 'pass' ? pc.green('✔') : pc.red('✖');
       let criterionName = pass.name;
@@ -1057,14 +1228,14 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
         const wLine = wrapped[i];
         const wPlain = stripAnsi(wLine);
         if (i === 0) {
-          lines.push(
+          bodyLines.push(
             border('│') +
               `  ${icon} ${wLine}` +
               ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
               border('│')
           );
         } else {
-          lines.push(
+          bodyLines.push(
             border('│') +
               `    ${pc.dim(wLine)}` +
               ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
@@ -1075,21 +1246,21 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
     }
 
     if (parsedFromLog.actions && parsedFromLog.actions.length > 0) {
-      lines.push(border('│') + ` ${pc.bold('Actions Taken:')}` + ' '.repeat(Math.max(1, width - 16)) + border('│'));
+      bodyLines.push(border('│') + ` ${pc.bold('Actions Taken:')}` + ' '.repeat(Math.max(1, width - 16)) + border('│'));
       for (const action of parsedFromLog.actions.slice(0, 4)) {
         const wrapped = wrapText(action, width - 8);
         for (let i = 0; i < wrapped.length; i++) {
           const wLine = wrapped[i];
           const wPlain = stripAnsi(wLine);
           if (i === 0) {
-            lines.push(
+            bodyLines.push(
               border('│') +
                 `  • ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
                 border('│')
             );
           } else {
-            lines.push(
+            bodyLines.push(
               border('│') +
                 `    ${wLine}` +
                 ' '.repeat(Math.max(1, width - 5 - wPlain.length)) +
@@ -1099,6 +1270,47 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
         }
       }
     }
+  } else if (options.routine === 'peer-review' && decision) {
+    let detail = '';
+    if (/merged/i.test(decision)) {
+      detail = 'PR approved and squash-merged into main.';
+    } else if (/bounce|draft/i.test(decision)) {
+      detail = 'PR converted to draft for author/autowork fixes.';
+    } else if (/defer|ci/i.test(decision)) {
+      detail = 'Clean review; awaiting in-progress remote CI checks before merge.';
+    } else if (/escalat/i.test(decision)) {
+      detail = 'Escalated to human review (needs-human).';
+    }
+
+    if (detail) {
+      const wrapped = wrapText(detail, width - 8);
+      for (let i = 0; i < wrapped.length; i++) {
+        const wLine = wrapped[i];
+        const wPlain = stripAnsi(wLine);
+        const icon = /merged/i.test(decision) ? pc.green('  ✔ ') : pc.yellow('  ⚠️  ');
+        const iconPlain = '  ✔ ';
+        if (i === 0) {
+          bodyLines.push(
+            border('│') +
+              `${icon}${wLine}` +
+              ' '.repeat(Math.max(1, width - 1 - iconPlain.length - wPlain.length)) +
+              border('│')
+          );
+        } else {
+          bodyLines.push(
+            border('│') +
+              `      ${wLine}` +
+              ' '.repeat(Math.max(1, width - 7 - wPlain.length)) +
+              border('│')
+          );
+        }
+      }
+    }
+  }
+
+  if (bodyLines.length > 0) {
+    lines.push(border(`├${horizontal}┤`));
+    lines.push(...bodyLines);
   }
 
   // Footer section with log link
