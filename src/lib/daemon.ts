@@ -40,6 +40,19 @@ const execFileAsync = promisify(execFile);
 export type BacklogIssue = BacklogIssueInfo;
 export type { BacklogTriageReport };
 
+export interface EvaluatedPRRecord {
+  headRefOid?: string;
+  evaluatedAt: string;
+  success: boolean;
+  outcome?: string;
+  ciState?: string;
+}
+
+export interface PRFailureRecord {
+  failedAt: number;
+  count: number;
+}
+
 export interface DaemonState {
   pid: number;
   startedAt: string;
@@ -52,6 +65,8 @@ export interface DaemonState {
   activeRoutine?: string;
   activeTarget?: string;
   activeWorktree?: string;
+  evaluatedPRs?: Record<number, EvaluatedPRRecord>;
+  failureCooldowns?: Record<number, PRFailureRecord>;
 }
 
 export interface DaemonOptions {
@@ -126,80 +141,27 @@ export function isDaemonRunning(repoRoot: string): boolean {
 export interface ReviewablePR {
   number: number;
   headRefName: string;
+  headRefOid?: string;
   title: string;
   statusCheckRollup?: Array<{
     status?: string;
     state?: string;
     conclusion?: string | null;
   }>;
-}
-
-/**
- * Checks if a pull request has CI checks that are currently running, queued, or pending.
- */
-export function isPRCiPending(pr: ReviewablePR): boolean {
-  if (!pr.statusCheckRollup || !Array.isArray(pr.statusCheckRollup) || pr.statusCheckRollup.length === 0) {
-    return false;
-  }
-  return pr.statusCheckRollup.some((check) => {
-    if (check.status && check.status !== 'COMPLETED') {
-      return true;
-    }
-    if (check.state && check.state === 'PENDING') {
-      return true;
-    }
-    return false;
-  });
-}
-
-export interface FilterReviewablePROptions {
-  allowPendingCi?: boolean;
-}
-
-/**
- * Filters a list of pull requests to include only reviewable PRs,
- * excluding automated release-please branches, release PR titles,
- * and PRs with active CI checks in progress (unless allowPendingCi is true).
- */
-export function filterReviewablePRs(
-  prs: ReviewablePR[],
-  options: FilterReviewablePROptions = {}
-): ReviewablePR[] {
-  return (prs || []).filter(
-    (pr) =>
-      pr &&
-      typeof pr.number === 'number' &&
-      !pr.headRefName?.startsWith('release-please--') &&
-      !pr.title?.startsWith('chore(main): release') &&
-      (options.allowPendingCi || !isPRCiPending(pr))
-  );
-}
-
-/**
- * Fast pre-flight check to query open ready PRs in ~100ms with 0 token cost,
- * excluding drafts, automated release-please branches, release PR titles,
- * and PRs with active CI checks still running.
- */
-export async function getOpenReviewablePRs(repoRoot: string): Promise<ReviewablePR[]> {
-  try {
-    const { stdout } = await execFileAsync(
-      'gh',
-      ['pr', 'list', '--state', 'open', '--draft=false', '--json', 'number,headRefName,title,statusCheckRollup'],
-      { cwd: repoRoot }
-    );
-    const prs = JSON.parse(stdout) as ReviewablePR[];
-    return filterReviewablePRs(prs);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Fast pre-flight check to query number of open ready PRs in ~100ms with 0 token cost.
- */
-export async function countOpenReadyPRs(repoRoot: string): Promise<number> {
-  const prs = await getOpenReviewablePRs(repoRoot);
-  return prs.length;
+  reviews?: Array<{
+    id?: string;
+    author?: { login: string };
+    state?: string;
+    commit?: { oid: string };
+    submittedAt?: string;
+    body?: string;
+  }>;
+  comments?: Array<{
+    id?: string;
+    author?: { login: string };
+    body?: string;
+    createdAt?: string;
+  }>;
 }
 
 /**
@@ -220,6 +182,270 @@ export function isBotLogin(login?: string | null): boolean {
     l === 'github-actions[bot]' ||
     l === 'jonah-fleet-bot'
   );
+}
+
+/**
+ * Checks if a pull request has CI checks that are currently running, queued, or pending.
+ */
+export function isPRCiPending(pr: ReviewablePR): boolean {
+  if (!pr.statusCheckRollup || !Array.isArray(pr.statusCheckRollup) || pr.statusCheckRollup.length === 0) {
+    return false;
+  }
+  return pr.statusCheckRollup.some((check) => {
+    if (check.status && check.status !== 'COMPLETED') {
+      return true;
+    }
+    if (check.state && check.state === 'PENDING') {
+      return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * Checks if all CI checks on a pull request have completed successfully (green).
+ */
+export function isPRCiGreen(pr: ReviewablePR): boolean {
+  if (!pr.statusCheckRollup || !Array.isArray(pr.statusCheckRollup) || pr.statusCheckRollup.length === 0) {
+    return false;
+  }
+  if (isPRCiPending(pr)) {
+    return false;
+  }
+  return pr.statusCheckRollup.every((check) => {
+    const conclusion = (check.conclusion || '').toUpperCase();
+    const state = (check.state || '').toUpperCase();
+    const status = (check.status || '').toUpperCase();
+    if (conclusion === 'SUCCESS' || conclusion === 'NEUTRAL' || conclusion === 'SKIPPED') {
+      return true;
+    }
+    if (state === 'SUCCESS') {
+      return true;
+    }
+    if (status === 'COMPLETED' && !conclusion) {
+      return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * Checks if any CI check on a pull request has explicitly failed or errored.
+ */
+export function isPRCiFailed(pr: ReviewablePR): boolean {
+  if (!pr.statusCheckRollup || !Array.isArray(pr.statusCheckRollup) || pr.statusCheckRollup.length === 0) {
+    return false;
+  }
+  return pr.statusCheckRollup.some((check) => {
+    const conclusion = (check.conclusion || '').toUpperCase();
+    const state = (check.state || '').toUpperCase();
+    return (
+      conclusion === 'FAILURE' ||
+      conclusion === 'TIMED_OUT' ||
+      conclusion === 'CANCELLED' ||
+      state === 'FAILURE' ||
+      state === 'ERROR'
+    );
+  });
+}
+
+export interface FilterReviewablePROptions {
+  allowPendingCi?: boolean;
+  evaluatedPRs?: Record<string | number, EvaluatedPRRecord> | Map<number, EvaluatedPRRecord>;
+  failureCooldowns?: Record<string | number, PRFailureRecord> | Map<number, PRFailureRecord>;
+  cooldownDurationMs?: number;
+}
+
+/**
+ * Determines whether a pull request has already been evaluated or reviewed
+ * on its current head commit, preventing wasteful re-review loops.
+ */
+export function isPRAlreadyEvaluated(
+  pr: ReviewablePR,
+  options: FilterReviewablePROptions = {}
+): boolean {
+  const headOid = pr.headRefOid;
+  const prNum = pr.number;
+
+  // 1. Check failure cooldown (from options or state)
+  const cooldowns = options.failureCooldowns;
+  if (cooldowns) {
+    const cooldown =
+      cooldowns instanceof Map
+        ? cooldowns.get(prNum)
+        : (cooldowns as any)[prNum] || (cooldowns as any)[String(prNum)];
+    const cooldownDurationMs = options.cooldownDurationMs ?? 15 * 60 * 1000;
+    if (cooldown && Date.now() - cooldown.failedAt < cooldownDurationMs) {
+      return true;
+    }
+  }
+
+  // 2. Check evaluatedPRs (from options or daemon state)
+  const evaluatedPRs = options.evaluatedPRs;
+  if (evaluatedPRs && headOid) {
+    const record: EvaluatedPRRecord | undefined =
+      evaluatedPRs instanceof Map
+        ? evaluatedPRs.get(prNum)
+        : (evaluatedPRs as any)[prNum] || (evaluatedPRs as any)[String(prNum)];
+    if (record && record.headRefOid === headOid) {
+      if (record.success) {
+        // If it was already evaluated successfully on this commit:
+        // Check if CI just turned green for an approved PR that was waiting for CI
+        const isGreen = isPRCiGreen(pr);
+        const wasGreen = record.ciState === 'green';
+        if (isGreen && !wasGreen && record.outcome !== 'merged') {
+          // Allow one sweep to perform the squash merge
+          return false;
+        }
+        return true;
+      }
+    }
+  }
+
+  // 3. Check GitHub bot reviews on the current head commit
+  if (headOid && pr.reviews && Array.isArray(pr.reviews)) {
+    const botReview = pr.reviews.find(
+      (r) => isBotLogin(r.author?.login) && r.commit?.oid === headOid
+    );
+    if (botReview) {
+      const body = botReview.body || '';
+      const state = (botReview.state || '').toUpperCase();
+
+      // Blocking findings / bounce to draft / changes requested / escalation: do not re-review unchanged commit
+      if (
+        state === 'CHANGES_REQUESTED' ||
+        /bounce.*draft/i.test(body) ||
+        /blocking findings/i.test(body) ||
+        /needs-human/i.test(body)
+      ) {
+        return true;
+      }
+
+      // If approved:
+      if (state === 'APPROVED' || /Approved for squash-merge/i.test(body)) {
+        if (isPRCiPending(pr) || isPRCiFailed(pr)) {
+          return true;
+        }
+        if (evaluatedPRs) {
+          const record =
+            evaluatedPRs instanceof Map
+              ? evaluatedPRs.get(prNum)
+              : (evaluatedPRs as any)[prNum] || (evaluatedPRs as any)[String(prNum)];
+          if (record && record.headRefOid === headOid && record.ciState === 'green') {
+            return true;
+          }
+        }
+      } else if (state === 'COMMENTED') {
+        if (/Decision:/i.test(body) || /Findings Summary/i.test(body) || /## Standards/i.test(body)) {
+          if (!isPRCiGreen(pr)) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  // 4. Check GitHub comments for bot review completion on the current PR
+  if (pr.comments && Array.isArray(pr.comments)) {
+    const botReviewComment = pr.comments.find(
+      (c) =>
+        isBotLogin(c.author?.login) &&
+        c.body &&
+        (/## Peer Review/i.test(c.body) ||
+          /## Standards/i.test(c.body) ||
+          /Decision:\s*\*\*BOUNCE/i.test(c.body) ||
+          /Decision:\s*BOUNCE/i.test(c.body) ||
+          /Code review completed: clean/i.test(c.body) ||
+          /Approved for [Ss]quash-[Mm]erge/i.test(c.body) ||
+          /🛑 Escalation:/i.test(c.body))
+    );
+    if (botReviewComment) {
+      const body = botReviewComment.body || '';
+      if (
+        /bounce.*draft/i.test(body) ||
+        /🛑 Escalation:/i.test(body) ||
+        isPRCiPending(pr) ||
+        isPRCiFailed(pr)
+      ) {
+        if (evaluatedPRs) {
+          const record =
+            evaluatedPRs instanceof Map
+              ? evaluatedPRs.get(prNum)
+              : (evaluatedPRs as any)[prNum] || (evaluatedPRs as any)[String(prNum)];
+          if (record && record.headRefOid === headOid) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Filters a list of pull requests to include only reviewable PRs,
+ * excluding automated release-please branches, release PR titles,
+ * PRs with active CI checks in progress (unless allowPendingCi is true),
+ * and PRs already evaluated or reviewed on the current head commit.
+ */
+export function filterReviewablePRs(
+  prs: ReviewablePR[],
+  options: FilterReviewablePROptions = {}
+): ReviewablePR[] {
+  return (prs || []).filter(
+    (pr) =>
+      pr &&
+      typeof pr.number === 'number' &&
+      !pr.headRefName?.startsWith('release-please--') &&
+      !pr.title?.startsWith('chore(main): release') &&
+      (options.allowPendingCi || !isPRCiPending(pr)) &&
+      !isPRAlreadyEvaluated(pr, options)
+  );
+}
+
+/**
+ * Fast pre-flight check to query open ready PRs in ~100ms with 0 token cost,
+ * excluding drafts, automated release-please branches, release PR titles,
+ * PRs with active CI checks still running, and already evaluated PRs.
+ */
+export async function getOpenReviewablePRs(
+  repoRoot: string,
+  options: FilterReviewablePROptions = {}
+): Promise<ReviewablePR[]> {
+  try {
+    const { stdout } = await execFileAsync(
+      'gh',
+      [
+        'pr',
+        'list',
+        '--state',
+        'open',
+        '--draft=false',
+        '--json',
+        'number,headRefName,headRefOid,title,statusCheckRollup,reviews,comments',
+      ],
+      { cwd: repoRoot }
+    );
+    const prs = JSON.parse(stdout) as ReviewablePR[];
+    const daemonState = options.evaluatedPRs ? null : readDaemonState(repoRoot);
+    const effectiveOptions: FilterReviewablePROptions = {
+      ...options,
+      evaluatedPRs: options.evaluatedPRs || daemonState?.evaluatedPRs,
+      failureCooldowns: options.failureCooldowns || daemonState?.failureCooldowns,
+    };
+    return filterReviewablePRs(prs, effectiveOptions);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fast pre-flight check to query number of open ready PRs in ~100ms with 0 token cost.
+ */
+export async function countOpenReadyPRs(repoRoot: string): Promise<number> {
+  const prs = await getOpenReviewablePRs(repoRoot);
+  return prs.length;
 }
 
 export interface BacklogPR {
@@ -657,11 +883,6 @@ export async function reconcileOrphanedLocalRuns(
   }
 }
 
-export interface PRFailureRecord {
-  failedAt: number;
-  count: number;
-}
-
 export interface DrainReviewQueueOptions {
   repoRoot: string;
   state?: DaemonState;
@@ -841,12 +1062,36 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
         console.log(formatPeerReviewOutcomeMessage(targetLabel, outcome, 'Local'));
         if (typeof prNum === 'number') {
           failureCooldowns?.delete(prNum);
+          if (state) {
+            if (!state.evaluatedPRs) state.evaluatedPRs = {};
+            state.evaluatedPRs[prNum] = {
+              headRefOid: currentPR.headRefOid,
+              evaluatedAt: new Date().toISOString(),
+              success: true,
+              outcome,
+              ciState: isPRCiGreen(currentPR) ? 'green' : isPRCiPending(currentPR) ? 'pending' : 'other',
+            };
+            if (state.failureCooldowns) {
+              delete state.failureCooldowns[prNum];
+            }
+          }
         }
       } else {
         console.warn(pc.yellow(`⚠️  Local peer-review on ${targetLabel} completed with code ${result.exitCode}.\n`));
         if (typeof prNum === 'number') {
           const prev = failureCooldowns?.get(prNum);
-          failureCooldowns?.set(prNum, { failedAt: Date.now(), count: (prev?.count || 0) + 1 });
+          const nextRecord = { failedAt: Date.now(), count: (prev?.count || 0) + 1 };
+          failureCooldowns?.set(prNum, nextRecord);
+          if (state) {
+            if (!state.failureCooldowns) state.failureCooldowns = {};
+            state.failureCooldowns[prNum] = nextRecord;
+            if (!state.evaluatedPRs) state.evaluatedPRs = {};
+            state.evaluatedPRs[prNum] = {
+              headRefOid: currentPR.headRefOid,
+              evaluatedAt: new Date().toISOString(),
+              success: false,
+            };
+          }
         }
       }
     } catch (err: any) {
@@ -864,7 +1109,18 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
         attemptedPRNumbers.add(currentPR.number);
         onAttempted?.(currentPR.number);
         const prev = failureCooldowns?.get(currentPR.number);
-        failureCooldowns?.set(currentPR.number, { failedAt: Date.now(), count: (prev?.count || 0) + 1 });
+        const nextRecord = { failedAt: Date.now(), count: (prev?.count || 0) + 1 };
+        failureCooldowns?.set(currentPR.number, nextRecord);
+        if (state) {
+          if (!state.failureCooldowns) state.failureCooldowns = {};
+          state.failureCooldowns[currentPR.number] = nextRecord;
+          if (!state.evaluatedPRs) state.evaluatedPRs = {};
+          state.evaluatedPRs[currentPR.number] = {
+            headRefOid: currentPR.headRefOid,
+            evaluatedAt: new Date().toISOString(),
+            success: false,
+          };
+        }
       }
     } finally {
       if (state) {
@@ -1096,6 +1352,11 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
   const autoworkIntervalMs = autoworkInterval * 60 * 1000;
 
   const failureCooldowns = new Map<number, PRFailureRecord>();
+  if (state?.failureCooldowns) {
+    for (const [key, val] of Object.entries(state.failureCooldowns)) {
+      failureCooldowns.set(parseInt(key, 10), val);
+    }
+  }
   const quotaCooldownMs = (options.quotaCooldownMinutes ?? 15) * 60 * 1000;
   let quotaCooldownUntil: number | undefined;
 

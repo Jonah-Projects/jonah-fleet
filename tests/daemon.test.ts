@@ -191,6 +191,84 @@ describe('Local Agent Daemon Manager', () => {
     expect(all.map((p) => p.number)).toEqual([1, 2, 3, 4, 5]);
   });
 
+  it('filters out PRs that have already been evaluated on the same headRefOid, and re-enables them when a new commit is pushed', () => {
+    const prs = [
+      {
+        number: 4906,
+        headRefName: 'feat/auto-follow',
+        headRefOid: 'commit-sha-1',
+        title: 'feat: auto follow',
+      },
+      {
+        number: 4910,
+        headRefName: 'feat/standings',
+        headRefOid: 'commit-sha-2',
+        title: 'feat: multi standings',
+      },
+    ];
+
+    const evaluatedPRs = {
+      4906: {
+        headRefOid: 'commit-sha-1',
+        evaluatedAt: new Date().toISOString(),
+        success: true,
+      },
+    };
+
+    // PR 4906 was evaluated at commit-sha-1, so it should be filtered out
+    const filtered = filterReviewablePRs(prs, { evaluatedPRs });
+    expect(filtered.map((p) => p.number)).toEqual([4910]);
+
+    // When PR 4906 pushes a new commit (headRefOid changes), it becomes reviewable again
+    const prsWithNewCommit = [
+      {
+        number: 4906,
+        headRefName: 'feat/auto-follow',
+        headRefOid: 'commit-sha-1-updated',
+        title: 'feat: auto follow',
+      },
+      prs[1],
+    ];
+    const filteredAfterCommit = filterReviewablePRs(prsWithNewCommit, { evaluatedPRs });
+    expect(filteredAfterCommit.map((p) => p.number)).toEqual([4906, 4910]);
+  });
+
+  it('filters out PRs that have existing bot reviews on the current headRefOid with blocking findings or bounce to draft', () => {
+    const prWithBotReview = {
+      number: 599,
+      headRefName: 'fix/radar-gate',
+      headRefOid: 'head-sha-599',
+      title: 'fix: radar preflight gate',
+      reviews: [
+        {
+          author: { login: 'jonah-fleet-bot' },
+          state: 'COMMENTED',
+          commit: { oid: 'head-sha-599' },
+          body: '## Peer Review (Round 1) · Findings Summary\n\n- **Decision**: **BOUNCE TO DRAFT**',
+        },
+      ],
+    };
+
+    const prUnreviewed = {
+      number: 601,
+      headRefName: 'feat/new-feature',
+      headRefOid: 'head-sha-601',
+      title: 'feat: unreviewed feature',
+      reviews: [],
+    };
+
+    const filtered = filterReviewablePRs([prWithBotReview, prUnreviewed]);
+    expect(filtered.map((p) => p.number)).toEqual([601]);
+
+    // When PR 599 pushes a new commit, it becomes reviewable again even with the old review present
+    const prWithNewCommit = {
+      ...prWithBotReview,
+      headRefOid: 'head-sha-599-v2',
+    };
+    const filteredNew = filterReviewablePRs([prWithNewCommit, prUnreviewed]);
+    expect(filteredNew.map((p) => p.number)).toEqual([599, 601]);
+  });
+
   describe('drainReviewQueue', () => {
     it('does not invoke peer-review routine when 0 reviewable PRs exist', async () => {
       let runRoutineCalled = false;
@@ -394,6 +472,39 @@ describe('Local Agent Daemon Manager', () => {
 
       // Should execute exactly once and not loop infinitely because attemptedPRNumbers tracks #401
       expect(runCount).toBe(1);
+    });
+
+    it('records evaluated PR in state.evaluatedPRs upon routine completion', async () => {
+      const prs = [
+        {
+          number: 501,
+          headRefName: 'feat/pr-501',
+          headRefOid: 'sha-501',
+          title: 'feat: new pr 501',
+        },
+      ];
+
+      const daemonState: any = {
+        pid: 1234,
+        status: 'idle',
+        routines: ['peer-review'],
+      };
+
+      await drainReviewQueue({
+        repoRoot: tmpRepo,
+        state: daemonState,
+        getPRs: async () => prs,
+        runRoutine: async (opts) => {
+          opts.onTargetDetected?.('PR #501');
+          return { success: true, outcome: 'approved' };
+        },
+      });
+
+      expect(daemonState.evaluatedPRs).toBeDefined();
+      expect(daemonState.evaluatedPRs[501]).toBeDefined();
+      expect(daemonState.evaluatedPRs[501].headRefOid).toBe('sha-501');
+      expect(daemonState.evaluatedPRs[501].success).toBe(true);
+      expect(daemonState.evaluatedPRs[501].outcome).toBe('approved');
     });
   });
 
