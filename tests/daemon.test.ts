@@ -12,6 +12,9 @@ import {
   filterReviewablePRs,
   isPRCiPending,
   isPRApproved,
+  isPRCiGreen,
+  isPRAlreadyEvaluated,
+  initializeDaemonState,
   drainReviewQueue,
   reconcileOrphanedLocalRuns,
   performAutoworkScan,
@@ -96,6 +99,126 @@ describe('Local Agent Daemon Manager', () => {
     writeDaemonState(tmpRepo, state);
     clearDaemonState(tmpRepo);
     expect(readDaemonState(tmpRepo)).toBeNull();
+  });
+
+  it('hydrates evaluatedPRs and failureCooldowns from existing daemon.json on startup via initializeDaemonState', () => {
+    const existingState: DaemonState = {
+      pid: 1234,
+      startedAt: '2026-10-02T10:00:00.000Z',
+      reviewIntervalMinutes: 3,
+      autoworkIntervalMinutes: 30,
+      routines: ['peer-review'],
+      status: 'idle',
+      evaluatedPRs: {
+        501: {
+          headRefOid: 'sha-501',
+          evaluatedAt: '2026-10-02T10:05:00.000Z',
+          success: true,
+          outcome: 'approved',
+          ciState: 'pending',
+        },
+      },
+      failureCooldowns: {
+        502: {
+          failedAt: 1727860000000,
+          count: 2,
+        },
+      },
+    };
+    writeDaemonState(tmpRepo, existingState);
+
+    const { state, failureCooldowns } = initializeDaemonState(tmpRepo, {
+      reviewInterval: 5,
+      autoworkInterval: 45,
+    });
+
+    expect(state.evaluatedPRs).toEqual(existingState.evaluatedPRs);
+    expect(state.failureCooldowns).toEqual(existingState.failureCooldowns);
+    expect(failureCooldowns.get(502)).toEqual({ failedAt: 1727860000000, count: 2 });
+
+    // Disk read-back verification: persisted state on disk must retain hydrated fields
+    const persisted = readDaemonState(tmpRepo);
+    expect(persisted?.evaluatedPRs).toEqual(existingState.evaluatedPRs);
+    expect(persisted?.failureCooldowns).toEqual(existingState.failureCooldowns);
+  });
+
+  it('correctly evaluates isPRCiGreen and rejects completed checks with missing/empty conclusion', () => {
+    // Empty conclusion on COMPLETED status is a bogus green defect and must return false
+    const prWithEmptyConclusion = {
+      number: 1,
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: null }],
+    } as any;
+    expect(isPRCiGreen(prWithEmptyConclusion)).toBe(false);
+
+    const prWithUndefinedConclusion = {
+      number: 2,
+      statusCheckRollup: [{ status: 'COMPLETED' }],
+    } as any;
+    expect(isPRCiGreen(prWithUndefinedConclusion)).toBe(false);
+
+    // Explicit positive completions must return true
+    const prSuccess = {
+      number: 3,
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    } as any;
+    expect(isPRCiGreen(prSuccess)).toBe(true);
+
+    const prNeutral = {
+      number: 4,
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'NEUTRAL' }],
+    } as any;
+    expect(isPRCiGreen(prNeutral)).toBe(true);
+
+    const prSkipped = {
+      number: 5,
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'SKIPPED' }],
+    } as any;
+    expect(isPRCiGreen(prSkipped)).toBe(true);
+  });
+
+  it('allows CI green transition only for approved PRs and excludes bounced PRs on the same commit', () => {
+    const headOid = 'sha-eval-1';
+    const greenPR = {
+      number: 100,
+      headRefOid: headOid,
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    } as any;
+
+    // Case 1: Approved PR waiting for CI - when CI turns green, isPRAlreadyEvaluated is false (allow 1 sweep)
+    const approvedWaitingForCi = {
+      100: {
+        headRefOid: headOid,
+        evaluatedAt: new Date().toISOString(),
+        success: true,
+        outcome: 'approved' as const,
+        ciState: 'pending' as const,
+      },
+    };
+    expect(isPRAlreadyEvaluated(greenPR, { evaluatedPRs: approvedWaitingForCi })).toBe(false);
+
+    // Case 2: Approved PR that was already evaluated after CI was green - stays evaluated (prevent infinite sweeps)
+    const approvedAlreadyGreen = {
+      100: {
+        headRefOid: headOid,
+        evaluatedAt: new Date().toISOString(),
+        success: true,
+        outcome: 'approved' as const,
+        ciState: 'green' as const,
+      },
+    };
+    expect(isPRAlreadyEvaluated(greenPR, { evaluatedPRs: approvedAlreadyGreen })).toBe(true);
+
+    // Case 3: Bounced PR waiting for author fixes - turning CI green must NOT re-trigger review on same commit
+    const bouncedPRWaitingForFixes = {
+      100: {
+        headRefOid: headOid,
+        evaluatedAt: new Date().toISOString(),
+        success: true,
+        outcome: 'bounced' as const,
+        ciState: 'pending' as const,
+      },
+    };
+    expect(isPRAlreadyEvaluated(greenPR, { evaluatedPRs: bouncedPRWaitingForFixes })).toBe(true);
   });
 
   it('safely handles PR count query on non-git or error directories', async () => {

@@ -40,12 +40,24 @@ const execFileAsync = promisify(execFile);
 export type BacklogIssue = BacklogIssueInfo;
 export type { BacklogTriageReport };
 
+export type EvaluatedPROutcome =
+  | 'approved'
+  | 'approved_pending_ci'
+  | 'bounced'
+  | 'bounced_to_draft'
+  | 'merged'
+  | 'rejected'
+  | 'failed'
+  | string;
+
+export type EvaluatedPRCiState = 'green' | 'pending' | 'other';
+
 export interface EvaluatedPRRecord {
   headRefOid?: string;
   evaluatedAt: string;
   success: boolean;
-  outcome?: string;
-  ciState?: string;
+  outcome?: EvaluatedPROutcome;
+  ciState?: EvaluatedPRCiState;
 }
 
 export interface PRFailureRecord {
@@ -216,14 +228,10 @@ export function isPRCiGreen(pr: ReviewablePR): boolean {
   return pr.statusCheckRollup.every((check) => {
     const conclusion = (check.conclusion || '').toUpperCase();
     const state = (check.state || '').toUpperCase();
-    const status = (check.status || '').toUpperCase();
     if (conclusion === 'SUCCESS' || conclusion === 'NEUTRAL' || conclusion === 'SKIPPED') {
       return true;
     }
     if (state === 'SUCCESS') {
-      return true;
-    }
-    if (status === 'COMPLETED' && !conclusion) {
       return true;
     }
     return false;
@@ -270,6 +278,18 @@ export function isPRApproved(pr: ReviewablePR): boolean {
   return false;
 }
 
+/**
+ * Helper to safely extract a record by numeric key from Record or Map without casting.
+ */
+function getRecord<T>(
+  record: Record<string | number, T> | Map<number, T> | undefined,
+  key: number
+): T | undefined {
+  if (!record) return undefined;
+  if (record instanceof Map) return record.get(key);
+  return record[key] ?? record[String(key)];
+}
+
 export interface FilterReviewablePROptions {
   allowPendingCi?: boolean;
   evaluatedPRs?: Record<string | number, EvaluatedPRRecord> | Map<number, EvaluatedPRRecord>;
@@ -289,14 +309,10 @@ export function isPRAlreadyEvaluated(
   const prNum = pr.number;
 
   // 1. Check failure cooldown (from options or state)
-  const cooldowns = options.failureCooldowns;
-  if (cooldowns) {
-    const cooldown =
-      cooldowns instanceof Map
-        ? cooldowns.get(prNum)
-        : (cooldowns as any)[prNum] || (cooldowns as any)[String(prNum)];
+  const cooldown = getRecord(options.failureCooldowns, prNum);
+  if (cooldown) {
     const cooldownDurationMs = options.cooldownDurationMs ?? 15 * 60 * 1000;
-    if (cooldown && Date.now() - cooldown.failedAt < cooldownDurationMs) {
+    if (Date.now() - cooldown.failedAt < cooldownDurationMs) {
       return true;
     }
   }
@@ -304,17 +320,18 @@ export function isPRAlreadyEvaluated(
   // 2. Check evaluatedPRs (from options or daemon state)
   const evaluatedPRs = options.evaluatedPRs;
   if (evaluatedPRs && headOid) {
-    const record: EvaluatedPRRecord | undefined =
-      evaluatedPRs instanceof Map
-        ? evaluatedPRs.get(prNum)
-        : (evaluatedPRs as any)[prNum] || (evaluatedPRs as any)[String(prNum)];
+    const record = getRecord(evaluatedPRs, prNum);
     if (record && record.headRefOid === headOid) {
       if (record.success) {
         // If it was already evaluated successfully on this commit:
         // Check if CI just turned green for an approved PR that was waiting for CI
         const isGreen = isPRCiGreen(pr);
         const wasGreen = record.ciState === 'green';
-        if (isGreen && !wasGreen && record.outcome !== 'merged') {
+        if (
+          isGreen &&
+          !wasGreen &&
+          (record.outcome === 'approved' || record.outcome === 'approved_pending_ci')
+        ) {
           // Allow one sweep to perform the squash merge
           return false;
         }
@@ -348,10 +365,7 @@ export function isPRAlreadyEvaluated(
           return true;
         }
         if (evaluatedPRs) {
-          const record =
-            evaluatedPRs instanceof Map
-              ? evaluatedPRs.get(prNum)
-              : (evaluatedPRs as any)[prNum] || (evaluatedPRs as any)[String(prNum)];
+          const record = getRecord(evaluatedPRs, prNum);
           if (record && record.headRefOid === headOid && record.ciState === 'green') {
             return true;
           }
@@ -359,41 +373,6 @@ export function isPRAlreadyEvaluated(
       } else if (state === 'COMMENTED') {
         if (/Decision:/i.test(body) || /Findings Summary/i.test(body) || /## Standards/i.test(body)) {
           if (!isPRCiGreen(pr)) {
-            return true;
-          }
-        }
-      }
-    }
-  }
-
-  // 4. Check GitHub comments for bot review completion on the current PR
-  if (pr.comments && Array.isArray(pr.comments)) {
-    const botReviewComment = pr.comments.find(
-      (c) =>
-        isBotLogin(c.author?.login) &&
-        c.body &&
-        (/## Peer Review/i.test(c.body) ||
-          /## Standards/i.test(c.body) ||
-          /Decision:\s*\*\*BOUNCE/i.test(c.body) ||
-          /Decision:\s*BOUNCE/i.test(c.body) ||
-          /Code review completed: clean/i.test(c.body) ||
-          /Approved for [Ss]quash-[Mm]erge/i.test(c.body) ||
-          /🛑 Escalation:/i.test(c.body))
-    );
-    if (botReviewComment) {
-      const body = botReviewComment.body || '';
-      if (
-        /bounce.*draft/i.test(body) ||
-        /🛑 Escalation:/i.test(body) ||
-        isPRCiPending(pr) ||
-        isPRCiFailed(pr)
-      ) {
-        if (evaluatedPRs) {
-          const record =
-            evaluatedPRs instanceof Map
-              ? evaluatedPRs.get(prNum)
-              : (evaluatedPRs as any)[prNum] || (evaluatedPRs as any)[String(prNum)];
-          if (record && record.headRefOid === headOid) {
             return true;
           }
         }
@@ -444,7 +423,7 @@ export async function getOpenReviewablePRs(
         'open',
         '--draft=false',
         '--json',
-        'number,headRefName,headRefOid,title,statusCheckRollup,reviews,comments',
+        'number,headRefName,headRefOid,title,statusCheckRollup,reviews',
       ],
       { cwd: repoRoot }
     );
@@ -926,6 +905,31 @@ export interface DrainReviewQueueOptions {
 }
 
 /**
+ * Records a PR failure in cooldown tracking and daemon state.
+ */
+function recordPRFailure(
+  prNum: number,
+  headRefOid: string | undefined,
+  failureCooldowns?: Map<number, PRFailureRecord>,
+  state?: DaemonState
+): void {
+  const prev = failureCooldowns?.get(prNum);
+  const nextRecord = { failedAt: Date.now(), count: (prev?.count || 0) + 1 };
+  failureCooldowns?.set(prNum, nextRecord);
+  if (state) {
+    if (!state.failureCooldowns) state.failureCooldowns = {};
+    state.failureCooldowns[prNum] = nextRecord;
+    if (!state.evaluatedPRs) state.evaluatedPRs = {};
+    state.evaluatedPRs[prNum] = {
+      headRefOid,
+      evaluatedAt: new Date().toISOString(),
+      success: false,
+      outcome: 'failed',
+    };
+  }
+}
+
+/**
  * Sequentially drains all open reviewable PRs by executing peer-review in isolated worktrees.
  * Tracks attempted PRs per pass to prevent infinite loops on stalled or repeatedly unmerged PRs.
  */
@@ -1102,19 +1106,7 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
       } else {
         console.warn(pc.yellow(`⚠️  Local peer-review on ${targetLabel} completed with code ${result.exitCode}.\n`));
         if (typeof prNum === 'number') {
-          const prev = failureCooldowns?.get(prNum);
-          const nextRecord = { failedAt: Date.now(), count: (prev?.count || 0) + 1 };
-          failureCooldowns?.set(prNum, nextRecord);
-          if (state) {
-            if (!state.failureCooldowns) state.failureCooldowns = {};
-            state.failureCooldowns[prNum] = nextRecord;
-            if (!state.evaluatedPRs) state.evaluatedPRs = {};
-            state.evaluatedPRs[prNum] = {
-              headRefOid: currentPR.headRefOid,
-              evaluatedAt: new Date().toISOString(),
-              success: false,
-            };
-          }
+          recordPRFailure(prNum, currentPR.headRefOid, failureCooldowns, state);
         }
       }
     } catch (err: any) {
@@ -1131,19 +1123,7 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
       if (currentPR) {
         attemptedPRNumbers.add(currentPR.number);
         onAttempted?.(currentPR.number);
-        const prev = failureCooldowns?.get(currentPR.number);
-        const nextRecord = { failedAt: Date.now(), count: (prev?.count || 0) + 1 };
-        failureCooldowns?.set(currentPR.number, nextRecord);
-        if (state) {
-          if (!state.failureCooldowns) state.failureCooldowns = {};
-          state.failureCooldowns[currentPR.number] = nextRecord;
-          if (!state.evaluatedPRs) state.evaluatedPRs = {};
-          state.evaluatedPRs[currentPR.number] = {
-            headRefOid: currentPR.headRefOid,
-            evaluatedAt: new Date().toISOString(),
-            success: false,
-          };
-        }
+        recordPRFailure(currentPR.number, currentPR.headRefOid, failureCooldowns, state);
       }
     } finally {
       if (state) {
@@ -1327,13 +1307,17 @@ export async function performAutoworkScan(
 }
 
 /**
- * Runs the multi-cadence polling daemon loop in the current process with interactive controls.
+ * Initializes and persists daemon state, and populates in-memory failure cooldowns.
  */
-export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {}): Promise<void> {
+export function initializeDaemonState(
+  repoRoot: string,
+  options: DaemonOptions = {}
+): { state: DaemonState; failureCooldowns: Map<number, PRFailureRecord> } {
   const reviewInterval = options.reviewInterval || 3;
   const autoworkInterval = options.autoworkInterval || options.interval || 30;
   const routines = options.routines || ['peer-review', 'autowork'];
 
+  const existingState = readDaemonState(repoRoot);
   const state: DaemonState = {
     pid: process.pid,
     startedAt: new Date().toISOString(),
@@ -1341,8 +1325,30 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
     autoworkIntervalMinutes: autoworkInterval,
     routines,
     status: 'idle',
+    evaluatedPRs: existingState?.evaluatedPRs,
+    failureCooldowns: existingState?.failureCooldowns,
   };
   writeDaemonState(repoRoot, state);
+
+  const failureCooldowns = new Map<number, PRFailureRecord>();
+  if (state.failureCooldowns) {
+    for (const [key, val] of Object.entries(state.failureCooldowns)) {
+      failureCooldowns.set(parseInt(key, 10), val);
+    }
+  }
+
+  return { state, failureCooldowns };
+}
+
+/**
+ * Runs the multi-cadence polling daemon loop in the current process with interactive controls.
+ */
+export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {}): Promise<void> {
+  const reviewInterval = options.reviewInterval || 3;
+  const autoworkInterval = options.autoworkInterval || options.interval || 30;
+  const routines = options.routines || ['peer-review', 'autowork'];
+
+  const { state, failureCooldowns } = initializeDaemonState(repoRoot, options);
 
   console.log(
     renderFleetBanner({
@@ -1374,12 +1380,6 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
   const reviewIntervalMs = reviewInterval * 60 * 1000;
   const autoworkIntervalMs = autoworkInterval * 60 * 1000;
 
-  const failureCooldowns = new Map<number, PRFailureRecord>();
-  if (state?.failureCooldowns) {
-    for (const [key, val] of Object.entries(state.failureCooldowns)) {
-      failureCooldowns.set(parseInt(key, 10), val);
-    }
-  }
   const quotaCooldownMs = (options.quotaCooldownMinutes ?? 15) * 60 * 1000;
   let quotaCooldownUntil: number | undefined;
 
