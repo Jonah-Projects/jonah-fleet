@@ -27,6 +27,7 @@ import { renderFleetBanner } from './brand.js';
 import {
   renderBacklogDiagnosticCard,
   isRoutineRunTitle,
+  isRadarDigestTitle,
   formatTargetLabel,
   detectPeerReviewOutcome,
   formatPeerReviewOutcomeMessage,
@@ -322,8 +323,14 @@ export function classifyBacklogIssues(
       continue;
     }
 
-    // 2. Gated by human (needs-human on issue OR on associated draft PR)
-    if (labelNames.includes('needs-human') || gatedDraftPRReferencedIssues.has(issue.number)) {
+    // 2. Gated by human (needs-human, needs-attention, radar/intel digest on issue OR on associated draft PR)
+    if (
+      labelNames.includes('needs-human') ||
+      labelNames.includes('needs-attention') ||
+      labelNames.includes('radar') ||
+      isRadarDigestTitle(issue.title) ||
+      gatedDraftPRReferencedIssues.has(issue.number)
+    ) {
       gatedHuman.push(issue);
       continue;
     }
