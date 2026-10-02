@@ -33,12 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **runner,daemon:** add startup transient 503 retry and exempt from PR failure cooldown ([#575](https://github.com/Jonah-Projects/jonah-fleet/issues/575)) ([c6f37eb](https://github.com/Jonah-Projects/jonah-fleet/commit/c6f37ebd4bc7072f267c77c42eba255aa71b2d78))
 
-## [Unreleased] - 2026-10-02
-
-### Bug Fixes
-
-* **daemon,terminal-card:** classify upstream ecosystem radar digests and `needs-attention` issues as human/maintainer-gated in backlog preflight triage, preventing repetitive autowork scan looping on informational digests
-
 ## [1.31.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.31.0...v1.31.1) (2026-10-01)
 
 
