@@ -129,7 +129,7 @@ Check if `$PR_NUMBER` is set:
   gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🧭 Milestone: Intake & Review Scope
 - **Phase**: \`Phase 1 · Review Target & Scope\`
 - **Status**: ⏳ In Progress
-- **Target / Context**: \`PR #<PR_NUMBER> (Round N)\`
+- **Target / Context**: PR #<PR_NUMBER> (Round N)
 - **Prior Failure Context**: <summary of past review failure/crash and verification focus, or None>
 - **Key Decision / Finding**: Claimed review window; starting multi-angle evaluation passes.
 - **Next**: Multi-Angle Code Review Pass" || true
@@ -277,7 +277,7 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
   gh issue comment "$ROUTINE_ISSUE_NUMBER" --body "### 🏁 Milestone: Run Completed
 - **Phase**: \`Phase 4 · Reconciliation\`
 - **Status**: ✅ SUCCESS
-- **Target / Context**: \`PR #<PR_NUMBER>\`
+- **Target / Context**: PR #<PR_NUMBER>
 - **Key Decision / Finding**: Review completed with decision \`<MERGE | BOUNCE | ESCALATE | DEFER_CI>\`.
 - **Next**: Routine finished; issue closed by harness" || true
   ```

@@ -351,16 +351,27 @@ export function tryCreateLocalRunIssue(
   hostname: string
 ): number | undefined {
   try {
-    const title = `[${routine}] run ${timestamp} (local)`;
-    const body = `### Autonomous Routine Execution in Progress (runner:local)\n- **Routine**: \`${routine}\`\n- **Timestamp**: \`${timestamp}\`\n- **Target**: \`${targetLabel}\`\n- **Host**: \`${hostname}\`\n\n_Running via Jonah Fleet CLI runner._`;
+    const title = targetLabel && targetLabel !== routine
+      ? `[${routine}] run ${timestamp} (${targetLabel})`
+      : `[${routine}] run ${timestamp} (local)`;
+    const formattedTarget = targetLabel.includes('#') ? targetLabel : `\`${targetLabel}\``;
+    const body = `### Autonomous Routine Execution in Progress (runner:local)\n- **Routine**: \`${routine}\`\n- **Timestamp**: \`${timestamp}\`\n- **Target**: ${formattedTarget}\n- **Host**: \`${hostname}\`\n\n_Running via Jonah Fleet CLI runner._`;
     const labels = `routine-log,routine:${routine},status:running,runner:local`;
-    const out = execSync(`gh issue create --title ${JSON.stringify(title)} --body ${JSON.stringify(body)} --label ${JSON.stringify(labels)}`, {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-    const match = out.match(/(\d+)$/);
-    return match ? parseInt(match[1], 10) : undefined;
+    const tmpFile = path.join(os.tmpdir(), `jonah-fleet-run-issue-${Date.now()}.md`);
+    fs.writeFileSync(tmpFile, body, 'utf8');
+    try {
+      const out = execSync(`gh issue create --title ${JSON.stringify(title)} --body-file ${JSON.stringify(tmpFile)} --label ${JSON.stringify(labels)}`, {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      const match = out.match(/(\d+)$/);
+      return match ? parseInt(match[1], 10) : undefined;
+    } finally {
+      if (fs.existsSync(tmpFile)) {
+        fs.unlinkSync(tmpFile);
+      }
+    }
   } catch {
     return undefined;
   }
@@ -385,7 +396,7 @@ export function formatMilestoneCard(options: MilestoneCardOptions): string {
     `### ${emoji} Milestone: ${options.milestoneTitle}`,
     `- **Phase**: \`${options.phase}\``,
     `- **Status**: ${options.status}`,
-    `- **Target / Context**: \`${options.targetOrContext}\``,
+    `- **Target / Context**: ${options.targetOrContext}`,
     `- **Key Decision / Finding**: ${options.keyDecisionOrFinding}`,
     `- **Next**: ${options.next}`,
   ].join('\n');

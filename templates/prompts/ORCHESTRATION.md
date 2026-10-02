@@ -137,7 +137,7 @@ How live execution progress is reported during autonomous routine runs:
    ### <Emoji> Milestone: <Milestone Name>
    - **Phase**: `<Phase Identifier>`
    - **Status**: <Status Emoji + Summary>
-   - **Target / Context**: `<Target Issue/PR or Context>`
+   - **Target / Context**: <Target Issue/PR or Context>
    - **Key Decision / Finding**: <Summary of key decision, root cause, or verification outcome>
    - **Next**: <Next planned milestone>
    ```
