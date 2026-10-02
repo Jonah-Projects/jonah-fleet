@@ -63,5 +63,5 @@ jobs:
         run: |
           gh issue create \
             --title "$ISSUE_TITLE" \
-            --label "enhancement" \
+            --label "enhancement,needs-attention" \
             --body-file "radar-report.md"

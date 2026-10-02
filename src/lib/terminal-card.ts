@@ -186,6 +186,16 @@ export function isRoutineRunTitle(title: string): boolean {
 }
 
 /**
+ * Returns true if a title represents an upstream ecosystem radar or intel digest issue.
+ */
+export function isRadarDigestTitle(title: string): boolean {
+  return (
+    /^(?:📡\s*)?(?:Upstream\s+)?Ecosystem\s+Radar:\s+Intel\s+Digest\b/i.test(title.trim()) ||
+    /\b(upstream ecosystem radar|intel digest)\b/i.test(title.trim())
+  );
+}
+
+/**
  * Strips temporary worktree roots and converts absolute worktree paths to clean relative paths.
  */
 export function sanitizeWorktreePaths(text: string): string {
@@ -1581,7 +1591,7 @@ export function renderBacklogDiagnosticCard(
     title: string,
     colorFn: (s: string) => string,
     items: BacklogIssueInfo[],
-    reasonLabel: string
+    reasonLabel: string | ((item: BacklogIssueInfo) => string)
   ) => {
     if (!items || items.length === 0) return;
     const sectionHeader = ` ${colorFn(pc.bold(title))}`;
@@ -1594,7 +1604,8 @@ export function renderBacklogDiagnosticCard(
 
     for (const item of items) {
       const itemTitle = cleanTargetTitle(item.title, width - 36);
-      const text = `• #${item.number}: ${itemTitle} (${reasonLabel})`;
+      const labelStr = typeof reasonLabel === 'function' ? reasonLabel(item) : reasonLabel;
+      const text = `• #${item.number}: ${itemTitle} (${labelStr})`;
       const wrapped = wrapText(text, width - 8);
       for (let i = 0; i < wrapped.length; i++) {
         const wLine = wrapped[i];
@@ -1610,7 +1621,19 @@ export function renderBacklogDiagnosticCard(
   };
 
   if (report.gatedHuman && report.gatedHuman.length > 0) {
-    renderSection('Gated by Human Decision (needs-human):', pc.red, report.gatedHuman, 'Gated: needs-human');
+    renderSection(
+      'Gated by Human Decision (needs-human / needs-attention / radar):',
+      pc.red,
+      report.gatedHuman,
+      (item) => {
+        const labels = (item.labels || []).map((l) =>
+          (typeof l === 'string' ? l : l.name).toLowerCase()
+        );
+        if (isRadarDigestTitle(item.title) || labels.includes('radar')) return 'Radar: intel digest';
+        if (labels.includes('needs-attention')) return 'Gated: needs-attention';
+        return 'Gated: needs-human';
+      }
+    );
   }
 
   if (report.awaitingInfo && report.awaitingInfo.length > 0) {

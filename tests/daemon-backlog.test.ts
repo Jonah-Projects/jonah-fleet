@@ -221,6 +221,44 @@ describe('Daemon Autowork Backlog Preflight & Classification', () => {
       expect(report.actionable).toHaveLength(0);
     });
 
+    it('classifies upstream ecosystem radar and intel digest issues as gatedHuman', () => {
+      const issues: BacklogIssue[] = [
+        {
+          number: 501,
+          title: '📡 Upstream Ecosystem Radar: Intel Digest (2026-09-28)',
+          labels: [{ name: 'enhancement' }],
+          assignees: [],
+        },
+        {
+          number: 502,
+          title: 'Upstream Ecosystem Radar: Intel Digest (2026-10-05)',
+          labels: [{ name: 'radar' }],
+          assignees: [],
+        },
+      ];
+
+      const report = classifyBacklogIssues(issues);
+      expect(report.gatedHuman).toHaveLength(2);
+      expect(report.gatedHuman.map((i) => i.number)).toEqual([501, 502]);
+      expect(report.actionable).toHaveLength(0);
+    });
+
+    it('classifies issues with needs-attention as gatedHuman', () => {
+      const issues: BacklogIssue[] = [
+        {
+          number: 503,
+          title: 'chore: unexpected triage required',
+          labels: [{ name: 'needs-attention' }],
+          assignees: [],
+        },
+      ];
+
+      const report = classifyBacklogIssues(issues);
+      expect(report.gatedHuman).toHaveLength(1);
+      expect(report.gatedHuman[0].number).toBe(503);
+      expect(report.actionable).toHaveLength(0);
+    });
+
     it('classifies issues with needs-info or needs-design as awaitingInfo', () => {
       const issues: BacklogIssue[] = [
         {
