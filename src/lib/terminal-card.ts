@@ -9,6 +9,7 @@ import {
   formatQuotaStatusBadge,
   formatTokenBreakdown,
   formatPlanQuotaSummary,
+  formatIoRatio,
   type RunUsageMetrics,
   type ActualPlanQuota,
 } from './telemetry.js';
@@ -1397,7 +1398,7 @@ function renderTokenQuotaSection(options: {
     const outTok = options.usage?.outputTokens;
     let ioStr = '';
     if (typeof inTok === 'number' && typeof outTok === 'number' && outTok > 0) {
-      ioStr = ` · I/O: ${(inTok / outTok).toFixed(0)}:1`;
+      ioStr = ` · I/O: ${formatIoRatio(inTok, outTok)}`;
     }
 
     const tokenLine1 = ` Tokens: ${pc.bold(total!.toLocaleString())}${breakdown ? pc.dim(` (${breakdown})`) : ''}${ioStr ? pc.cyan(ioStr) : ''}`;
