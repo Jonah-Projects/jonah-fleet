@@ -36,7 +36,9 @@ import {
   calculateTokenQuotaPercentages,
   getRollingWindowTokenUsage,
   formatTokenBreakdown,
+  getActualPlanQuotaSync,
   type RunUsageMetrics,
+  type ActualPlanQuota,
 } from './telemetry.js';
 
 export interface RunLocalRoutineOptions {
@@ -72,6 +74,7 @@ export interface RunLocalRoutineResult {
   durationMs?: number;
   outcome?: PeerReviewOutcome;
   usage?: RunUsageMetrics;
+  planQuota?: ActualPlanQuota;
 }
 
 export interface StreamJsonEvent {
@@ -779,6 +782,7 @@ export interface FallbackReportOptions {
   output?: string;
   stderr?: string;
   usage?: RunUsageMetrics;
+  planQuota?: ActualPlanQuota;
   repoRoot?: string;
 }
 
@@ -895,6 +899,13 @@ export function formatFallbackRunReport(options: FallbackReportOptions): string 
           reportContent += `| Weekly Spend | \`${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()}\` tokens (\`${rolling.weeklyPercentage.toFixed(1)}%\` · \`[${rolling.weeklyStatus}]\`) |\n`;
         }
       } catch {}
+
+      if (options.planQuota && options.planQuota.available) {
+        const plan = options.planQuota;
+        if (plan.gemini5hRemainingPct !== undefined && plan.geminiWeeklyRemainingPct !== undefined) {
+          reportContent += `| Real Plan Quota | Gemini 5h: \`${plan.gemini5hRemainingPct.toFixed(1)}% remaining\` · Weekly: \`${plan.geminiWeeklyRemainingPct.toFixed(1)}% remaining\` |\n`;
+        }
+      }
     }
   }
 
@@ -1407,6 +1418,8 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     }
   }
 
+  const planQuota = getActualPlanQuotaSync({ repoRoot: targetDir });
+
   if (loopGuardTrip) {
     exitCode = 1;
     reportContent = formatLoopGuardReport({
@@ -1437,6 +1450,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
       output,
       stderr: [accumulatedStderr, prematureError].filter(Boolean).join('\n'),
       usage: sessionUsage,
+      planQuota,
       repoRoot: targetDir,
     });
   }
@@ -1463,6 +1477,14 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
           issueNumber: routineIssueNumber,
           durationMs,
           usage: sessionUsage,
+          planQuota: planQuota.available
+            ? {
+                gemini5hRemainingPct: planQuota.gemini5hRemainingPct,
+                geminiWeeklyRemainingPct: planQuota.geminiWeeklyRemainingPct,
+                claude5hRemainingPct: planQuota.claude5hRemainingPct,
+                claudeWeeklyRemainingPct: planQuota.claudeWeeklyRemainingPct,
+              }
+            : undefined,
         },
         null,
         2
@@ -1498,6 +1520,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
             title: targetTitle,
             durationMs,
             usage: sessionUsage,
+            planQuota,
           }) +
           '\n'
       );
@@ -1512,6 +1535,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
             pr: effectivePR,
             durationMs,
             usage: sessionUsage,
+            planQuota,
           }) +
           '\n'
       );
@@ -1534,6 +1558,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     transientServiceError,
     durationMs,
     usage: sessionUsage,
+    planQuota,
     outcome:
       routine === 'peer-review' && exitCode === 0
         ? detectPeerReviewOutcome({

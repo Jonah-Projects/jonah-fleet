@@ -837,6 +837,28 @@ The build is completing. Continuing shortly.
       expect(clean).toContain('Rolling 7d:');
       expect(clean).toMatch(/Rolling 7d:.*\[EXCEEDED\]/);
     });
+
+    it('renders actual plan quota line when planQuota is provided', () => {
+      const card = renderSummaryCard({
+        routine: 'peer-review',
+        pr: 101,
+        durationMs: 25000,
+        output: 'Approved PR #101.',
+        usage: { totalTokens: 12_000 },
+        planQuota: {
+          available: true,
+          groups: {},
+          gemini5hRemainingPct: 43.0,
+          geminiWeeklyRemainingPct: 16.2,
+          fetchedAt: new Date().toISOString(),
+        },
+      });
+
+      const clean = stripAnsi(card);
+      expect(clean).toContain('Plan Quota:');
+      expect(clean).toContain('Gemini 5h: 43.0% remaining');
+      expect(clean).toContain('Weekly: 16.2% remaining');
+    });
   });
 });
 

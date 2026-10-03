@@ -8,10 +8,12 @@ import {
   getRollingWindowTokenUsage,
   formatQuotaStatusBadge,
   formatTokenBreakdown,
+  getActualPlanQuotaSync,
   type RunUsageMetrics,
+  type ActualPlanQuota,
 } from './telemetry.js';
 
-export type { RunUsageMetrics } from './telemetry.js';
+export type { RunUsageMetrics, ActualPlanQuota } from './telemetry.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -24,6 +26,7 @@ export interface SummaryCardOptions {
   title?: string;
   durationMs?: number;
   usage?: RunUsageMetrics;
+  planQuota?: ActualPlanQuota;
 }
 
 export interface ErrorCardOptions {
@@ -35,6 +38,7 @@ export interface ErrorCardOptions {
   durationMs?: number;
   error?: Error;
   usage?: RunUsageMetrics;
+  planQuota?: ActualPlanQuota;
 }
 
 export interface ParsedRunSummary {
@@ -1339,11 +1343,12 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
   }
 
   // Token consumption & Quota Limit Pacing
-  if (typeof options.usage?.totalTokens === 'number') {
+  if (typeof options.usage?.totalTokens === 'number' || options.planQuota?.available) {
     lines.push(
       ...renderTokenQuotaSection({
         usage: options.usage,
         repoRoot: options.repoRoot,
+        planQuota: options.planQuota,
         width,
         borderColor: border,
       })
@@ -1368,41 +1373,63 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
 function renderTokenQuotaSection(options: {
   usage?: RunUsageMetrics;
   repoRoot?: string;
+  planQuota?: ActualPlanQuota;
   width: number;
   borderColor?: (s: string) => string;
 }): string[] {
   const total = options.usage?.totalTokens;
-  if (typeof total !== 'number') return [];
+  const hasUsage = typeof total === 'number';
+  const plan = options.planQuota;
+  const hasPlan = Boolean(plan && plan.available);
+
+  if (!hasUsage && !hasPlan) return [];
 
   const border = options.borderColor ?? ((s: string) => pc.dim(pc.gray(s)));
   const width = options.width;
   const horizontal = '─'.repeat(width - 2);
   const lines: string[] = [];
 
-  const quota = calculateTokenQuotaPercentages(total);
-  const breakdown = formatTokenBreakdown(options.usage, 'prefix');
-
   lines.push(border(`├${horizontal}┤`));
-  const tokenLine1 = ` Tokens: ${pc.bold(total.toLocaleString())}${breakdown ? pc.dim(` (${breakdown})`) : ''}`;
-  lines.push(border('│') + tokenLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine1).length)) + border('│'));
 
-  const tokenLine2 = `         ↳ ${pc.cyan(quota.pctOf5hLimit.toFixed(2) + '% of 5h limit')} · ${pc.cyan(quota.pctOfWeeklyLimit.toFixed(2) + '% of weekly limit')}`;
-  lines.push(border('│') + tokenLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine2).length)) + border('│'));
+  if (hasUsage) {
+    const quota = calculateTokenQuotaPercentages(total!);
+    const breakdown = formatTokenBreakdown(options.usage, 'prefix');
 
-  if (options.repoRoot) {
-    try {
-      const rolling = getRollingWindowTokenUsage(options.repoRoot);
-      if (rolling.windowTokens > 0 || rolling.weeklyTokens > 0) {
-        const badge5h = formatQuotaStatusBadge(rolling.windowStatus);
-        const badgeWeekly = formatQuotaStatusBadge(rolling.weeklyStatus);
+    const tokenLine1 = ` Tokens: ${pc.bold(total!.toLocaleString())}${breakdown ? pc.dim(` (${breakdown})`) : ''}`;
+    lines.push(border('│') + tokenLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine1).length)) + border('│'));
 
-        const rollingLine1 = ` Rolling 5h: ${rolling.windowTokens.toLocaleString()} / ${rolling.windowLimit.toLocaleString()} tokens (${rolling.windowPercentage.toFixed(1)}% · ${badge5h})`;
-        lines.push(border('│') + rollingLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine1).length)) + border('│'));
+    const tokenLine2 = `         ↳ ${pc.cyan(quota.pctOf5hLimit.toFixed(2) + '% of 5h limit')} · ${pc.cyan(quota.pctOfWeeklyLimit.toFixed(2) + '% of weekly limit')}`;
+    lines.push(border('│') + tokenLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine2).length)) + border('│'));
 
-        const rollingLine2 = ` Rolling 7d: ${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()} tokens (${rolling.weeklyPercentage.toFixed(1)}% · ${badgeWeekly})`;
-        lines.push(border('│') + rollingLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine2).length)) + border('│'));
+    if (options.repoRoot) {
+      try {
+        const rolling = getRollingWindowTokenUsage(options.repoRoot);
+        if (rolling.windowTokens > 0 || rolling.weeklyTokens > 0) {
+          const badge5h = formatQuotaStatusBadge(rolling.windowStatus);
+          const badgeWeekly = formatQuotaStatusBadge(rolling.weeklyStatus);
+
+          const rollingLine1 = ` Rolling 5h: ${rolling.windowTokens.toLocaleString()} / ${rolling.windowLimit.toLocaleString()} tokens (${rolling.windowPercentage.toFixed(1)}% · ${badge5h})`;
+          lines.push(border('│') + rollingLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine1).length)) + border('│'));
+
+          const rollingLine2 = ` Rolling 7d: ${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()} tokens (${rolling.weeklyPercentage.toFixed(1)}% · ${badgeWeekly})`;
+          lines.push(border('│') + rollingLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine2).length)) + border('│'));
+        }
+      } catch {}
+    }
+  }
+
+  if (hasPlan && plan) {
+    if (plan.gemini5hRemainingPct !== undefined || plan.geminiWeeklyRemainingPct !== undefined) {
+      const subParts: string[] = [];
+      if (plan.gemini5hRemainingPct !== undefined) {
+        subParts.push(`Gemini 5h: ${plan.gemini5hRemainingPct.toFixed(1)}% remaining`);
       }
-    } catch {}
+      if (plan.geminiWeeklyRemainingPct !== undefined) {
+        subParts.push(`Weekly: ${plan.geminiWeeklyRemainingPct.toFixed(1)}% remaining`);
+      }
+      const planLine = ` Plan Quota: ${subParts.join(' · ')}`;
+      lines.push(border('│') + planLine + ' '.repeat(Math.max(1, width - 2 - stripAnsi(planLine).length)) + border('│'));
+    }
   }
 
   return lines;
@@ -1457,11 +1484,12 @@ export function renderErrorCard(options: ErrorCardOptions): string {
   }
 
   // Token consumption & Quota Limit Pacing
-  if (typeof options.usage?.totalTokens === 'number') {
+  if (typeof options.usage?.totalTokens === 'number' || options.planQuota?.available) {
     lines.push(
       ...renderTokenQuotaSection({
         usage: options.usage,
         repoRoot: options.repoRoot,
+        planQuota: options.planQuota,
         width,
         borderColor: (s) => pc.red(s),
       })
