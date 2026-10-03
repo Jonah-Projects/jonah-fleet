@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.33.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.32.0...v1.33.0) (2026-10-03)
+
+
+### Features
+
+* **telemetry,status,runner:** discover and report real-time provider plan quota ([#625](https://github.com/Jonah-Projects/jonah-fleet/issues/625)) ([d317b28](https://github.com/Jonah-Projects/jonah-fleet/commit/d317b28c0622fff0ba540af56f2275fd59a96a09))
+
 ## [1.32.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.31.7...v1.32.0) (2026-10-03)
 
 
