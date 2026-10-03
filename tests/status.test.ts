@@ -120,4 +120,99 @@ describe('Status Command', () => {
     expect(jsonOutput.tokenUsage.recentRunCount).toBe(1);
     expect(jsonOutput.tokenUsage.byRoutine.autowork.totalTokens).toBe(54000);
   });
+
+  it('displays real-time plan quota in text and json when cached plan quota is present', async () => {
+    fs.writeFileSync(
+      path.join(tempDir, 'agents-manifest.json'),
+      JSON.stringify({ version: '1.8.0', preset: 'standard', routines: { autowork: true }, skills: ['tdd'] })
+    );
+
+    const fleetDir = path.join(tempDir, '.jonah-fleet');
+    fs.mkdirSync(fleetDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(fleetDir, 'plan-quota-cache.json'),
+      JSON.stringify({
+        cachedAt: Date.now(),
+        quota: {
+          available: true,
+          groups: {},
+          gemini5hRemainingPct: 43.0,
+          geminiWeeklyRemainingPct: 16.2,
+          gemini5hResetTime: '2026-10-03 12:20 CEST',
+          geminiWeeklyResetTime: '2026-10-07 06:44 CEST',
+          claude5hRemainingPct: 100.0,
+          claudeWeeklyRemainingPct: 100.0,
+          claude5hResetTime: '2026-10-03 14:48 CEST',
+          claudeWeeklyResetTime: '2026-10-10 09:48 CEST',
+          fetchedAt: new Date().toISOString(),
+        },
+      })
+    );
+
+    // Test JSON output
+    const jsonSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await runStatus({ cwd: tempDir, json: true });
+    const jsonOutput = JSON.parse(jsonSpy.mock.calls[0][0]);
+    expect(jsonOutput.planQuota).toBeDefined();
+    expect(jsonOutput.planQuota.gemini5hRemainingPct).toBe(43.0);
+    expect(jsonOutput.planQuota.claude5hResetTime).toBe('2026-10-03 14:48 CEST');
+    expect(jsonOutput.planQuota.claudeWeeklyResetTime).toBe('2026-10-10 09:48 CEST');
+    jsonSpy.mockRestore();
+
+    // Test text output
+    const textSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await runStatus({ cwd: tempDir, json: false });
+    const textOutput = textSpy.mock.calls.map((c) => stripAnsi(c[0])).join('\n');
+    expect(textOutput).toContain('Real-Time Plan Quota (Google Antigravity)');
+    expect(textOutput).toContain('Gemini Models:');
+    expect(textOutput).toContain('43.0% 5h remaining');
+    expect(textOutput).toContain('Claude/GPT Models:');
+    expect(textOutput).toContain('100.0% 5h remaining (resets 2026-10-03 14:48 CEST)');
+    expect(textOutput).toContain('100.0% weekly remaining (resets 2026-10-10 09:48 CEST)');
+    textSpy.mockRestore();
+  });
+
+  it('renders plan quota without undefined when only 5h or weekly limits are defined', async () => {
+    fs.writeFileSync(
+      path.join(tempDir, 'agents-manifest.json'),
+      JSON.stringify(
+        {
+          version: '1.8.0',
+          preset: 'standard',
+          routines: { autowork: true },
+          skills: ['tdd'],
+        },
+        null,
+        2
+      )
+    );
+
+    const fleetDir = path.join(tempDir, '.jonah-fleet');
+    fs.mkdirSync(fleetDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(fleetDir, 'plan-quota-cache.json'),
+      JSON.stringify({
+        cachedAt: Date.now(),
+        quota: {
+          available: true,
+          groups: {},
+          geminiWeeklyRemainingPct: 62.5,
+          geminiWeeklyResetTime: '2026-10-07 06:44 CEST',
+          claude5hRemainingPct: 88.0,
+          claude5hResetTime: '2026-10-03 14:48 CEST',
+          fetchedAt: new Date().toISOString(),
+        },
+      })
+    );
+
+    const textSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await runStatus({ cwd: tempDir, json: false });
+    const textOutput = textSpy.mock.calls.map((c) => stripAnsi(c[0])).join('\n');
+    expect(textOutput).toContain('Gemini Models:');
+    expect(textOutput).toContain('62.5% weekly remaining (resets 2026-10-07 06:44 CEST)');
+    expect(textOutput).not.toContain('undefined');
+    expect(textOutput).toContain('Claude/GPT Models:');
+    expect(textOutput).toContain('88.0% 5h remaining (resets 2026-10-03 14:48 CEST)');
+    textSpy.mockRestore();
+  });
 });

@@ -1040,6 +1040,72 @@ describe('Local Routine Runner', () => {
       expect(report).toContain('| 5h Window Usage | `60,000 / 2,000,000` tokens (`3.0%` · `[HEALTHY]`) |');
       expect(report).toContain('| Weekly Spend | `9,560,000 / 8,750,000` tokens (`109.3%` · `[EXCEEDED]`) |');
     });
+
+    it('renders real plan quota row in fallback report when planQuota is provided', () => {
+      const report = formatFallbackRunReport({
+        routine: 'peer-review',
+        timestamp: '2026-10-03T09-00-00Z',
+        exitCode: 0,
+        hostname: 'penguin',
+        targetLabel: 'PR #101',
+        durationSec: 25,
+        usage: { totalTokens: 12_000 },
+        planQuota: {
+          available: true,
+          groups: {},
+          gemini5hRemainingPct: 43.0,
+          geminiWeeklyRemainingPct: 16.2,
+          fetchedAt: new Date().toISOString(),
+        },
+        repoRoot: tmpRepo,
+      });
+
+      expect(report).toContain('| Real Plan Quota | Gemini 5h: `43.0% remaining` · Weekly: `16.2% remaining` |');
+    });
+
+    it('renders Gemini and Claude/GPT plan quota in fallback run report when both are present', () => {
+      const report = formatFallbackRunReport({
+        routine: 'peer-review',
+        timestamp: '2026-10-03T09-00-00Z',
+        exitCode: 0,
+        hostname: 'penguin',
+        targetLabel: 'PR #101',
+        durationSec: 25,
+        usage: { totalTokens: 12_000 },
+        planQuota: {
+          available: true,
+          groups: {},
+          gemini5hRemainingPct: 43.0,
+          geminiWeeklyRemainingPct: 16.2,
+          claude5hRemainingPct: 100.0,
+          claudeWeeklyRemainingPct: 100.0,
+          fetchedAt: new Date().toISOString(),
+        },
+        repoRoot: tmpRepo,
+      });
+
+      expect(report).toContain('| Real Plan Quota | Gemini 5h: `43.0% remaining` · Weekly: `16.2% remaining`<br>Claude/GPT 5h: `100.0% remaining` · Weekly: `100.0% remaining` |');
+    });
+
+    it('renders real plan quota in fallback report when usage or totalTokens is undefined', () => {
+      const report = formatFallbackRunReport({
+        routine: 'autowork',
+        timestamp: '2026-10-03T09-00-00Z',
+        exitCode: 1,
+        hostname: 'penguin',
+        targetLabel: 'Issue #42',
+        durationSec: 10,
+        planQuota: {
+          available: true,
+          groups: {},
+          gemini5hRemainingPct: 43.0,
+          geminiWeeklyRemainingPct: 16.2,
+          fetchedAt: new Date().toISOString(),
+        },
+      });
+
+      expect(report).toContain('| Real Plan Quota | Gemini 5h: `43.0% remaining` · Weekly: `16.2% remaining` |');
+    });
   });
 
   describe('detectPrematureRoutineExit', () => {

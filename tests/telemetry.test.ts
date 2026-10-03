@@ -14,6 +14,10 @@ import {
   getRollingWindowTokenUsage,
   formatQuotaStatusBadge,
   formatTokenBreakdown,
+  parseAgyQuotaOutput,
+  fetchActualPlanQuota,
+  getActualPlanQuotaSync,
+  formatPlanQuotaSummary,
 } from '../src/lib/telemetry.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -654,6 +658,187 @@ Releasing claim and applying needs-info label.
       expect(summaries.length).toBe(1);
       expect(summaries[0].routine).toBe('autowork');
       expect(summaries[0].result).toBe('SUCCESS');
+    });
+  });
+
+  describe('Actual Plan Quota (Google Antigravity)', () => {
+    const sampleAgyJsonOutput = JSON.stringify({
+      conversation_id: '',
+      status: 'SUCCESS',
+      command: {
+        name: 'usage',
+        data: {
+          description:
+            'Within each group, models share a weekly limit and a 5-hour limit. Quota is consumed proportionally to the cost of the tokens.',
+          groups: [
+            {
+              name: 'Gemini Models',
+              description: 'Models within this group: Gemini Flash, Gemini Pro',
+              buckets: [
+                {
+                  id: 'gemini-weekly',
+                  name: 'Weekly Limit Remaining',
+                  description: 'You have used some of your weekly limit',
+                  window: 'weekly',
+                  remaining_fraction: 0.16182342,
+                  reset_time: '2026-10-07T04:44:43Z',
+                },
+                {
+                  id: 'gemini-5h',
+                  name: 'Five Hour Limit Remaining',
+                  description: 'You have used some of your 5-hour limit',
+                  window: '5h',
+                  remaining_fraction: 0.4300806,
+                  reset_time: '2026-10-03T10:20:55Z',
+                },
+              ],
+            },
+            {
+              name: 'Claude and GPT models',
+              description: 'Models within this group: Claude Opus, Claude Sonnet, GPT-OSS',
+              buckets: [
+                {
+                  id: '3p-weekly',
+                  name: 'Weekly Limit Remaining',
+                  window: 'weekly',
+                  remaining_fraction: 1.0,
+                  reset_time: '2026-10-10T07:50:57Z',
+                },
+                {
+                  id: '3p-5h',
+                  name: 'Five Hour Limit Remaining',
+                  window: '5h',
+                  remaining_fraction: 1.0,
+                  reset_time: '2026-10-03T12:50:57Z',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    it('parses structured JSON quota output from agy --output-format json --print /quota', () => {
+      const quota = parseAgyQuotaOutput(sampleAgyJsonOutput);
+
+      expect(quota.available).toBe(true);
+      expect(quota.description).toContain('Within each group');
+      expect(quota.geminiWeeklyRemainingPct).toBeCloseTo(16.18, 1);
+      expect(quota.gemini5hRemainingPct).toBeCloseTo(43.01, 1);
+      expect(quota.geminiWeeklyResetTime).toBe('2026-10-07T04:44:43Z');
+      expect(quota.gemini5hResetTime).toBe('2026-10-03T10:20:55Z');
+      expect(quota.claudeWeeklyRemainingPct).toBe(100.0);
+      expect(quota.claude5hRemainingPct).toBe(100.0);
+      expect(quota.claudeWeeklyResetTime).toBe('2026-10-10T07:50:57Z');
+      expect(quota.claude5hResetTime).toBe('2026-10-03T12:50:57Z');
+
+      expect(quota.groups['Gemini Models']).toBeDefined();
+      expect(quota.groups['Gemini Models'].buckets.length).toBe(2);
+      expect(quota.groups['Claude and GPT models']).toBeDefined();
+    });
+
+    it('parses plain text tabular quota output as fallback', () => {
+      const textOutput = `
+Quota:
+Gemini Models          Weekly Limit Remaining     16%   2026-10-07 06:44 CEST
+Gemini Models          Five Hour Limit Remaining  44%   2026-10-03 12:20 CEST
+Claude and GPT models  Weekly Limit Remaining     100%  2026-10-10 09:48 CEST
+Claude and GPT models  Five Hour Limit Remaining  100%  2026-10-03 14:48 CEST
+`;
+      const quota = parseAgyQuotaOutput(textOutput);
+      expect(quota.available).toBe(true);
+      expect(quota.geminiWeeklyRemainingPct).toBe(16);
+      expect(quota.gemini5hRemainingPct).toBe(44);
+      expect(quota.claudeWeeklyRemainingPct).toBe(100);
+      expect(quota.claude5hRemainingPct).toBe(100);
+      expect(quota.geminiWeeklyResetTime).toBe('2026-10-07 06:44 CEST');
+      expect(quota.claudeWeeklyResetTime).toBe('2026-10-10 09:48 CEST');
+      expect(quota.claude5hResetTime).toBe('2026-10-03 14:48 CEST');
+    });
+
+    it('returns unavailable when output is empty or errors', () => {
+      const empty = parseAgyQuotaOutput('');
+      expect(empty.available).toBe(false);
+      expect(empty.groups).toEqual({});
+
+      const errorOutput = parseAgyQuotaOutput('Error: You are not logged into Antigravity');
+      expect(errorOutput.available).toBe(false);
+      expect(errorOutput.error?.toLowerCase()).toContain('not logged in');
+    });
+
+    it('caches plan quota to disk and reuses valid cache within TTL', () => {
+      const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'jonah-fleet-quota-cache-'));
+      try {
+        let executionCount = 0;
+        const mockExecutor = () => {
+          executionCount++;
+          return sampleAgyJsonOutput;
+        };
+
+        // First call: executes command and writes cache
+        const quota1 = getActualPlanQuotaSync({ repoRoot: tmpRepo, executor: mockExecutor, cacheTtlMs: 5000 });
+        expect(quota1.available).toBe(true);
+        expect(executionCount).toBe(1);
+
+        // Verify cache file was written
+        const cachePath = path.join(tmpRepo, '.jonah-fleet', 'plan-quota-cache.json');
+        expect(fs.existsSync(cachePath)).toBe(true);
+
+        // Second call: reads from cache without re-executing
+        const quota2 = getActualPlanQuotaSync({ repoRoot: tmpRepo, executor: mockExecutor, cacheTtlMs: 5000 });
+        expect(quota2.available).toBe(true);
+        expect(executionCount).toBe(1); // Still 1!
+
+        // Third call with 0 TTL: forces refresh
+        const quota3 = getActualPlanQuotaSync({ repoRoot: tmpRepo, executor: mockExecutor, cacheTtlMs: 0 });
+        expect(quota3.available).toBe(true);
+        expect(executionCount).toBe(2);
+      } finally {
+        fs.rmSync(tmpRepo, { recursive: true, force: true });
+      }
+    });
+
+    it('fetches plan quota asynchronously via fetchActualPlanQuota', async () => {
+      const mockExecutor = vi.fn().mockResolvedValue(sampleAgyJsonOutput);
+      const quota = await fetchActualPlanQuota({ executor: mockExecutor });
+      expect(quota.available).toBe(true);
+      expect(quota.geminiWeeklyRemainingPct).toBeCloseTo(16.18, 1);
+    });
+
+    it('formats a clean summary for terminal cards and CLI status', () => {
+      const quota = parseAgyQuotaOutput(sampleAgyJsonOutput);
+      const summary = stripAnsi(formatPlanQuotaSummary(quota));
+
+      expect(summary).toContain('Gemini 5h: 43.0% remaining');
+      expect(summary).toContain('Weekly: 16.2% remaining');
+      expect(summary).toContain('Claude/GPT 5h: 100.0% remaining');
+      expect(summary).toContain('Weekly: 100.0% remaining');
+    });
+
+    it('formats plan quota summary correctly when only weekly or 5h percentages exist', () => {
+      const claudeWeeklyOnly = {
+        available: true,
+        groups: {},
+        claudeWeeklyRemainingPct: 85.0,
+        fetchedAt: new Date().toISOString(),
+      };
+      expect(stripAnsi(formatPlanQuotaSummary(claudeWeeklyOnly))).toBe('Claude/GPT Weekly: 85.0% remaining');
+
+      const geminiWeeklyOnly = {
+        available: true,
+        groups: {},
+        geminiWeeklyRemainingPct: 50.0,
+        fetchedAt: new Date().toISOString(),
+      };
+      expect(stripAnsi(formatPlanQuotaSummary(geminiWeeklyOnly))).toBe('Gemini Weekly: 50.0% remaining');
+    });
+
+    it('formats plan quota summary with markdown backticks and br delimiter when markdown option is true', () => {
+      const quota = parseAgyQuotaOutput(sampleAgyJsonOutput);
+      const markdownSummary = formatPlanQuotaSummary(quota, { markdown: true });
+      expect(markdownSummary).toContain('Gemini 5h: `43.0% remaining` · Weekly: `16.2% remaining`');
+      expect(markdownSummary).toContain('<br>');
+      expect(markdownSummary).toContain('Claude/GPT 5h: `100.0% remaining` · Weekly: `100.0% remaining`');
     });
   });
 });

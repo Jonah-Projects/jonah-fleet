@@ -1,7 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execSync, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import pc from 'picocolors';
 import { GhExecutor, defaultGhExecutor } from './fleet-query.js';
+
+const execFileAsync = promisify(execFile);
 
 export const GLOBAL_WEEKLY_TOKEN_BUDGET = 8_750_000; // ~8.75M tokens/week (70% ceiling)
 export const GLOBAL_5H_TOKEN_BUDGET = 2_000_000; // ~2.0M tokens rolling 5h window limit
@@ -32,6 +36,42 @@ export interface TokenQuotaWindowUsage {
   weeklyPercentage: number;
   weeklyStatus: QuotaHealthStatus;
   status: QuotaHealthStatus;
+}
+
+export interface PlanQuotaBucket {
+  id: string;
+  name: string;
+  window: '5h' | 'weekly' | string;
+  remainingFraction: number;
+  remainingPercentage: number;
+  resetTime: string;
+  description?: string;
+}
+
+export interface PlanQuotaGroup {
+  name: string; // e.g. "Gemini Models", "Claude and GPT models"
+  description?: string;
+  buckets: PlanQuotaBucket[];
+  weeklyRemainingPct?: number;
+  weeklyResetTime?: string;
+  window5hRemainingPct?: number;
+  window5hResetTime?: string;
+}
+
+export interface ActualPlanQuota {
+  available: boolean;
+  description?: string;
+  groups: Record<string, PlanQuotaGroup>;
+  geminiWeeklyRemainingPct?: number;
+  gemini5hRemainingPct?: number;
+  geminiWeeklyResetTime?: string;
+  gemini5hResetTime?: string;
+  claudeWeeklyRemainingPct?: number;
+  claude5hRemainingPct?: number;
+  claudeWeeklyResetTime?: string;
+  claude5hResetTime?: string;
+  fetchedAt: string;
+  error?: string;
 }
 
 /**
@@ -188,6 +228,327 @@ export function getRollingWindowTokenUsage(
     weeklyStatus,
     status,
   };
+}
+
+/**
+ * Parses structured JSON or tabular text output from `agy --output-format json --print /quota`.
+ */
+export function parseAgyQuotaOutput(raw: string): ActualPlanQuota {
+  if (!raw || typeof raw !== 'string') {
+    return {
+      available: false,
+      groups: {},
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
+  // Check for common error or unauthenticated outputs
+  if (
+    raw.includes('not logged into Antigravity') ||
+    raw.includes('error getting token source') ||
+    raw.includes('not authenticated')
+  ) {
+    return {
+      available: false,
+      groups: {},
+      fetchedAt: new Date().toISOString(),
+      error: 'Not logged into Antigravity',
+    };
+  }
+
+  // Attempt JSON parse
+  let jsonData: any = null;
+  try {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      jsonData = JSON.parse(trimmed);
+    }
+  } catch {}
+
+  const groups: Record<string, PlanQuotaGroup> = {};
+  let description: string | undefined;
+
+  if (jsonData) {
+    const commandData = jsonData.command?.data || jsonData.data || jsonData;
+    description = commandData.description;
+    const rawGroups = commandData.groups || [];
+
+    for (const g of rawGroups) {
+      if (!g || !g.name) continue;
+      const groupName = g.name;
+      const buckets: PlanQuotaBucket[] = [];
+      let weeklyRemainingPct: number | undefined;
+      let weeklyResetTime: string | undefined;
+      let window5hRemainingPct: number | undefined;
+      let window5hResetTime: string | undefined;
+
+      for (const b of g.buckets || []) {
+        const remainingFraction = typeof b.remaining_fraction === 'number' ? b.remaining_fraction : 0;
+        const remainingPercentage = remainingFraction * 100;
+        const resetTime = b.reset_time || '';
+        const window = b.window || (b.id?.includes('5h') ? '5h' : 'weekly');
+
+        const bucket: PlanQuotaBucket = {
+          id: b.id || '',
+          name: b.name || '',
+          window,
+          remainingFraction,
+          remainingPercentage,
+          resetTime,
+          description: b.description,
+        };
+        buckets.push(bucket);
+
+        if (window === 'weekly' || b.id?.includes('weekly')) {
+          weeklyRemainingPct = remainingPercentage;
+          weeklyResetTime = resetTime;
+        } else if (window === '5h' || b.id?.includes('5h')) {
+          window5hRemainingPct = remainingPercentage;
+          window5hResetTime = resetTime;
+        }
+      }
+
+      groups[groupName] = {
+        name: groupName,
+        description: g.description,
+        buckets,
+        weeklyRemainingPct,
+        weeklyResetTime,
+        window5hRemainingPct,
+        window5hResetTime,
+      };
+    }
+  } else {
+    // Plain text tabular parsing fallback
+    const lines = raw.split('\n');
+    for (const line of lines) {
+      const match =
+        line.match(/^\s*([A-Za-z0-9 ]+?)\t+([^\t]+)\t+(\d+)%\t+(.*)$/) ||
+        line.match(/^\s*(.+?)\s{2,}(Weekly Limit Remaining|Five Hour Limit Remaining)\s+(\d+)%\s*(.*)$/);
+      if (match) {
+        const groupName = match[1].trim();
+        const bucketName = match[2].trim();
+        const pct = parseInt(match[3], 10);
+        const resetTime = match[4].trim();
+
+        if (!groups[groupName]) {
+          groups[groupName] = {
+            name: groupName,
+            buckets: [],
+          };
+        }
+
+        const isWeekly = bucketName.toLowerCase().includes('weekly');
+        const window = isWeekly ? 'weekly' : '5h';
+
+        groups[groupName].buckets.push({
+          id: isWeekly
+            ? `${groupName.toLowerCase().replace(/\s+/g, '-')}-weekly`
+            : `${groupName.toLowerCase().replace(/\s+/g, '-')}-5h`,
+          name: bucketName,
+          window,
+          remainingFraction: pct / 100,
+          remainingPercentage: pct,
+          resetTime,
+        });
+
+        if (isWeekly) {
+          groups[groupName].weeklyRemainingPct = pct;
+          groups[groupName].weeklyResetTime = resetTime;
+        } else {
+          groups[groupName].window5hRemainingPct = pct;
+          groups[groupName].window5hResetTime = resetTime;
+        }
+      }
+    }
+  }
+
+  const hasGroups = Object.keys(groups).length > 0;
+  if (!hasGroups) {
+    return {
+      available: false,
+      groups: {},
+      fetchedAt: new Date().toISOString(),
+      error: raw.length > 0 ? (raw.length > 200 ? raw.slice(0, 200) + '...' : raw) : 'No quota information found',
+    };
+  }
+
+  const geminiGroup = groups['Gemini Models'];
+  const claudeGroup = groups['Claude and GPT models'];
+
+  return {
+    available: true,
+    description,
+    groups,
+    geminiWeeklyRemainingPct: geminiGroup?.weeklyRemainingPct,
+    gemini5hRemainingPct: geminiGroup?.window5hRemainingPct,
+    geminiWeeklyResetTime: geminiGroup?.weeklyResetTime,
+    gemini5hResetTime: geminiGroup?.window5hResetTime,
+    claudeWeeklyRemainingPct: claudeGroup?.weeklyRemainingPct,
+    claude5hRemainingPct: claudeGroup?.window5hRemainingPct,
+    claudeWeeklyResetTime: claudeGroup?.weeklyResetTime,
+    claude5hResetTime: claudeGroup?.window5hResetTime,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+function readCachedPlanQuota(cacheFile: string | undefined, cacheTtlMs: number): ActualPlanQuota | null {
+  if (!cacheFile || cacheTtlMs <= 0 || !fs.existsSync(cacheFile)) return null;
+  try {
+    const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    if (
+      cached &&
+      typeof cached.cachedAt === 'number' &&
+      Date.now() - cached.cachedAt < cacheTtlMs &&
+      cached.quota
+    ) {
+      return cached.quota;
+    }
+  } catch {}
+  return null;
+}
+
+function writeCachedPlanQuota(cacheFile: string | undefined, quota: ActualPlanQuota): void {
+  if (!cacheFile || !quota.available) return;
+  try {
+    fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+    fs.writeFileSync(cacheFile, JSON.stringify({ cachedAt: Date.now(), quota }, null, 2));
+  } catch {}
+}
+
+/**
+ * Synchronously retrieves actual plan quota from disk cache or by invoking `agy --output-format json --print /quota`.
+ */
+export function getActualPlanQuotaSync(options: {
+  repoRoot?: string;
+  cacheTtlMs?: number;
+  executor?: () => string;
+} = {}): ActualPlanQuota {
+  const cacheTtlMs = options.cacheTtlMs ?? 60_000;
+  const cacheFile = options.repoRoot ? path.join(options.repoRoot, '.jonah-fleet', 'plan-quota-cache.json') : undefined;
+  const cached = readCachedPlanQuota(cacheFile, cacheTtlMs);
+  if (cached) return cached;
+
+  try {
+    let rawOutput: string;
+    if (options.executor) {
+      rawOutput = options.executor();
+    } else if (process.env.VITEST) {
+      return {
+        available: false,
+        groups: {},
+        fetchedAt: new Date().toISOString(),
+        error: 'Skipped in test environment',
+      };
+    } else {
+      rawOutput = execSync('agy --output-format json --print "/quota"', {
+        encoding: 'utf8',
+        timeout: 10000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    }
+
+    const quota = parseAgyQuotaOutput(rawOutput);
+    writeCachedPlanQuota(cacheFile, quota);
+    return quota;
+  } catch (err: any) {
+    return {
+      available: false,
+      groups: {},
+      fetchedAt: new Date().toISOString(),
+      error: err?.message || String(err),
+    };
+  }
+}
+
+/**
+ * Asynchronously retrieves actual plan quota from disk cache or by invoking `agy --output-format json --print /quota`.
+ */
+export async function fetchActualPlanQuota(options: {
+  repoRoot?: string;
+  cacheTtlMs?: number;
+  executor?: () => Promise<string> | string;
+} = {}): Promise<ActualPlanQuota> {
+  const cacheTtlMs = options.cacheTtlMs ?? 60_000;
+  const cacheFile = options.repoRoot ? path.join(options.repoRoot, '.jonah-fleet', 'plan-quota-cache.json') : undefined;
+  const cached = readCachedPlanQuota(cacheFile, cacheTtlMs);
+  if (cached) return cached;
+
+  try {
+    let rawOutput: string;
+    if (options.executor) {
+      rawOutput = await options.executor();
+    } else if (process.env.VITEST) {
+      return {
+        available: false,
+        groups: {},
+        fetchedAt: new Date().toISOString(),
+        error: 'Skipped in test environment',
+      };
+    } else {
+      const { stdout } = await execFileAsync('agy', ['--output-format', 'json', '--print', '/quota'], {
+        timeout: 10000,
+      });
+      rawOutput = stdout;
+    }
+
+    const quota = parseAgyQuotaOutput(rawOutput);
+    writeCachedPlanQuota(cacheFile, quota);
+    return quota;
+  } catch (err: any) {
+    return {
+      available: false,
+      groups: {},
+      fetchedAt: new Date().toISOString(),
+      error: err?.message || String(err),
+    };
+  }
+}
+
+/**
+ * Formats a clean human-readable summary of plan quota for display.
+ */
+export function formatPlanQuotaSummary(
+  quota: ActualPlanQuota,
+  options: { markdown?: boolean } = {}
+): string {
+  if (!quota || !quota.available) {
+    return 'Plan Quota: Unavailable';
+  }
+
+  const parts: string[] = [];
+  const fmt = (pct: number) =>
+    options.markdown ? `\`${pct.toFixed(1)}% remaining\`` : `${pct.toFixed(1)}% remaining`;
+
+  if (quota.gemini5hRemainingPct !== undefined || quota.geminiWeeklyRemainingPct !== undefined) {
+    const subParts: string[] = [];
+    if (quota.gemini5hRemainingPct !== undefined) {
+      subParts.push(`Gemini 5h: ${fmt(quota.gemini5hRemainingPct)}`);
+    }
+    if (quota.geminiWeeklyRemainingPct !== undefined) {
+      const label = quota.gemini5hRemainingPct !== undefined ? 'Weekly' : 'Gemini Weekly';
+      subParts.push(`${label}: ${fmt(quota.geminiWeeklyRemainingPct)}`);
+    }
+    if (subParts.length > 0) {
+      parts.push(subParts.join(' · '));
+    }
+  }
+
+  if (quota.claude5hRemainingPct !== undefined || quota.claudeWeeklyRemainingPct !== undefined) {
+    const subParts: string[] = [];
+    if (quota.claude5hRemainingPct !== undefined) {
+      subParts.push(`Claude/GPT 5h: ${fmt(quota.claude5hRemainingPct)}`);
+    }
+    if (quota.claudeWeeklyRemainingPct !== undefined) {
+      const label = quota.claude5hRemainingPct !== undefined ? 'Weekly' : 'Claude/GPT Weekly';
+      subParts.push(`${label}: ${fmt(quota.claudeWeeklyRemainingPct)}`);
+    }
+    if (subParts.length > 0) {
+      parts.push(subParts.join(' · '));
+    }
+  }
+
+  return parts.join(options.markdown ? '<br>' : '\n');
 }
 
 export interface RoutineTelemetrySummary {

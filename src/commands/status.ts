@@ -6,7 +6,7 @@ import { checkDrift } from '../lib/diff.js';
 import { FLEET_VERSION } from '../lib/presets.js';
 import { computeTokenSpendFromLogs } from '../lib/fleet-query.js';
 import { formatTokens, formatCurrency } from '../lib/dashboard.js';
-import { getRollingWindowTokenUsage, formatQuotaStatusBadge } from '../lib/telemetry.js';
+import { getRollingWindowTokenUsage, formatQuotaStatusBadge, getActualPlanQuotaSync } from '../lib/telemetry.js';
 import { runMonitor } from './monitor.js';
 import { renderFleetBanner } from '../lib/brand.js';
 
@@ -72,6 +72,7 @@ export async function runStatus(options: StatusOptions = {}): Promise<void> {
   }
 
   const rollingQuota = getRollingWindowTokenUsage(cwd);
+  const planQuota = getActualPlanQuotaSync({ repoRoot: cwd });
 
   if (options.json) {
     console.log(
@@ -89,6 +90,7 @@ export async function runStatus(options: StatusOptions = {}): Promise<void> {
           repositories: manifest.repositories || [],
           tokenUsage,
           quotaPacing: rollingQuota,
+          planQuota: planQuota.available ? planQuota : undefined,
           drift: {
             hasDrift,
             ...drift,
@@ -204,6 +206,38 @@ export async function runStatus(options: StatusOptions = {}): Promise<void> {
     console.log(
       `    • 7-Day Spend:    ${pc.bold(formatTokens(rollingQuota.weeklyTokens))} / ${formatTokens(rollingQuota.weeklyLimit)} tokens (${pc.cyan(rollingQuota.weeklyPercentage.toFixed(1) + '%')}) ${badgeWeekly}`
     );
+  }
+
+  if (planQuota.available) {
+    console.log(pc.bold('\n  ⚡ Real-Time Plan Quota (Google Antigravity):'));
+    if (planQuota.gemini5hRemainingPct !== undefined || planQuota.geminiWeeklyRemainingPct !== undefined) {
+      const parts: string[] = [];
+      if (planQuota.gemini5hRemainingPct !== undefined) {
+        const reset5h = planQuota.gemini5hResetTime ? pc.dim(` (resets ${planQuota.gemini5hResetTime})`) : '';
+        parts.push(`${pc.bold(planQuota.gemini5hRemainingPct.toFixed(1) + '% 5h remaining')}${reset5h}`);
+      }
+      if (planQuota.geminiWeeklyRemainingPct !== undefined) {
+        const resetWk = planQuota.geminiWeeklyResetTime ? pc.dim(` (resets ${planQuota.geminiWeeklyResetTime})`) : '';
+        parts.push(`${pc.bold(planQuota.geminiWeeklyRemainingPct.toFixed(1) + '% weekly remaining')}${resetWk}`);
+      }
+      if (parts.length > 0) {
+        console.log(`    • Gemini Models:     ${parts.join(' · ')}`);
+      }
+    }
+    if (planQuota.claude5hRemainingPct !== undefined || planQuota.claudeWeeklyRemainingPct !== undefined) {
+      const parts: string[] = [];
+      if (planQuota.claude5hRemainingPct !== undefined) {
+        const reset5h = planQuota.claude5hResetTime ? pc.dim(` (resets ${planQuota.claude5hResetTime})`) : '';
+        parts.push(`${pc.bold(planQuota.claude5hRemainingPct.toFixed(1) + '% 5h remaining')}${reset5h}`);
+      }
+      if (planQuota.claudeWeeklyRemainingPct !== undefined) {
+        const resetWk = planQuota.claudeWeeklyResetTime ? pc.dim(` (resets ${planQuota.claudeWeeklyResetTime})`) : '';
+        parts.push(`${pc.bold(planQuota.claudeWeeklyRemainingPct.toFixed(1) + '% weekly remaining')}${resetWk}`);
+      }
+      if (parts.length > 0) {
+        console.log(`    • Claude/GPT Models: ${parts.join(' · ')}`);
+      }
+    }
   }
 
   console.log(pc.bold('\n  Drift / Health:'));
