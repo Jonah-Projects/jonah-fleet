@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.31.7...v1.32.0) (2026-10-03)
+
+
+### Features
+
+* **telemetry,runner:** report token consumption and 5h/weekly quota percentages ([#617](https://github.com/Jonah-Projects/jonah-fleet/issues/617)) ([daab60b](https://github.com/Jonah-Projects/jonah-fleet/commit/daab60b16c9b0a08ff57ce5611021576e92c83c1))
+
 ## [1.31.7](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.31.6...v1.31.7) (2026-10-03)
 
 
