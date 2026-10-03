@@ -10,6 +10,32 @@ const execFileAsync = promisify(execFile);
 export const GLOBAL_WEEKLY_TOKEN_BUDGET = 8_750_000; // ~8.75M tokens/week (70% ceiling)
 export const GLOBAL_5H_TOKEN_BUDGET = 2_000_000; // ~2.0M tokens rolling 5h window limit
 
+export const TOKEN_ANOMALY_THRESHOLDS = {
+  CONTEXT_ASYMMETRY_RATIO: 35,
+  CONTEXT_ASYMMETRY_MIN_INPUT_TOKENS: 50_000,
+  BUDGET_HOG_PERCENT: 75,
+  MULTI_ROUTINE_CANNIBALIZATION_PERCENT: 80,
+  MULTI_ROUTINE_MIN_ROUTINES: 3,
+  ITERATION_EXHAUSTION_PERCENT: 20,
+  PLAN_QUOTA_WEEKLY_WARNING_PERCENT: 30,
+  PLAN_QUOTA_WEEKLY_CRITICAL_PERCENT: 20,
+  PLAN_QUOTA_5H_CRITICAL_PERCENT: 20,
+  RE_REVIEW_THRASH_THRESHOLD: 2,
+} as const;
+
+/**
+ * Formats input and output token numbers into a human-readable I/O ratio string (e.g. "35:1").
+ */
+export function formatIoRatio(
+  inputTokens: number,
+  outputTokens: number,
+  precision: number = 0
+): string {
+  const safeOut = Math.max(1, outputTokens);
+  const ratio = inputTokens / safeOut;
+  return `${ratio.toFixed(precision)}:1`;
+}
+
 export interface RunUsageMetrics {
   totalTokens?: number;
   inputTokens?: number;
@@ -72,6 +98,21 @@ export interface ActualPlanQuota {
   claude5hResetTime?: string;
   fetchedAt: string;
   error?: string;
+}
+
+export interface TokenAnomalyReport {
+  type:
+    | 'context_asymmetry'
+    | 'unilateral_rereview_thrash'
+    | 'budget_hog'
+    | 'multi_routine_cannibalization'
+    | 'plan_quota_velocity'
+    | 'token_surge'
+    | 'iteration_exhaustion';
+  severity: 'WARNING' | 'CRITICAL';
+  routine?: string;
+  message: string;
+  remediation: string;
 }
 
 /**
@@ -510,7 +551,7 @@ export async function fetchActualPlanQuota(options: {
  */
 export function formatPlanQuotaSummary(
   quota: ActualPlanQuota,
-  options: { markdown?: boolean } = {}
+  options: { markdown?: boolean; hideUnused?: boolean } = {}
 ): string {
   if (!quota || !quota.available) {
     return 'Plan Quota: Unavailable';
@@ -520,31 +561,48 @@ export function formatPlanQuotaSummary(
   const fmt = (pct: number) =>
     options.markdown ? `\`${pct.toFixed(1)}% remaining\`` : `${pct.toFixed(1)}% remaining`;
 
+  const geminiUnused =
+    (quota.gemini5hRemainingPct === undefined || quota.gemini5hRemainingPct === 100) &&
+    (quota.geminiWeeklyRemainingPct === undefined || quota.geminiWeeklyRemainingPct === 100);
+
+  const claudeUnused =
+    (quota.claude5hRemainingPct === undefined || quota.claude5hRemainingPct === 100) &&
+    (quota.claudeWeeklyRemainingPct === undefined || quota.claudeWeeklyRemainingPct === 100);
+
+  // If hiding unused quotas, still display the primary provider (Gemini) when all providers are unused to avoid an empty quota section
+  const allProvidersUnused = geminiUnused && claudeUnused;
+  const shouldDisplayGemini = !options.hideUnused || !geminiUnused || allProvidersUnused;
+  const shouldDisplayClaude = !options.hideUnused || !claudeUnused;
+
   if (quota.gemini5hRemainingPct !== undefined || quota.geminiWeeklyRemainingPct !== undefined) {
-    const subParts: string[] = [];
-    if (quota.gemini5hRemainingPct !== undefined) {
-      subParts.push(`Gemini 5h: ${fmt(quota.gemini5hRemainingPct)}`);
-    }
-    if (quota.geminiWeeklyRemainingPct !== undefined) {
-      const label = quota.gemini5hRemainingPct !== undefined ? 'Weekly' : 'Gemini Weekly';
-      subParts.push(`${label}: ${fmt(quota.geminiWeeklyRemainingPct)}`);
-    }
-    if (subParts.length > 0) {
-      parts.push(subParts.join(' · '));
+    if (shouldDisplayGemini) {
+      const subParts: string[] = [];
+      if (quota.gemini5hRemainingPct !== undefined) {
+        subParts.push(`Gemini 5h: ${fmt(quota.gemini5hRemainingPct)}`);
+      }
+      if (quota.geminiWeeklyRemainingPct !== undefined) {
+        const label = quota.gemini5hRemainingPct !== undefined ? 'Weekly' : 'Gemini Weekly';
+        subParts.push(`${label}: ${fmt(quota.geminiWeeklyRemainingPct)}`);
+      }
+      if (subParts.length > 0) {
+        parts.push(subParts.join(' · '));
+      }
     }
   }
 
   if (quota.claude5hRemainingPct !== undefined || quota.claudeWeeklyRemainingPct !== undefined) {
-    const subParts: string[] = [];
-    if (quota.claude5hRemainingPct !== undefined) {
-      subParts.push(`Claude/GPT 5h: ${fmt(quota.claude5hRemainingPct)}`);
-    }
-    if (quota.claudeWeeklyRemainingPct !== undefined) {
-      const label = quota.claude5hRemainingPct !== undefined ? 'Weekly' : 'Claude/GPT Weekly';
-      subParts.push(`${label}: ${fmt(quota.claudeWeeklyRemainingPct)}`);
-    }
-    if (subParts.length > 0) {
-      parts.push(subParts.join(' · '));
+    if (!options.hideUnused || !claudeUnused) {
+      const subParts: string[] = [];
+      if (quota.claude5hRemainingPct !== undefined) {
+        subParts.push(`Claude/GPT 5h: ${fmt(quota.claude5hRemainingPct)}`);
+      }
+      if (quota.claudeWeeklyRemainingPct !== undefined) {
+        const label = quota.claude5hRemainingPct !== undefined ? 'Weekly' : 'Claude/GPT Weekly';
+        subParts.push(`${label}: ${fmt(quota.claudeWeeklyRemainingPct)}`);
+      }
+      if (subParts.length > 0) {
+        parts.push(subParts.join(' · '));
+      }
     }
   }
 
@@ -573,6 +631,8 @@ export interface RoutineTelemetrySummary {
   ambiguityGateTriggered?: boolean;
   questionsAskedCount?: number;
   needsInfoApplied?: boolean;
+  targetPr?: number;
+  commitSha?: string;
 }
 
 export interface WeeklyBudgetStatus {
@@ -725,6 +785,20 @@ export function parseLogToTelemetry(
     questionsAskedCount = questionLines.length > 0 ? questionLines.length : 2;
   }
 
+  let targetPr: number | undefined;
+  const rawTarget = metadata['target'] || metadata['target / context'] || metadata['pr'];
+  if (rawTarget) {
+    const prMatch = rawTarget.match(/PR\s*#?(\d+)/i);
+    if (prMatch) targetPr = parseInt(prMatch[1], 10);
+  }
+
+  let commitSha: string | undefined =
+    metadata['commit'] || metadata['commit sha'] || metadata['head sha'] || metadata['sha'];
+  if (!commitSha) {
+    const shaMatch = content.match(/(?:commit|head\s+sha|head\s+commit)[:\s]+`?([0-9a-f]{7,40})`?/i);
+    if (shaMatch) commitSha = shaMatch[1];
+  }
+
   return {
     schemaVersion: '1.0.0',
     routine,
@@ -746,6 +820,8 @@ export function parseLogToTelemetry(
     ambiguityGateTriggered: ambiguityGateTriggered || undefined,
     questionsAskedCount,
     needsInfoApplied: needsInfoApplied || undefined,
+    targetPr,
+    commitSha,
   };
 }
 
@@ -941,15 +1017,87 @@ export function collectLocalTelemetryLogs(dir: string, repositoryName: string = 
   const traverse = (currentDir: string) => {
     if (!fs.existsSync(currentDir)) return;
     const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+
+    // Collect base names to avoid duplicates when both .md and .json exist
+    const filesByBase = new Map<string, { json?: string; md?: string }>();
     for (const entry of entries) {
-      const fullPath = path.join(currentDir, entry.name);
       if (entry.isDirectory()) {
-        traverse(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        traverse(path.join(currentDir, entry.name));
+      } else if (entry.isFile()) {
+        if (entry.name.endsWith('.md')) {
+          const base = entry.name.slice(0, -3);
+          const current = filesByBase.get(base) || {};
+          current.md = path.join(currentDir, entry.name);
+          filesByBase.set(base, current);
+        } else if (entry.name.endsWith('.json')) {
+          const base = entry.name.slice(0, -5);
+          const current = filesByBase.get(base) || {};
+          current.json = path.join(currentDir, entry.name);
+          filesByBase.set(base, current);
+        }
+      }
+    }
+
+    for (const [, paths] of filesByBase) {
+      let parsed = false;
+      if (paths.json) {
         try {
-          const content = fs.readFileSync(fullPath, 'utf8');
+          const content = fs.readFileSync(paths.json, 'utf8');
+          const data = JSON.parse(content);
+          if (data.routine && data.timestamp) {
+            const inTokens = data.usage?.inputTokens ?? data.usage?.input_tokens ?? data.inputTokens ?? 0;
+            const outTokens = data.usage?.outputTokens ?? data.usage?.output_tokens ?? data.outputTokens ?? 0;
+            const totTokens = data.usage?.totalTokens ?? data.usage?.total_tokens ?? data.totalTokens ?? (inTokens + outTokens);
+            const durationSec = data.durationMs ? Math.round(data.durationMs / 1000) : (data.durationSeconds ?? undefined);
+            const result = data.result ?? (data.success === true ? 'SUCCESS' : data.success === false ? 'FAILURE' : 'UNKNOWN');
+
+            const targetPr =
+              data.pr ??
+              data.targetPr ??
+              (typeof data.target === 'string'
+                ? data.target.match(/PR\s*#?(\d+)/i)?.[1]
+                  ? parseInt(data.target.match(/PR\s*#?(\d+)/i)![1], 10)
+                  : undefined
+                : undefined);
+            const commitSha =
+              data.commitSha ??
+              data.headRefOid ??
+              data.headSha ??
+              (typeof data.commit === 'string' ? data.commit : data.commit?.oid);
+
+            summaries.push({
+              schemaVersion: '1.0.0',
+              routine: data.routine,
+              repository: repositoryName,
+              timestamp: data.timestamp,
+              result,
+              errorReason: data.errorReason || data.error,
+              failureCategory: data.failureCategory,
+              inputTokens: inTokens,
+              outputTokens: outTokens,
+              totalTokens: totTokens,
+              estimatedCost: data.estimatedCost ?? (totTokens / 1_000_000) * 0.35,
+              durationSeconds: durationSec,
+              iterationsUsed: data.iterationsUsed,
+              maxIterations: data.maxIterations,
+              ambiguityGateTriggered: Boolean(data.ambiguityGateTriggered),
+              questionsAskedCount: data.questionsAskedCount || 0,
+              needsInfoApplied: Boolean(data.needsInfoApplied),
+              targetPr,
+              commitSha,
+            });
+            parsed = true;
+          }
+        } catch {}
+      }
+      if (!parsed && paths.md) {
+        try {
+          const content = fs.readFileSync(paths.md, 'utf8');
           const summary = parseLogToTelemetry(content, { repository: repositoryName });
-          if (summary) summaries.push(summary);
+          if (summary) {
+            summaries.push(summary);
+            parsed = true;
+          }
         } catch {}
       }
     }
@@ -1057,9 +1205,178 @@ function renderProgressBar(percentage: number, width: number = 25): string {
   return pc.green(filledBar) + pc.gray(emptyBar);
 }
 
+export function detectTokenAnomalies(
+  telemetry: AggregatedTelemetry,
+  options: { actualQuota?: ActualPlanQuota } = {}
+): TokenAnomalyReport[] {
+  const anomalies: TokenAnomalyReport[] = [];
+
+  // 1. Context Asymmetry & Prompt Bloat
+  // Routine inputTokens / outputTokens > 35:1 with significant input volume (>50k)
+  for (const [routineName, r] of Object.entries(telemetry.byRoutine)) {
+    const ratio = r.totalInputTokens / Math.max(1, r.totalOutputTokens);
+    if (
+      ratio > TOKEN_ANOMALY_THRESHOLDS.CONTEXT_ASYMMETRY_RATIO &&
+      r.totalInputTokens > TOKEN_ANOMALY_THRESHOLDS.CONTEXT_ASYMMETRY_MIN_INPUT_TOKENS
+    ) {
+      anomalies.push({
+        type: 'context_asymmetry',
+        severity: 'WARNING',
+        routine: routineName,
+        message: `Context Asymmetry on '${routineName}': Input/Output ratio is ${formatIoRatio(r.totalInputTokens, r.totalOutputTokens, 1)} (${r.totalInputTokens.toLocaleString()} input vs ${r.totalOutputTokens.toLocaleString()} output tokens).`,
+        remediation: `Apply progressive disclosure and skill pruning. Scope skills strictly per routine rather than injecting all skills globally.`,
+      });
+    }
+  }
+
+  // 2. Budget Hog (Single routine consumes > 75% of fleet tokens)
+  if (telemetry.totalTokens > 0) {
+    for (const [routineName, r] of Object.entries(telemetry.byRoutine)) {
+      const share = (r.totalTokens / telemetry.totalTokens) * 100;
+      if (
+        share > TOKEN_ANOMALY_THRESHOLDS.BUDGET_HOG_PERCENT &&
+        Object.keys(telemetry.byRoutine).length > 1
+      ) {
+        anomalies.push({
+          type: 'budget_hog',
+          severity: 'CRITICAL',
+          routine: routineName,
+          message: `Budget Hog on '${routineName}': Consumes ${share.toFixed(1)}% of total fleet token allowance.`,
+          remediation: `Throttle dispatch cadence, introduce stricter pre-qualification filters, or add early exit guards.`,
+        });
+      }
+    }
+  }
+
+  // 3. Multi-Routine Budget Cannibalization (Top 2 routines consume > 80% of fleet tokens across 3+ routines)
+  if (
+    telemetry.totalTokens > 0 &&
+    Object.keys(telemetry.byRoutine).length >= TOKEN_ANOMALY_THRESHOLDS.MULTI_ROUTINE_MIN_ROUTINES
+  ) {
+    const sortedRoutines = Object.values(telemetry.byRoutine).sort(
+      (a, b) => b.totalTokens - a.totalTokens
+    );
+    const top2Spend = (sortedRoutines[0]?.totalTokens || 0) + (sortedRoutines[1]?.totalTokens || 0);
+    const top2Share = (top2Spend / telemetry.totalTokens) * 100;
+    if (top2Share > TOKEN_ANOMALY_THRESHOLDS.MULTI_ROUTINE_CANNIBALIZATION_PERCENT) {
+      anomalies.push({
+        type: 'multi_routine_cannibalization',
+        severity: 'WARNING',
+        message: `Multi-Routine Budget Cannibalization: Top 2 routines ('${sortedRoutines[0]?.routine}' and '${sortedRoutines[1]?.routine}') consume ${top2Share.toFixed(1)}% of fleet tokens.`,
+        remediation: `Rebalance dispatch pacing and coordinate candidate skips across authoring and review routines.`,
+      });
+    }
+  }
+
+  // 4. Unilateral Re-Review Thrash (PR evaluated >= 2 times on the identical commit SHA without state changes)
+  const prShaEvaluations = new Map<string, { pr: number; sha: string; count: number; routine: string }>();
+  for (const e of telemetry.events || []) {
+    if (e.targetPr && e.commitSha) {
+      const key = `${e.targetPr}:${e.commitSha}`;
+      const existing = prShaEvaluations.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        prShaEvaluations.set(key, { pr: e.targetPr, sha: e.commitSha, count: 1, routine: e.routine });
+      }
+    }
+  }
+  for (const { pr, sha, count, routine } of prShaEvaluations.values()) {
+    if (count >= TOKEN_ANOMALY_THRESHOLDS.RE_REVIEW_THRASH_THRESHOLD) {
+      anomalies.push({
+        type: 'unilateral_rereview_thrash',
+        severity: 'WARNING',
+        routine,
+        message: `Unilateral Re-Review Thrash on PR #${pr}: Evaluated ${count} times on identical commit SHA ${sha.slice(0, 7)} without intervening commits.`,
+        remediation: `Enforce persistent review commit state and failure cooldowns (e.g. daemon.json review state cache).`,
+      });
+    }
+  }
+
+  // 5. Iteration Ceiling Exhaustion (>20% runs terminate at token_limit)
+  for (const [routineName, r] of Object.entries(telemetry.byRoutine)) {
+    if (r.runCount >= 3) {
+      const tokenLimitFailures = (telemetry.events || []).filter(
+        (e) => e.routine === routineName && e.failureCategory === 'token_limit'
+      ).length;
+      const failPct = (tokenLimitFailures / r.runCount) * 100;
+      if (failPct > TOKEN_ANOMALY_THRESHOLDS.ITERATION_EXHAUSTION_PERCENT) {
+        anomalies.push({
+          type: 'iteration_exhaustion',
+          severity: 'WARNING',
+          routine: routineName,
+          message: `Iteration Ceiling Exhaustion on '${routineName}': ${failPct.toFixed(1)}% of runs terminate at max iteration/token limit.`,
+          remediation: `Decompose tasks vertically into smaller slices and tighten pre-ready self-audits.`,
+        });
+      }
+    }
+  }
+
+  // 6. Plan Quota Burn Velocity (Actual provider quota remaining is <30% weekly or <20% in 5h window)
+  if (options.actualQuota?.available) {
+    const geminiWeekly = options.actualQuota.geminiWeeklyRemainingPct;
+    const gemini5h = options.actualQuota.gemini5hRemainingPct;
+    if (
+      geminiWeekly !== undefined &&
+      geminiWeekly < TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_WEEKLY_WARNING_PERCENT
+    ) {
+      anomalies.push({
+        type: 'plan_quota_velocity',
+        severity:
+          geminiWeekly < TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_WEEKLY_CRITICAL_PERCENT
+            ? 'CRITICAL'
+            : 'WARNING',
+        message: `Plan Quota Burn Velocity: Gemini weekly plan quota is at ${geminiWeekly.toFixed(1)}% remaining (<${TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_WEEKLY_WARNING_PERCENT}% threshold).`,
+        remediation: `Downgrade auxiliary routines ('peer-review', 'optimizer') to medium reasoning effort and standard Flash models (gemini-3.8-flash-medium).`,
+      });
+    }
+    if (
+      gemini5h !== undefined &&
+      gemini5h < TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_5H_CRITICAL_PERCENT
+    ) {
+      anomalies.push({
+        type: 'plan_quota_velocity',
+        severity: 'CRITICAL',
+        message: `Plan Quota Burn Velocity: Gemini 5h rolling plan quota is at ${gemini5h.toFixed(1)}% remaining (<${TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_5H_CRITICAL_PERCENT}% threshold).`,
+        remediation: `Throttle active agent execution to prevent rate limit lockout during the current 5-hour window.`,
+      });
+    }
+
+    const claudeWeekly = options.actualQuota.claudeWeeklyRemainingPct;
+    const claude5h = options.actualQuota.claude5hRemainingPct;
+    if (
+      claudeWeekly !== undefined &&
+      claudeWeekly < TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_WEEKLY_WARNING_PERCENT
+    ) {
+      anomalies.push({
+        type: 'plan_quota_velocity',
+        severity:
+          claudeWeekly < TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_WEEKLY_CRITICAL_PERCENT
+            ? 'CRITICAL'
+            : 'WARNING',
+        message: `Plan Quota Burn Velocity: Claude/GPT weekly plan quota is at ${claudeWeekly.toFixed(1)}% remaining (<${TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_WEEKLY_WARNING_PERCENT}% threshold).`,
+        remediation: `Conserve Claude/GPT quota for complex architectural reasoning; route standard tasks to Gemini Flash.`,
+      });
+    }
+    if (
+      claude5h !== undefined &&
+      claude5h < TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_5H_CRITICAL_PERCENT
+    ) {
+      anomalies.push({
+        type: 'plan_quota_velocity',
+        severity: 'CRITICAL',
+        message: `Plan Quota Burn Velocity: Claude/GPT 5h rolling plan quota is at ${claude5h.toFixed(1)}% remaining (<${TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_5H_CRITICAL_PERCENT}% threshold).`,
+        remediation: `Throttle active agent execution to prevent Claude/GPT rate limit lockout during the current 5-hour window.`,
+      });
+    }
+  }
+
+  return anomalies;
+}
+
 export function renderTelemetryDashboard(
   telemetry: AggregatedTelemetry,
-  options: { json?: boolean } = {}
+  options: { json?: boolean; actualQuota?: ActualPlanQuota } = {}
 ): string {
   if (options.json) {
     return JSON.stringify(telemetry, null, 2);
@@ -1100,10 +1417,12 @@ export function renderTelemetryDashboard(
   lines.push('\n' + pc.bold('🤖 Spend by Agent Routine:'));
   for (const [routineName, r] of Object.entries(telemetry.byRoutine)) {
     const costStr = pc.green(`$${r.totalEstimatedCost.toFixed(2)}`);
+    const ioRatioStr = formatIoRatio(r.totalInputTokens, r.totalOutputTokens);
     lines.push(
       `   • ${pc.cyan(routineName.padEnd(30))} ` +
         `Runs: ${pc.bold(r.runCount.toString().padStart(2))} | ` +
         `Tokens: ${pc.bold(formatTokens(r.totalTokens).padStart(7))} | ` +
+        `I/O: ${ioRatioStr.padStart(5)} | ` +
         `Cost: ${costStr.padStart(6)} | ` +
         `Avg Iter: ${r.avgIterationsUsed.toFixed(1)}`
     );
@@ -1134,6 +1453,17 @@ export function renderTelemetryDashboard(
   lines.push(
     `   • Est. Wasted Tokens Averted: ~${pc.bold(pc.green(formatTokens(amb.estimatedTokensSaved)))} tokens (avoided speculative builds)`
   );
+
+  // Detected Anomalies
+  const anomalies = detectTokenAnomalies(telemetry, { actualQuota: options.actualQuota });
+  if (anomalies.length > 0) {
+    lines.push('\n' + pc.bold(pc.yellow('🚨 Detected Token & Pacing Anomalies:')));
+    for (const anom of anomalies) {
+      const badge = anom.severity === 'CRITICAL' ? pc.red('[CRITICAL]') : pc.yellow('[WARNING]');
+      lines.push(`   ${badge} ${anom.message}`);
+      lines.push(pc.gray(`     ↳ Remediation: ${anom.remediation}`));
+    }
+  }
 
   // Failure breakdown
   const failKeys = Object.keys(telemetry.failureCategories);

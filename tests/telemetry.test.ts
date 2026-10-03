@@ -18,6 +18,9 @@ import {
   fetchActualPlanQuota,
   getActualPlanQuotaSync,
   formatPlanQuotaSummary,
+  detectTokenAnomalies,
+  formatIoRatio,
+  TOKEN_ANOMALY_THRESHOLDS,
 } from '../src/lib/telemetry.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -839,6 +842,345 @@ Claude and GPT models  Five Hour Limit Remaining  100%  2026-10-03 14:48 CEST
       expect(markdownSummary).toContain('Gemini 5h: `43.0% remaining` · Weekly: `16.2% remaining`');
       expect(markdownSummary).toContain('<br>');
       expect(markdownSummary).toContain('Claude/GPT 5h: `100.0% remaining` · Weekly: `100.0% remaining`');
+    });
+  });
+
+  describe('detectTokenAnomalies & Local Run Artifacts', () => {
+    it('detects Context Asymmetry when input/output ratio exceeds 35:1', () => {
+      const summaries: RoutineTelemetrySummary[] = [
+        {
+          schemaVersion: '1.0.0',
+          routine: 'autowork',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 120,
+          iterationsUsed: 10,
+          maxIterations: 65,
+          result: 'SUCCESS',
+          inputTokens: 90000,
+          outputTokens: 1500, // 60:1 ratio
+          totalTokens: 91500,
+          estimatedCost: 0.25,
+        },
+      ];
+      const aggregated = aggregateFleetTelemetry(summaries);
+      const anomalies = detectTokenAnomalies(aggregated);
+
+      const asymmetry = anomalies.find((a) => a.type === 'context_asymmetry');
+      expect(asymmetry).toBeDefined();
+      expect(asymmetry?.routine).toBe('autowork');
+      expect(asymmetry?.message).toContain('60.0:1');
+      expect(asymmetry?.remediation).toMatch(/skill pruning|progressive disclosure/i);
+    });
+
+    it('detects Multi-Routine Budget Cannibalization when top-2 routines consume >80% of fleet tokens', () => {
+      const summaries: RoutineTelemetrySummary[] = [
+        {
+          schemaVersion: '1.0.0',
+          routine: 'autowork',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 100,
+          iterationsUsed: 10,
+          maxIterations: 65,
+          result: 'SUCCESS',
+          inputTokens: 40000,
+          outputTokens: 2000,
+          totalTokens: 42000, // 42%
+          estimatedCost: 0.1,
+        },
+        {
+          schemaVersion: '1.0.0',
+          routine: 'peer-review',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 100,
+          iterationsUsed: 10,
+          maxIterations: 30,
+          result: 'SUCCESS',
+          inputTokens: 42000,
+          outputTokens: 2000,
+          totalTokens: 44000, // 44% => combined 86%
+          estimatedCost: 0.1,
+        },
+        {
+          schemaVersion: '1.0.0',
+          routine: 'issues-housekeeping',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 50,
+          iterationsUsed: 5,
+          maxIterations: 20,
+          result: 'SUCCESS',
+          inputTokens: 13000,
+          outputTokens: 1000,
+          totalTokens: 14000, // 14%
+          estimatedCost: 0.03,
+        },
+      ];
+      const aggregated = aggregateFleetTelemetry(summaries);
+      const anomalies = detectTokenAnomalies(aggregated);
+
+      const cannibalization = anomalies.find((a) => a.type === 'multi_routine_cannibalization');
+      expect(cannibalization).toBeDefined();
+      expect(cannibalization?.message).toContain('86.0%');
+    });
+
+    it('detects Plan Quota Velocity anomaly when actual plan quota remaining is <30%', () => {
+      const summaries: RoutineTelemetrySummary[] = [
+        {
+          schemaVersion: '1.0.0',
+          routine: 'autowork',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 100,
+          iterationsUsed: 10,
+          maxIterations: 65,
+          result: 'SUCCESS',
+          inputTokens: 10000,
+          outputTokens: 1000,
+          totalTokens: 11000,
+          estimatedCost: 0.05,
+        },
+      ];
+      const aggregated = aggregateFleetTelemetry(summaries);
+      const quota = {
+        available: true,
+        groups: {},
+        geminiWeeklyRemainingPct: 15.4,
+        gemini5hRemainingPct: 35.8,
+        fetchedAt: new Date().toISOString(),
+      };
+      const anomalies = detectTokenAnomalies(aggregated, { actualQuota: quota });
+
+      const planAnomaly = anomalies.find((a) => a.type === 'plan_quota_velocity');
+      expect(planAnomaly).toBeDefined();
+      expect(planAnomaly?.severity).toBe('CRITICAL');
+      expect(planAnomaly?.message).toContain('15.4%');
+    });
+
+    it('collects local telemetry from .jonah-fleet/runs/*.json files directly', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fleet-telemetry-test-'));
+      const runsDir = path.join(tempDir, '.jonah-fleet', 'runs');
+      fs.mkdirSync(runsDir, { recursive: true });
+
+      const jsonRun = {
+        routine: 'peer-review',
+        timestamp: '2026-10-03T08:32:11.038Z',
+        exitCode: 0,
+        success: true,
+        target: 'PR #625',
+        durationMs: 120000,
+        usage: {
+          inputTokens: 50000,
+          outputTokens: 2000,
+          thinkingTokens: 1000,
+          totalTokens: 52000,
+        },
+      };
+      fs.writeFileSync(path.join(runsDir, 'peer-review-test.json'), JSON.stringify(jsonRun, null, 2));
+
+      const collected = collectLocalTelemetryLogs(tempDir, 'test-repo');
+      expect(collected.length).toBe(1);
+      expect(collected[0].routine).toBe('peer-review');
+      expect(collected[0].inputTokens).toBe(50000);
+      expect(collected[0].outputTokens).toBe(2000);
+      expect(collected[0].totalTokens).toBe(52000);
+      expect(collected[0].result).toBe('SUCCESS');
+
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('does not trigger Multi-Routine Budget Cannibalization on a 2-routine fleet', () => {
+      const summaries: RoutineTelemetrySummary[] = [
+        {
+          schemaVersion: '1.0.0',
+          routine: 'autowork',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 100,
+          iterationsUsed: 10,
+          maxIterations: 65,
+          result: 'SUCCESS',
+          inputTokens: 50000,
+          outputTokens: 2000,
+          totalTokens: 52000,
+          estimatedCost: 0.1,
+        },
+        {
+          schemaVersion: '1.0.0',
+          routine: 'peer-review',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 100,
+          iterationsUsed: 10,
+          maxIterations: 30,
+          result: 'SUCCESS',
+          inputTokens: 50000,
+          outputTokens: 2000,
+          totalTokens: 52000,
+          estimatedCost: 0.1,
+        },
+      ];
+      const aggregated = aggregateFleetTelemetry(summaries);
+      const anomalies = detectTokenAnomalies(aggregated);
+      const cannibalization = anomalies.find((a) => a.type === 'multi_routine_cannibalization');
+      expect(cannibalization).toBeUndefined();
+    });
+
+    it('evaluates both weekly and 5h rolling plan quotas independently without masking', () => {
+      const summaries: RoutineTelemetrySummary[] = [
+        {
+          schemaVersion: '1.0.0',
+          routine: 'autowork',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 100,
+          iterationsUsed: 10,
+          maxIterations: 65,
+          result: 'SUCCESS',
+          inputTokens: 10000,
+          outputTokens: 1000,
+          totalTokens: 11000,
+          estimatedCost: 0.05,
+        },
+      ];
+      const aggregated = aggregateFleetTelemetry(summaries);
+      const quota = {
+        available: true,
+        groups: {},
+        geminiWeeklyRemainingPct: 28.0, // < 30%
+        gemini5hRemainingPct: 5.0,      // < 20%
+        claudeWeeklyRemainingPct: 25.0, // < 30%
+        claude5hRemainingPct: 10.0,     // < 20%
+        fetchedAt: new Date().toISOString(),
+      };
+      const anomalies = detectTokenAnomalies(aggregated, { actualQuota: quota });
+      const planAnomalies = anomalies.filter((a) => a.type === 'plan_quota_velocity');
+
+      // Both Gemini weekly and 5h rolling limits must be present (neither masked by else-if)
+      const geminiWeekly = planAnomalies.find((a) => a.message.includes('Gemini weekly'));
+      const gemini5h = planAnomalies.find((a) => a.message.includes('Gemini 5h'));
+      expect(geminiWeekly).toBeDefined();
+      expect(gemini5h).toBeDefined();
+
+      // Claude quotas must also be evaluated
+      const claudeWeekly = planAnomalies.find((a) => a.message.includes('Claude/GPT weekly'));
+      const claude5h = planAnomalies.find((a) => a.message.includes('Claude/GPT 5h'));
+      expect(claudeWeekly).toBeDefined();
+      expect(claude5h).toBeDefined();
+    });
+
+    it('detects Unilateral Re-Review Thrash when a PR is evaluated >= 2 times on identical commit SHA', () => {
+      const summaries: RoutineTelemetrySummary[] = [
+        {
+          schemaVersion: '1.0.0',
+          routine: 'peer-review',
+          repository: 'test/repo',
+          timestamp: '2026-10-03T10:00:00Z',
+          durationSeconds: 60,
+          result: 'BOUNCED_TO_DRAFT',
+          inputTokens: 20000,
+          outputTokens: 1000,
+          totalTokens: 21000,
+          estimatedCost: 0.05,
+          targetPr: 42,
+          commitSha: '21e8e774f82fecc0bfab76c068dc72f2123de8b1',
+        },
+        {
+          schemaVersion: '1.0.0',
+          routine: 'peer-review',
+          repository: 'test/repo',
+          timestamp: '2026-10-03T10:30:00Z',
+          durationSeconds: 60,
+          result: 'BOUNCED_TO_DRAFT',
+          inputTokens: 20000,
+          outputTokens: 1000,
+          totalTokens: 21000,
+          estimatedCost: 0.05,
+          targetPr: 42,
+          commitSha: '21e8e774f82fecc0bfab76c068dc72f2123de8b1',
+        },
+      ];
+      const aggregated = aggregateFleetTelemetry(summaries);
+      const anomalies = detectTokenAnomalies(aggregated);
+      const thrash = anomalies.find((a) => a.type === 'unilateral_rereview_thrash');
+      expect(thrash).toBeDefined();
+      expect(thrash?.severity).toBe('WARNING');
+      expect(thrash?.routine).toBe('peer-review');
+      expect(thrash?.message).toContain('PR #42');
+      expect(thrash?.message).toContain('21e8e77');
+    });
+
+    it('prioritizes .json over .md when both coexist in runs directory and deduplicates', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fleet-telemetry-dedup-test-'));
+      const runsDir = path.join(tempDir, '.jonah-fleet', 'runs');
+      fs.mkdirSync(runsDir, { recursive: true });
+
+      const baseName = 'peer-review-2026-10-03T11-00-00Z';
+      const mdContent = `
+# Run Log
+## Metadata
+| Field | Value |
+|---|---|
+| Routine | \`peer-review\` |
+| Timestamp | \`2026-10-03T11:00:00Z\` |
+| Result | \`SUCCESS\` |
+| Input tokens | 30000 |
+| Output tokens | 1000 |
+| Duration | 90s |
+| Target | \`PR #100\` |
+| Commit | \`abcdef1\` |
+`;
+      const jsonRun = {
+        routine: 'peer-review',
+        timestamp: '2026-10-03T11:00:00Z',
+        exitCode: 0,
+        success: true,
+        target: 'PR #100',
+        pr: 100,
+        commitSha: 'abcdef123456789',
+        durationMs: 95400, // Exact machine duration
+        usage: {
+          inputTokens: 30000,
+          outputTokens: 1000,
+          thinkingTokens: 500,
+          totalTokens: 31000,
+        },
+      };
+
+      fs.writeFileSync(path.join(runsDir, `${baseName}.md`), mdContent, 'utf8');
+      fs.writeFileSync(path.join(runsDir, `${baseName}.json`), JSON.stringify(jsonRun, null, 2), 'utf8');
+
+      const collected = collectLocalTelemetryLogs(tempDir, 'test-repo');
+      expect(collected.length).toBe(1);
+      // Duration from JSON is Math.round(95400 / 1000) = 95s, whereas MD had 90s.
+      // Prioritizing JSON yields 95.
+      expect(collected[0].durationSeconds).toBe(95);
+      expect(collected[0].targetPr).toBe(100);
+      expect(collected[0].commitSha).toBe('abcdef123456789');
+
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('formats I/O ratio safely with formatIoRatio helper', () => {
+      expect(formatIoRatio(35000, 1000)).toBe('35:1');
+      expect(formatIoRatio(35500, 1000, 1)).toBe('35.5:1');
+      expect(formatIoRatio(100, 0)).toBe('100:1');
+      expect(formatIoRatio(0, 0)).toBe('0:1');
+    });
+
+    it('exposes typed TOKEN_ANOMALY_THRESHOLDS constants with documented values', () => {
+      expect(TOKEN_ANOMALY_THRESHOLDS.CONTEXT_ASYMMETRY_RATIO).toBe(35);
+      expect(TOKEN_ANOMALY_THRESHOLDS.CONTEXT_ASYMMETRY_MIN_INPUT_TOKENS).toBe(50000);
+      expect(TOKEN_ANOMALY_THRESHOLDS.BUDGET_HOG_PERCENT).toBe(75);
+      expect(TOKEN_ANOMALY_THRESHOLDS.MULTI_ROUTINE_CANNIBALIZATION_PERCENT).toBe(80);
+      expect(TOKEN_ANOMALY_THRESHOLDS.MULTI_ROUTINE_MIN_ROUTINES).toBe(3);
+      expect(TOKEN_ANOMALY_THRESHOLDS.ITERATION_EXHAUSTION_PERCENT).toBe(20);
+      expect(TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_WEEKLY_WARNING_PERCENT).toBe(30);
+      expect(TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_WEEKLY_CRITICAL_PERCENT).toBe(20);
+      expect(TOKEN_ANOMALY_THRESHOLDS.PLAN_QUOTA_5H_CRITICAL_PERCENT).toBe(20);
+      expect(TOKEN_ANOMALY_THRESHOLDS.RE_REVIEW_THRASH_THRESHOLD).toBe(2);
     });
   });
 });
