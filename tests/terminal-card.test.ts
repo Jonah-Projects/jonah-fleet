@@ -742,6 +742,31 @@ The build is completing. Continuing shortly.
 
       expect(card).not.toMatch(/├[─]+┤\s*\n\s*├[─]+┤/);
     });
+
+    it('renders token usage breakdown and limit percentages when usage option is provided', () => {
+      const card = renderSummaryCard({
+        routine: 'peer-review',
+        pr: 601,
+        title: 'fix(daemon): persist review state',
+        durationMs: 42000,
+        output: 'Squash-merged PR #601 into main.',
+        usage: {
+          totalTokens: 14250,
+          inputTokens: 11800,
+          outputTokens: 950,
+          thinkingTokens: 1500,
+        },
+      });
+
+      const clean = stripAnsi(card);
+      expect(clean).toContain('14.3k tokens');
+      expect(clean).toContain('Tokens: 14,250');
+      expect(clean).toContain('in: 11,800');
+      expect(clean).toContain('out: 950');
+      expect(clean).toContain('think: 1,500');
+      expect(clean).toContain('0.71% of 5h limit');
+      expect(clean).toContain('0.16% of weekly limit');
+    });
   });
 });
 

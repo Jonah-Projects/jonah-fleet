@@ -79,6 +79,7 @@ export interface DaemonState {
   activeWorktree?: string;
   evaluatedPRs?: Record<number, EvaluatedPRRecord>;
   failureCooldowns?: Record<number, PRFailureRecord>;
+  sessionTokens?: number;
 }
 
 export interface DaemonOptions {
@@ -102,6 +103,12 @@ export interface DaemonOptions {
     transientServiceError?: boolean;
     output?: string;
     stderr?: string;
+    usage?: {
+      totalTokens?: number;
+      inputTokens?: number;
+      outputTokens?: number;
+      thinkingTokens?: number;
+    };
   }>;
 }
 
@@ -898,6 +905,12 @@ export interface DrainReviewQueueOptions {
     transientServiceError?: boolean;
     output?: string;
     stderr?: string;
+    usage?: {
+      totalTokens?: number;
+      inputTokens?: number;
+      outputTokens?: number;
+      thinkingTokens?: number;
+    };
   }>;
   onAttempted?: (prNumber: number) => void;
   failureCooldowns?: Map<number, PRFailureRecord>;
@@ -1042,6 +1055,11 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
         onAttempted?.(prNum);
       }
 
+      if (result.usage?.totalTokens && state) {
+        state.sessionTokens = (state.sessionTokens || 0) + result.usage.totalTokens;
+        writeDaemonState(repoRoot, state);
+      }
+
       const isQuota =
         result.quotaPaused ||
         (!result.success &&
@@ -1161,6 +1179,12 @@ export interface PerformAutoworkScanOptions {
     transientServiceError?: boolean;
     output?: string;
     stderr?: string;
+    usage?: {
+      totalTokens?: number;
+      inputTokens?: number;
+      outputTokens?: number;
+      thinkingTokens?: number;
+    };
   }>;
   onDiagnosticCard?: (card: string) => void;
   onAttempted?: (prNumber: number) => void;
@@ -1266,6 +1290,11 @@ export async function performAutoworkScan(
       }
     },
   });
+
+  if (result.usage?.totalTokens && state) {
+    state.sessionTokens = (state.sessionTokens || 0) + result.usage.totalTokens;
+    writeDaemonState(repoRoot, state);
+  }
 
   const isQuota =
     result.quotaPaused ||

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **telemetry,runner,terminal-card,status:** report token consumption and 5-hour/weekly quota percentages on each run, terminal summary card, run report, status pacing section, and persist run usage to artifacts
 * **runner,daemon:** scope skill discovery by routine to eliminate context bloat, add fast-path merge mode for approved PRs with green CI, and calibrate `peer-review` and `optimizer` to `gemini-3.8-flash-medium`
 
 ### Bug Fixes

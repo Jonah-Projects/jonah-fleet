@@ -32,6 +32,10 @@ import {
 } from './loop-guard.js';
 import pc from 'picocolors';
 import { DEFAULT_ROUTINE_MODELS } from './presets.js';
+import {
+  calculateTokenQuotaPercentages,
+  getRollingWindowTokenUsage,
+} from './telemetry.js';
 
 export interface RunLocalRoutineOptions {
   targetDir: string;
@@ -65,6 +69,12 @@ export interface RunLocalRoutineResult {
   transientServiceError?: boolean;
   durationMs?: number;
   outcome?: PeerReviewOutcome;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    thinkingTokens?: number;
+    totalTokens?: number;
+  };
 }
 
 export interface StreamJsonEvent {
@@ -771,6 +781,13 @@ export interface FallbackReportOptions {
   durationSec: number;
   output?: string;
   stderr?: string;
+  usage?: {
+    totalTokens?: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    thinkingTokens?: number;
+  };
+  repoRoot?: string;
 }
 
 /**
@@ -864,6 +881,33 @@ export function formatFallbackRunReport(options: FallbackReportOptions): string 
         `| Duration | \`${options.durationSec}s\` |\n`,
         `| Duration | \`${options.durationSec}s\` |\n| Decision | \`${decisionMap[outcome]}\` |\n`
       );
+    }
+  }
+
+  const total = options.usage?.totalTokens;
+  if (typeof total === 'number') {
+    const u = options.usage!;
+    const quota = calculateTokenQuotaPercentages(total);
+    const breakdown = [
+      u.inputTokens !== undefined ? `${u.inputTokens.toLocaleString()} in` : '',
+      u.outputTokens !== undefined ? `${u.outputTokens.toLocaleString()} out` : '',
+      u.thinkingTokens !== undefined ? `${u.thinkingTokens.toLocaleString()} think` : '',
+    ].filter(Boolean).join(' · ');
+
+    const k5h = (quota.window5hLimit / 1_000_000).toFixed(1) + 'M';
+    const kWeekly = (quota.weeklyLimit / 1_000_000).toFixed(2) + 'M';
+
+    reportContent += `| Run Tokens | \`${total.toLocaleString()}\`${breakdown ? ` (\`${breakdown}\`)` : ''} |\n`;
+    reportContent += `| Run % of Limits | \`${quota.pctOf5hLimit.toFixed(2)}%\` of 5h (\`${k5h}\`) · \`${quota.pctOfWeeklyLimit.toFixed(2)}%\` of weekly (\`${kWeekly}\`) |\n`;
+
+    if (options.repoRoot) {
+      try {
+        const rolling = getRollingWindowTokenUsage(options.repoRoot);
+        if (rolling.windowTokens > 0 || rolling.weeklyTokens > 0) {
+          reportContent += `| 5h Window Usage | \`${rolling.windowTokens.toLocaleString()} / ${rolling.windowLimit.toLocaleString()}\` tokens (\`${rolling.windowPercentage.toFixed(1)}%\` · \`[${rolling.status}]\`) |\n`;
+          reportContent += `| Weekly Spend | \`${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()}\` tokens (\`${rolling.weeklyPercentage.toFixed(1)}%\` · \`[${rolling.status}]\`) |\n`;
+        }
+      } catch {}
     }
   }
 
@@ -1131,6 +1175,12 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
   });
 
   let executedAnyTool = false;
+  let sessionUsage: {
+    inputTokens?: number;
+    outputTokens?: number;
+    thinkingTokens?: number;
+    totalTokens?: number;
+  } | undefined;
 
   const stdoutParser = new LineBufferedStreamParser((line: string) => {
     const event = parseStreamJsonEvent(line);
@@ -1209,6 +1259,14 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
         if (event.result.response) {
           finalResponseText = event.result.response;
           checkTargetDetection(event.result.response);
+        }
+        if (event.result.usage) {
+          sessionUsage = {
+            inputTokens: event.result.usage.input_tokens,
+            outputTokens: event.result.usage.output_tokens,
+            thinkingTokens: event.result.usage.thinking_tokens,
+            totalTokens: event.result.usage.total_tokens,
+          };
         }
         if (options.verbose) {
           const formatted = formatVerboseEvent(event);
@@ -1391,6 +1449,8 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
       durationSec,
       output,
       stderr: [accumulatedStderr, prematureError].filter(Boolean).join('\n'),
+      usage: sessionUsage,
+      repoRoot: targetDir,
     });
   }
 
@@ -1415,6 +1475,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
           target: targetLabel,
           issueNumber: routineIssueNumber,
           durationMs,
+          usage: sessionUsage,
         },
         null,
         2
@@ -1449,6 +1510,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
             pr: effectivePR,
             title: targetTitle,
             durationMs,
+            usage: sessionUsage,
           }) +
           '\n'
       );
@@ -1462,6 +1524,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
             issue: effectiveIssue,
             pr: effectivePR,
             durationMs,
+            usage: sessionUsage,
           }) +
           '\n'
       );
@@ -1483,6 +1546,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     quotaResetInfo: quotaInfo.resetInfo,
     transientServiceError,
     durationMs,
+    usage: sessionUsage,
     outcome:
       routine === 'peer-review' && exitCode === 0
         ? detectPeerReviewOutcome({

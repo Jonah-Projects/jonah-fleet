@@ -3,8 +3,19 @@ import path from 'node:path';
 import { execFileSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import pc from 'picocolors';
+import {
+  calculateTokenQuotaPercentages,
+  getRollingWindowTokenUsage,
+} from './telemetry.js';
 
 const execFileAsync = promisify(execFile);
+
+export interface RunUsageMetrics {
+  totalTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  thinkingTokens?: number;
+}
 
 export interface SummaryCardOptions {
   routine: string;
@@ -14,6 +25,7 @@ export interface SummaryCardOptions {
   pr?: string | number;
   title?: string;
   durationMs?: number;
+  usage?: RunUsageMetrics;
 }
 
 export interface ErrorCardOptions {
@@ -24,6 +36,7 @@ export interface ErrorCardOptions {
   pr?: string | number;
   durationMs?: number;
   error?: Error;
+  usage?: RunUsageMetrics;
 }
 
 export interface ParsedRunSummary {
@@ -1096,6 +1109,10 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
   const headerParts = [pc.bold(pc.white(options.routine.toUpperCase()))];
   if (target) headerParts.push(pc.yellow(target));
   if (durationStr) headerParts.push(pc.dim(`(${durationStr})`));
+  if (options.usage?.totalTokens) {
+    const kTokens = (options.usage.totalTokens / 1000).toFixed(1) + 'k tokens';
+    headerParts.push(pc.cyan(kTokens));
+  }
   const headerContent = headerParts.join(' · ');
   const headerPlain = stripAnsi(headerContent);
 
@@ -1321,6 +1338,45 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
   if (bodyLines.length > 0) {
     lines.push(border(`├${horizontal}┤`));
     lines.push(...bodyLines);
+  }
+
+  // Token consumption & Quota Limit Pacing
+  const total = options.usage?.totalTokens;
+  if (typeof total === 'number') {
+    const u = options.usage!;
+    const quota = calculateTokenQuotaPercentages(total);
+    const breakdown = [
+      u.inputTokens !== undefined ? `in: ${u.inputTokens.toLocaleString()}` : '',
+      u.outputTokens !== undefined ? `out: ${u.outputTokens.toLocaleString()}` : '',
+      u.thinkingTokens !== undefined ? `think: ${u.thinkingTokens.toLocaleString()}` : '',
+    ].filter(Boolean).join(' · ');
+
+    lines.push(border(`├${horizontal}┤`));
+    const tokenLine1 = ` Tokens: ${pc.bold(total.toLocaleString())}${breakdown ? pc.dim(` (${breakdown})`) : ''}`;
+    lines.push(border('│') + tokenLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine1).length)) + border('│'));
+
+    const tokenLine2 = `         ↳ ${pc.cyan(quota.pctOf5hLimit.toFixed(2) + '% of 5h limit')} · ${pc.cyan(quota.pctOfWeeklyLimit.toFixed(2) + '% of weekly limit')}`;
+    lines.push(border('│') + tokenLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine2).length)) + border('│'));
+
+    if (options.repoRoot) {
+      try {
+        const rolling = getRollingWindowTokenUsage(options.repoRoot);
+        if (rolling.windowTokens > 0 || rolling.weeklyTokens > 0) {
+          const statusBadge =
+            rolling.status === 'HEALTHY'
+              ? pc.green('[HEALTHY]')
+              : rolling.status === 'WARNING'
+                ? pc.yellow('[WARNING]')
+                : pc.red(`[${rolling.status}]`);
+
+          const rollingLine1 = ` Rolling 5h: ${rolling.windowTokens.toLocaleString()} / ${rolling.windowLimit.toLocaleString()} tokens (${rolling.windowPercentage.toFixed(1)}% · ${statusBadge})`;
+          lines.push(border('│') + rollingLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine1).length)) + border('│'));
+
+          const rollingLine2 = ` Rolling 7d: ${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()} tokens (${rolling.weeklyPercentage.toFixed(1)}% · ${statusBadge})`;
+          lines.push(border('│') + rollingLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine2).length)) + border('│'));
+        }
+      } catch {}
+    }
   }
 
   // Footer section with log link

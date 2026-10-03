@@ -939,6 +939,26 @@ describe('Local Routine Runner', () => {
       });
       expect(reportBounced).toContain('| Decision | `BOUNCE` |');
     });
+
+    it('includes token usage breakdown and limit percentages when usage is provided', () => {
+      const report = formatFallbackRunReport({
+        routine: 'peer-review',
+        timestamp: '2026-10-03T08-30-00Z',
+        exitCode: 0,
+        hostname: 'penguin',
+        targetLabel: 'PR #601',
+        durationSec: 42,
+        usage: {
+          totalTokens: 14250,
+          inputTokens: 11800,
+          outputTokens: 950,
+          thinkingTokens: 1500,
+        },
+      });
+
+      expect(report).toContain('| Run Tokens | `14,250` (`11,800 in · 950 out · 1,500 think`) |');
+      expect(report).toContain('| Run % of Limits | `0.71%` of 5h (`2.0M`) · `0.16%` of weekly (`8.75M`) |');
+    });
   });
 
   describe('detectPrematureRoutineExit', () => {

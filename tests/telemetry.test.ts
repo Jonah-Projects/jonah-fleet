@@ -9,6 +9,9 @@ import {
   collectRepoTelemetry,
   RoutineTelemetrySummary,
   GLOBAL_WEEKLY_TOKEN_BUDGET,
+  GLOBAL_5H_TOKEN_BUDGET,
+  calculateTokenQuotaPercentages,
+  getRollingWindowTokenUsage,
 } from '../src/lib/telemetry.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -159,6 +162,97 @@ describe('Fleet Telemetry Hub', () => {
       expect(budget.remainingTokens).toBe(0);
       expect(budget.utilizationPercentage).toBeCloseTo(108.57, 1);
       expect(budget.status).toBe('EXCEEDED');
+    });
+  });
+
+  describe('calculateTokenQuotaPercentages', () => {
+    it('calculates percentages of 5h limit and weekly limit accurately', () => {
+      const result = calculateTokenQuotaPercentages(20_000);
+      expect(result.window5hLimit).toBe(2_000_000);
+      expect(result.weeklyLimit).toBe(8_750_000);
+      // 20,000 / 2,000,000 = 1.0%
+      expect(result.pctOf5hLimit).toBe(1.0);
+      // 20,000 / 8,750,000 = ~0.2285%
+      expect(result.pctOfWeeklyLimit).toBeCloseTo(0.23, 2);
+    });
+
+    it('respects custom 5h and weekly limits if supplied', () => {
+      const result = calculateTokenQuotaPercentages(50_000, {
+        window5hLimit: 1_000_000,
+        weeklyLimit: 5_000_000,
+      });
+      expect(result.window5hLimit).toBe(1_000_000);
+      expect(result.weeklyLimit).toBe(5_000_000);
+      expect(result.pctOf5hLimit).toBe(5.0);
+      expect(result.pctOfWeeklyLimit).toBe(1.0);
+    });
+  });
+
+  describe('getRollingWindowTokenUsage', () => {
+    it('aggregates runs within 5h and 7d windows from .jonah-fleet/runs/*.json', () => {
+      const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'jonah-fleet-rolling-test-'));
+      try {
+        const runsDir = path.join(tmpRepo, '.jonah-fleet', 'runs');
+        fs.mkdirSync(runsDir, { recursive: true });
+
+        const now = Date.now();
+        // 1. Run 1 hour ago: 25k tokens
+        fs.writeFileSync(
+          path.join(runsDir, 'peer-review-1h.json'),
+          JSON.stringify({
+            routine: 'peer-review',
+            timestamp: new Date(now - 1 * 3600 * 1000).toISOString(),
+            usage: { totalTokens: 25_000 },
+          })
+        );
+        // Set file mtime to 1 hour ago
+        fs.utimesSync(path.join(runsDir, 'peer-review-1h.json'), (now - 1 * 3600 * 1000) / 1000, (now - 1 * 3600 * 1000) / 1000);
+
+        // 2. Run 3 hours ago: 35k tokens
+        fs.writeFileSync(
+          path.join(runsDir, 'autowork-3h.json'),
+          JSON.stringify({
+            routine: 'autowork',
+            timestamp: new Date(now - 3 * 3600 * 1000).toISOString(),
+            usage: { totalTokens: 35_000 },
+          })
+        );
+        fs.utimesSync(path.join(runsDir, 'autowork-3h.json'), (now - 3 * 3600 * 1000) / 1000, (now - 3 * 3600 * 1000) / 1000);
+
+        // 3. Run 24 hours ago: 40k tokens (within 7d, outside 5h)
+        fs.writeFileSync(
+          path.join(runsDir, 'peer-review-24h.json'),
+          JSON.stringify({
+            routine: 'peer-review',
+            timestamp: new Date(now - 24 * 3600 * 1000).toISOString(),
+            usage: { totalTokens: 40_000 },
+          })
+        );
+        fs.utimesSync(path.join(runsDir, 'peer-review-24h.json'), (now - 24 * 3600 * 1000) / 1000, (now - 24 * 3600 * 1000) / 1000);
+
+        // 4. Run 10 days ago: 100k tokens (outside 7d, should be ignored)
+        fs.writeFileSync(
+          path.join(runsDir, 'autowork-10d.json'),
+          JSON.stringify({
+            routine: 'autowork',
+            timestamp: new Date(now - 10 * 86400 * 1000).toISOString(),
+            usage: { totalTokens: 100_000 },
+          })
+        );
+        fs.utimesSync(path.join(runsDir, 'autowork-10d.json'), (now - 10 * 86400 * 1000) / 1000, (now - 10 * 86400 * 1000) / 1000);
+
+        const rolling = getRollingWindowTokenUsage(tmpRepo, { now });
+        // 5h window: 25k + 35k = 60k
+        expect(rolling.windowTokens).toBe(60_000);
+        expect(rolling.windowPercentage).toBeCloseTo(3.0, 1);
+
+        // 7d weekly window: 25k + 35k + 40k = 100k (excludes 10d run)
+        expect(rolling.weeklyTokens).toBe(100_000);
+        expect(rolling.weeklyPercentage).toBeCloseTo(1.14, 2);
+        expect(rolling.status).toBe('HEALTHY');
+      } finally {
+        fs.rmSync(tmpRepo, { recursive: true, force: true });
+      }
     });
   });
 
