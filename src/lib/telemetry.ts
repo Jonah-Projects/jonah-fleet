@@ -508,21 +508,26 @@ export async function fetchActualPlanQuota(options: {
 /**
  * Formats a clean human-readable summary of plan quota for display.
  */
-export function formatPlanQuotaSummary(quota: ActualPlanQuota): string {
+export function formatPlanQuotaSummary(
+  quota: ActualPlanQuota,
+  options: { markdown?: boolean } = {}
+): string {
   if (!quota || !quota.available) {
     return 'Plan Quota: Unavailable';
   }
 
   const parts: string[] = [];
+  const fmt = (pct: number) =>
+    options.markdown ? `\`${pct.toFixed(1)}% remaining\`` : `${pct.toFixed(1)}% remaining`;
 
   if (quota.gemini5hRemainingPct !== undefined || quota.geminiWeeklyRemainingPct !== undefined) {
     const subParts: string[] = [];
     if (quota.gemini5hRemainingPct !== undefined) {
-      subParts.push(`Gemini 5h: ${quota.gemini5hRemainingPct.toFixed(1)}% remaining`);
+      subParts.push(`Gemini 5h: ${fmt(quota.gemini5hRemainingPct)}`);
     }
     if (quota.geminiWeeklyRemainingPct !== undefined) {
       const label = quota.gemini5hRemainingPct !== undefined ? 'Weekly' : 'Gemini Weekly';
-      subParts.push(`${label}: ${quota.geminiWeeklyRemainingPct.toFixed(1)}% remaining`);
+      subParts.push(`${label}: ${fmt(quota.geminiWeeklyRemainingPct)}`);
     }
     if (subParts.length > 0) {
       parts.push(subParts.join(' · '));
@@ -532,18 +537,18 @@ export function formatPlanQuotaSummary(quota: ActualPlanQuota): string {
   if (quota.claude5hRemainingPct !== undefined || quota.claudeWeeklyRemainingPct !== undefined) {
     const subParts: string[] = [];
     if (quota.claude5hRemainingPct !== undefined) {
-      subParts.push(`Claude/GPT 5h: ${quota.claude5hRemainingPct.toFixed(1)}% remaining`);
+      subParts.push(`Claude/GPT 5h: ${fmt(quota.claude5hRemainingPct)}`);
     }
     if (quota.claudeWeeklyRemainingPct !== undefined) {
       const label = quota.claude5hRemainingPct !== undefined ? 'Weekly' : 'Claude/GPT Weekly';
-      subParts.push(`${label}: ${quota.claudeWeeklyRemainingPct.toFixed(1)}% remaining`);
+      subParts.push(`${label}: ${fmt(quota.claudeWeeklyRemainingPct)}`);
     }
     if (subParts.length > 0) {
       parts.push(subParts.join(' · '));
     }
   }
 
-  return parts.join('\n');
+  return parts.join(options.markdown ? '<br>' : '\n');
 }
 
 export interface RoutineTelemetrySummary {

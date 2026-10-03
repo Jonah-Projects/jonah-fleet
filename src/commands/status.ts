@@ -211,18 +211,32 @@ export async function runStatus(options: StatusOptions = {}): Promise<void> {
   if (planQuota.available) {
     console.log(pc.bold('\n  ⚡ Real-Time Plan Quota (Google Antigravity):'));
     if (planQuota.gemini5hRemainingPct !== undefined || planQuota.geminiWeeklyRemainingPct !== undefined) {
-      const reset5h = planQuota.gemini5hResetTime ? pc.dim(` (resets ${planQuota.gemini5hResetTime})`) : '';
-      const resetWk = planQuota.geminiWeeklyResetTime ? pc.dim(` (resets ${planQuota.geminiWeeklyResetTime})`) : '';
-      console.log(
-        `    • Gemini Models:     ${pc.bold(planQuota.gemini5hRemainingPct?.toFixed(1) + '% 5h remaining')}${reset5h} · ${pc.bold(planQuota.geminiWeeklyRemainingPct?.toFixed(1) + '% weekly remaining')}${resetWk}`
-      );
+      const parts: string[] = [];
+      if (planQuota.gemini5hRemainingPct !== undefined) {
+        const reset5h = planQuota.gemini5hResetTime ? pc.dim(` (resets ${planQuota.gemini5hResetTime})`) : '';
+        parts.push(`${pc.bold(planQuota.gemini5hRemainingPct.toFixed(1) + '% 5h remaining')}${reset5h}`);
+      }
+      if (planQuota.geminiWeeklyRemainingPct !== undefined) {
+        const resetWk = planQuota.geminiWeeklyResetTime ? pc.dim(` (resets ${planQuota.geminiWeeklyResetTime})`) : '';
+        parts.push(`${pc.bold(planQuota.geminiWeeklyRemainingPct.toFixed(1) + '% weekly remaining')}${resetWk}`);
+      }
+      if (parts.length > 0) {
+        console.log(`    • Gemini Models:     ${parts.join(' · ')}`);
+      }
     }
     if (planQuota.claude5hRemainingPct !== undefined || planQuota.claudeWeeklyRemainingPct !== undefined) {
-      const reset5h = planQuota.claude5hResetTime ? pc.dim(` (resets ${planQuota.claude5hResetTime})`) : '';
-      const resetWk = planQuota.claudeWeeklyResetTime ? pc.dim(` (resets ${planQuota.claudeWeeklyResetTime})`) : '';
-      console.log(
-        `    • Claude/GPT Models: ${pc.bold(planQuota.claude5hRemainingPct?.toFixed(1) + '% 5h remaining')}${reset5h} · ${pc.bold(planQuota.claudeWeeklyRemainingPct?.toFixed(1) + '% weekly remaining')}${resetWk}`
-      );
+      const parts: string[] = [];
+      if (planQuota.claude5hRemainingPct !== undefined) {
+        const reset5h = planQuota.claude5hResetTime ? pc.dim(` (resets ${planQuota.claude5hResetTime})`) : '';
+        parts.push(`${pc.bold(planQuota.claude5hRemainingPct.toFixed(1) + '% 5h remaining')}${reset5h}`);
+      }
+      if (planQuota.claudeWeeklyRemainingPct !== undefined) {
+        const resetWk = planQuota.claudeWeeklyResetTime ? pc.dim(` (resets ${planQuota.claudeWeeklyResetTime})`) : '';
+        parts.push(`${pc.bold(planQuota.claudeWeeklyRemainingPct.toFixed(1) + '% weekly remaining')}${resetWk}`);
+      }
+      if (parts.length > 0) {
+        console.log(`    • Claude/GPT Models: ${parts.join(' · ')}`);
+      }
     }
   }
 

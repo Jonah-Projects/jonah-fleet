@@ -416,6 +416,36 @@ The build is completing. Continuing shortly.
       expect(clean).toContain('0.71% of 5h limit');
       expect(clean).toContain('0.16% of weekly limit');
     });
+
+    it('renders real plan quota section when planQuota is provided', () => {
+      const daemonLogDir = path.join(tmpRepo, '.jonah-fleet');
+      fs.mkdirSync(daemonLogDir, { recursive: true });
+      fs.writeFileSync(path.join(daemonLogDir, 'daemon.log'), 'fatal error: timeout\n');
+
+      const card = renderErrorCard({
+        routine: 'autowork',
+        exitCode: 1,
+        repoRoot: tmpRepo,
+        issue: 42,
+        durationMs: 12000,
+        planQuota: {
+          available: true,
+          groups: {},
+          gemini5hRemainingPct: 45.0,
+          geminiWeeklyRemainingPct: 20.0,
+          claude5hRemainingPct: 90.0,
+          claudeWeeklyRemainingPct: 80.0,
+          fetchedAt: new Date().toISOString(),
+        },
+      });
+
+      const clean = stripAnsi(card);
+      expect(clean).toContain('Plan Quota:');
+      expect(clean).toContain('Gemini 5h: 45.0% remaining');
+      expect(clean).toContain('Weekly: 20.0% remaining');
+      expect(clean).toContain('Claude/GPT 5h: 90.0% remaining');
+      expect(clean).toContain('Weekly: 80.0% remaining');
+    });
   });
 
   describe('formatActionDescription', () => {

@@ -832,6 +832,14 @@ Claude and GPT models  Five Hour Limit Remaining  100%  2026-10-03 14:48 CEST
       };
       expect(stripAnsi(formatPlanQuotaSummary(geminiWeeklyOnly))).toBe('Gemini Weekly: 50.0% remaining');
     });
+
+    it('formats plan quota summary with markdown backticks and br delimiter when markdown option is true', () => {
+      const quota = parseAgyQuotaOutput(sampleAgyJsonOutput);
+      const markdownSummary = formatPlanQuotaSummary(quota, { markdown: true });
+      expect(markdownSummary).toContain('Gemini 5h: `43.0% remaining` · Weekly: `16.2% remaining`');
+      expect(markdownSummary).toContain('<br>');
+      expect(markdownSummary).toContain('Claude/GPT 5h: `100.0% remaining` · Weekly: `100.0% remaining`');
+    });
   });
 });
 

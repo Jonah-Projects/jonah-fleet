@@ -36,6 +36,7 @@ import {
   calculateTokenQuotaPercentages,
   getRollingWindowTokenUsage,
   formatTokenBreakdown,
+  formatPlanQuotaSummary,
   fetchActualPlanQuota,
   type RunUsageMetrics,
   type ActualPlanQuota,
@@ -899,29 +900,13 @@ export function formatFallbackRunReport(options: FallbackReportOptions): string 
           reportContent += `| Weekly Spend | \`${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()}\` tokens (\`${rolling.weeklyPercentage.toFixed(1)}%\` · \`[${rolling.weeklyStatus}]\`) |\n`;
         }
       } catch {}
+    }
+  }
 
-      if (options.planQuota && options.planQuota.available) {
-        const plan = options.planQuota;
-        const quotaParts: string[] = [];
-        if (plan.gemini5hRemainingPct !== undefined || plan.geminiWeeklyRemainingPct !== undefined) {
-          const sub: string[] = [];
-          if (plan.gemini5hRemainingPct !== undefined) sub.push(`Gemini 5h: \`${plan.gemini5hRemainingPct.toFixed(1)}% remaining\``);
-          if (plan.geminiWeeklyRemainingPct !== undefined) sub.push(`Weekly: \`${plan.geminiWeeklyRemainingPct.toFixed(1)}% remaining\``);
-          if (sub.length > 0) quotaParts.push(sub.join(' · '));
-        }
-        if (plan.claude5hRemainingPct !== undefined || plan.claudeWeeklyRemainingPct !== undefined) {
-          const sub: string[] = [];
-          if (plan.claude5hRemainingPct !== undefined) sub.push(`Claude/GPT 5h: \`${plan.claude5hRemainingPct.toFixed(1)}% remaining\``);
-          if (plan.claudeWeeklyRemainingPct !== undefined) {
-            const label = plan.claude5hRemainingPct !== undefined ? 'Weekly' : 'Claude/GPT Weekly';
-            sub.push(`${label}: \`${plan.claudeWeeklyRemainingPct.toFixed(1)}% remaining\``);
-          }
-          if (sub.length > 0) quotaParts.push(sub.join(' · '));
-        }
-        if (quotaParts.length > 0) {
-          reportContent += `| Real Plan Quota | ${quotaParts.join('<br>')} |\n`;
-        }
-      }
+  if (options.planQuota && options.planQuota.available) {
+    const quotaSummary = formatPlanQuotaSummary(options.planQuota, { markdown: true });
+    if (quotaSummary && quotaSummary !== 'Plan Quota: Unavailable') {
+      reportContent += `| Real Plan Quota | ${quotaSummary} |\n`;
     }
   }
 
