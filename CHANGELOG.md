@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **terminal-card,telemetry:** streamline terminal summary cards by displaying I/O ratio directly on token line, suppressing redundant/alarmist synthetic rolling token limits when real provider plan quota is present, and hiding untouched 100% provider quotas
 * **optimizer,telemetry,prompts:** harden prompt optimizer and orchestration routines against token leaks with Context Asymmetry, Unilateral Re-Review Thrash, Multi-Routine Cannibalization, and Plan Quota Burn Velocity anomaly heuristics, local run artifact ingestion, and I/O ratio scorecard tracking
 * **telemetry,status,runner,terminal-card:** discover and report real-time provider plan quota (5h rolling and weekly limits with reset countdowns for Gemini and 3P models) via `agy --output-format json --print /quota` with 1-minute TTL disk caching
 * **telemetry,runner,terminal-card,status:** report token consumption and 5-hour/weekly quota percentages on each run, terminal summary card, run report, status pacing section, and persist run usage to artifacts

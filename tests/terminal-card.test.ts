@@ -893,6 +893,46 @@ The build is completing. Continuing shortly.
       expect(clean).toContain('Claude/GPT 5h: 100.0% remaining');
       expect(clean).toContain('Weekly: 80.0% remaining');
     });
+
+    it('renders streamlined token line with I/O ratio and suppresses synthetic rolling limits when planQuota is available', () => {
+      const card = renderSummaryCard({
+        routine: 'peer-review',
+        pr: 4946,
+        title: 'feat(ux): rework season switcher',
+        durationMs: 506000,
+        output: 'Squash-merged PR #4946 into main.',
+        repoRoot: tmpRepo,
+        usage: {
+          totalTokens: 1_979_289,
+          inputTokens: 1_941_550,
+          outputTokens: 37_739,
+          thinkingTokens: 17_764,
+        },
+        planQuota: {
+          available: true,
+          groups: {},
+          gemini5hRemainingPct: 88.1,
+          geminiWeeklyRemainingPct: 10.7,
+          claude5hRemainingPct: 100.0,
+          claudeWeeklyRemainingPct: 100.0,
+          fetchedAt: new Date().toISOString(),
+        },
+      });
+
+      const clean = stripAnsi(card);
+      expect(clean).toContain('Tokens: 1,979,289');
+      expect(clean).toContain('I/O: 51:1');
+      // Synthetic limits must be suppressed when real planQuota is present
+      expect(clean).not.toContain('Rolling 5h:');
+      expect(clean).not.toContain('Rolling 7d:');
+      expect(clean).not.toContain('of 5h limit');
+      // Real quota must be present
+      expect(clean).toContain('Plan Quota:');
+      expect(clean).toContain('Gemini 5h: 88.1% remaining');
+      expect(clean).toContain('Weekly: 10.7% remaining');
+      // Untouched 100% Claude/GPT is hidden to keep the card compact
+      expect(clean).not.toContain('Claude/GPT');
+    });
   });
 });
 

@@ -1392,34 +1392,43 @@ function renderTokenQuotaSection(options: {
   lines.push(border(`├${horizontal}┤`));
 
   if (hasUsage) {
-    const quota = calculateTokenQuotaPercentages(total!);
     const breakdown = formatTokenBreakdown(options.usage, 'prefix');
+    const inTok = options.usage?.inputTokens;
+    const outTok = options.usage?.outputTokens;
+    let ioStr = '';
+    if (typeof inTok === 'number' && typeof outTok === 'number' && outTok > 0) {
+      ioStr = ` · I/O: ${(inTok / outTok).toFixed(0)}:1`;
+    }
 
-    const tokenLine1 = ` Tokens: ${pc.bold(total!.toLocaleString())}${breakdown ? pc.dim(` (${breakdown})`) : ''}`;
+    const tokenLine1 = ` Tokens: ${pc.bold(total!.toLocaleString())}${breakdown ? pc.dim(` (${breakdown})`) : ''}${ioStr ? pc.cyan(ioStr) : ''}`;
     lines.push(border('│') + tokenLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine1).length)) + border('│'));
 
-    const tokenLine2 = `         ↳ ${pc.cyan(quota.pctOf5hLimit.toFixed(2) + '% of 5h limit')} · ${pc.cyan(quota.pctOfWeeklyLimit.toFixed(2) + '% of weekly limit')}`;
-    lines.push(border('│') + tokenLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine2).length)) + border('│'));
+    // When real provider plan quota is NOT available, fall back to synthetic limits and rolling window spend
+    if (!hasPlan) {
+      const quota = calculateTokenQuotaPercentages(total!);
+      const tokenLine2 = `         ↳ ${pc.cyan(quota.pctOf5hLimit.toFixed(2) + '% of 5h limit')} · ${pc.cyan(quota.pctOfWeeklyLimit.toFixed(2) + '% of weekly limit')}`;
+      lines.push(border('│') + tokenLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine2).length)) + border('│'));
 
-    if (options.repoRoot) {
-      try {
-        const rolling = getRollingWindowTokenUsage(options.repoRoot);
-        if (rolling.windowTokens > 0 || rolling.weeklyTokens > 0) {
-          const badge5h = formatQuotaStatusBadge(rolling.windowStatus);
-          const badgeWeekly = formatQuotaStatusBadge(rolling.weeklyStatus);
+      if (options.repoRoot) {
+        try {
+          const rolling = getRollingWindowTokenUsage(options.repoRoot);
+          if (rolling.windowTokens > 0 || rolling.weeklyTokens > 0) {
+            const badge5h = formatQuotaStatusBadge(rolling.windowStatus);
+            const badgeWeekly = formatQuotaStatusBadge(rolling.weeklyStatus);
 
-          const rollingLine1 = ` Rolling 5h: ${rolling.windowTokens.toLocaleString()} / ${rolling.windowLimit.toLocaleString()} tokens (${rolling.windowPercentage.toFixed(1)}% · ${badge5h})`;
-          lines.push(border('│') + rollingLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine1).length)) + border('│'));
+            const rollingLine1 = ` Rolling 5h: ${rolling.windowTokens.toLocaleString()} / ${rolling.windowLimit.toLocaleString()} tokens (${rolling.windowPercentage.toFixed(1)}% · ${badge5h})`;
+            lines.push(border('│') + rollingLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine1).length)) + border('│'));
 
-          const rollingLine2 = ` Rolling 7d: ${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()} tokens (${rolling.weeklyPercentage.toFixed(1)}% · ${badgeWeekly})`;
-          lines.push(border('│') + rollingLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine2).length)) + border('│'));
-        }
-      } catch {}
+            const rollingLine2 = ` Rolling 7d: ${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()} tokens (${rolling.weeklyPercentage.toFixed(1)}% · ${badgeWeekly})`;
+            lines.push(border('│') + rollingLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine2).length)) + border('│'));
+          }
+        } catch {}
+      }
     }
   }
 
   if (hasPlan && plan) {
-    const summary = formatPlanQuotaSummary(plan);
+    const summary = formatPlanQuotaSummary(plan, { hideUnused: true });
     if (summary && summary !== 'Plan Quota: Unavailable') {
       const summaryLines = summary.split('\n');
       for (let i = 0; i < summaryLines.length; i++) {

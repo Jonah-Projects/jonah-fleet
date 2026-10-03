@@ -525,7 +525,7 @@ export async function fetchActualPlanQuota(options: {
  */
 export function formatPlanQuotaSummary(
   quota: ActualPlanQuota,
-  options: { markdown?: boolean } = {}
+  options: { markdown?: boolean; hideUnused?: boolean } = {}
 ): string {
   if (!quota || !quota.available) {
     return 'Plan Quota: Unavailable';
@@ -535,31 +535,43 @@ export function formatPlanQuotaSummary(
   const fmt = (pct: number) =>
     options.markdown ? `\`${pct.toFixed(1)}% remaining\`` : `${pct.toFixed(1)}% remaining`;
 
+  const geminiUnused =
+    (quota.gemini5hRemainingPct === undefined || quota.gemini5hRemainingPct === 100) &&
+    (quota.geminiWeeklyRemainingPct === undefined || quota.geminiWeeklyRemainingPct === 100);
+
+  const claudeUnused =
+    (quota.claude5hRemainingPct === undefined || quota.claude5hRemainingPct === 100) &&
+    (quota.claudeWeeklyRemainingPct === undefined || quota.claudeWeeklyRemainingPct === 100);
+
   if (quota.gemini5hRemainingPct !== undefined || quota.geminiWeeklyRemainingPct !== undefined) {
-    const subParts: string[] = [];
-    if (quota.gemini5hRemainingPct !== undefined) {
-      subParts.push(`Gemini 5h: ${fmt(quota.gemini5hRemainingPct)}`);
-    }
-    if (quota.geminiWeeklyRemainingPct !== undefined) {
-      const label = quota.gemini5hRemainingPct !== undefined ? 'Weekly' : 'Gemini Weekly';
-      subParts.push(`${label}: ${fmt(quota.geminiWeeklyRemainingPct)}`);
-    }
-    if (subParts.length > 0) {
-      parts.push(subParts.join(' · '));
+    if (!options.hideUnused || !geminiUnused || claudeUnused) {
+      const subParts: string[] = [];
+      if (quota.gemini5hRemainingPct !== undefined) {
+        subParts.push(`Gemini 5h: ${fmt(quota.gemini5hRemainingPct)}`);
+      }
+      if (quota.geminiWeeklyRemainingPct !== undefined) {
+        const label = quota.gemini5hRemainingPct !== undefined ? 'Weekly' : 'Gemini Weekly';
+        subParts.push(`${label}: ${fmt(quota.geminiWeeklyRemainingPct)}`);
+      }
+      if (subParts.length > 0) {
+        parts.push(subParts.join(' · '));
+      }
     }
   }
 
   if (quota.claude5hRemainingPct !== undefined || quota.claudeWeeklyRemainingPct !== undefined) {
-    const subParts: string[] = [];
-    if (quota.claude5hRemainingPct !== undefined) {
-      subParts.push(`Claude/GPT 5h: ${fmt(quota.claude5hRemainingPct)}`);
-    }
-    if (quota.claudeWeeklyRemainingPct !== undefined) {
-      const label = quota.claude5hRemainingPct !== undefined ? 'Weekly' : 'Claude/GPT Weekly';
-      subParts.push(`${label}: ${fmt(quota.claudeWeeklyRemainingPct)}`);
-    }
-    if (subParts.length > 0) {
-      parts.push(subParts.join(' · '));
+    if (!options.hideUnused || !claudeUnused) {
+      const subParts: string[] = [];
+      if (quota.claude5hRemainingPct !== undefined) {
+        subParts.push(`Claude/GPT 5h: ${fmt(quota.claude5hRemainingPct)}`);
+      }
+      if (quota.claudeWeeklyRemainingPct !== undefined) {
+        const label = quota.claude5hRemainingPct !== undefined ? 'Weekly' : 'Claude/GPT Weekly';
+        subParts.push(`${label}: ${fmt(quota.claudeWeeklyRemainingPct)}`);
+      }
+      if (subParts.length > 0) {
+        parts.push(subParts.join(' · '));
+      }
     }
   }
 
