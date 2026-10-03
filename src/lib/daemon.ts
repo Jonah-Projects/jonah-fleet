@@ -34,6 +34,7 @@ import {
   type BacklogTriageReport,
   type BacklogIssueInfo,
 } from './terminal-card.js';
+import type { RunUsageMetrics } from './telemetry.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -79,6 +80,7 @@ export interface DaemonState {
   activeWorktree?: string;
   evaluatedPRs?: Record<number, EvaluatedPRRecord>;
   failureCooldowns?: Record<number, PRFailureRecord>;
+  sessionTokens?: number;
 }
 
 export interface DaemonOptions {
@@ -102,6 +104,7 @@ export interface DaemonOptions {
     transientServiceError?: boolean;
     output?: string;
     stderr?: string;
+    usage?: RunUsageMetrics;
   }>;
 }
 
@@ -123,6 +126,20 @@ export function writeDaemonState(repoRoot: string, state: DaemonState): void {
   const statePath = getDaemonStatePath(repoRoot);
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n', 'utf8');
+}
+
+/**
+ * Records routine session token usage in daemon state and persists it to disk.
+ */
+export function recordDaemonSessionUsage(
+  repoRoot: string,
+  state: DaemonState | undefined,
+  usage?: RunUsageMetrics
+): void {
+  if (usage?.totalTokens && state) {
+    state.sessionTokens = (state.sessionTokens || 0) + usage.totalTokens;
+    writeDaemonState(repoRoot, state);
+  }
 }
 
 export function clearDaemonState(repoRoot: string): void {
@@ -898,6 +915,7 @@ export interface DrainReviewQueueOptions {
     transientServiceError?: boolean;
     output?: string;
     stderr?: string;
+    usage?: RunUsageMetrics;
   }>;
   onAttempted?: (prNumber: number) => void;
   failureCooldowns?: Map<number, PRFailureRecord>;
@@ -1042,6 +1060,8 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
         onAttempted?.(prNum);
       }
 
+      recordDaemonSessionUsage(repoRoot, state, result.usage);
+
       const isQuota =
         result.quotaPaused ||
         (!result.success &&
@@ -1161,6 +1181,7 @@ export interface PerformAutoworkScanOptions {
     transientServiceError?: boolean;
     output?: string;
     stderr?: string;
+    usage?: RunUsageMetrics;
   }>;
   onDiagnosticCard?: (card: string) => void;
   onAttempted?: (prNumber: number) => void;
@@ -1266,6 +1287,8 @@ export async function performAutoworkScan(
       }
     },
   });
+
+  recordDaemonSessionUsage(repoRoot, state, result.usage);
 
   const isQuota =
     result.quotaPaused ||

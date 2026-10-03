@@ -4,6 +4,191 @@ import pc from 'picocolors';
 import { GhExecutor, defaultGhExecutor } from './fleet-query.js';
 
 export const GLOBAL_WEEKLY_TOKEN_BUDGET = 8_750_000; // ~8.75M tokens/week (70% ceiling)
+export const GLOBAL_5H_TOKEN_BUDGET = 2_000_000; // ~2.0M tokens rolling 5h window limit
+
+export interface RunUsageMetrics {
+  totalTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  thinkingTokens?: number;
+}
+
+export type QuotaHealthStatus = 'HEALTHY' | 'WARNING' | 'EXCEEDED';
+
+export interface TokenQuotaPercentages {
+  pctOf5hLimit: number;
+  pctOfWeeklyLimit: number;
+  window5hLimit: number;
+  weeklyLimit: number;
+}
+
+export interface TokenQuotaWindowUsage {
+  windowTokens: number;
+  windowLimit: number;
+  windowPercentage: number;
+  windowStatus: QuotaHealthStatus;
+  weeklyTokens: number;
+  weeklyLimit: number;
+  weeklyPercentage: number;
+  weeklyStatus: QuotaHealthStatus;
+  status: QuotaHealthStatus;
+}
+
+/**
+ * Formats a styled quota status badge.
+ */
+export function formatQuotaStatusBadge(status: QuotaHealthStatus | string): string {
+  if (status === 'HEALTHY') return pc.green('[HEALTHY]');
+  if (status === 'WARNING') return pc.yellow('[WARNING]');
+  if (status === 'EXCEEDED') return pc.red('[EXCEEDED]');
+  return pc.red(`[${status}]`);
+}
+
+/**
+ * Formats a token breakdown string across input, output, and thinking tokens.
+ */
+export function formatTokenBreakdown(
+  usage?: RunUsageMetrics,
+  style: 'prefix' | 'suffix' = 'prefix'
+): string {
+  if (!usage) return '';
+  const inTok =
+    usage.inputTokens !== undefined
+      ? style === 'suffix'
+        ? `${usage.inputTokens.toLocaleString()} in`
+        : `in: ${usage.inputTokens.toLocaleString()}`
+      : '';
+  const outTok =
+    usage.outputTokens !== undefined
+      ? style === 'suffix'
+        ? `${usage.outputTokens.toLocaleString()} out`
+        : `out: ${usage.outputTokens.toLocaleString()}`
+      : '';
+  const thinkTok =
+    usage.thinkingTokens !== undefined
+      ? style === 'suffix'
+        ? `${usage.thinkingTokens.toLocaleString()} think`
+        : `think: ${usage.thinkingTokens.toLocaleString()}`
+      : '';
+
+  return [inTok, outTok, thinkTok].filter(Boolean).join(' · ');
+}
+
+/**
+ * Calculates a run's token consumption as a percentage of the 5h and weekly budget ceilings.
+ */
+export function calculateTokenQuotaPercentages(
+  totalTokens: number,
+  options: { window5hLimit?: number; weeklyLimit?: number } = {}
+): TokenQuotaPercentages {
+  const window5hLimit = options.window5hLimit ?? GLOBAL_5H_TOKEN_BUDGET;
+  const weeklyLimit = options.weeklyLimit ?? GLOBAL_WEEKLY_TOKEN_BUDGET;
+
+  const pctOf5hLimit = window5hLimit > 0 ? (totalTokens / window5hLimit) * 100 : 0;
+  const pctOfWeeklyLimit = weeklyLimit > 0 ? (totalTokens / weeklyLimit) * 100 : 0;
+
+  return {
+    pctOf5hLimit,
+    pctOfWeeklyLimit,
+    window5hLimit,
+    weeklyLimit,
+  };
+}
+
+/**
+ * Aggregates local routine runs from .jonah-fleet/runs/*.json across 5h and 7d rolling windows.
+ */
+export function getRollingWindowTokenUsage(
+  repoRoot: string,
+  options: { window5hLimit?: number; weeklyLimit?: number; now?: number } = {}
+): TokenQuotaWindowUsage {
+  const window5hLimit = options.window5hLimit ?? GLOBAL_5H_TOKEN_BUDGET;
+  const weeklyLimit = options.weeklyLimit ?? GLOBAL_WEEKLY_TOKEN_BUDGET;
+  const now = options.now ?? Date.now();
+
+  const window5hCutoff = now - 5 * 3600 * 1000;
+  const weeklyCutoff = now - 7 * 86400 * 1000;
+
+  let windowTokens = 0;
+  let weeklyTokens = 0;
+
+  const runsDir = path.join(repoRoot, '.jonah-fleet', 'runs');
+  if (fs.existsSync(runsDir)) {
+    try {
+      const files = fs.readdirSync(runsDir);
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue;
+        const fullPath = path.join(runsDir, file);
+        try {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          const data = JSON.parse(content);
+
+          let runTime: number | null = null;
+          if (data.timestamp) {
+            const parsed = new Date(data.timestamp).getTime();
+            if (!isNaN(parsed) && parsed > 0) {
+              runTime = parsed;
+            }
+          }
+          if (runTime === null) {
+            const stat = fs.statSync(fullPath);
+            runTime = stat.mtimeMs;
+          }
+
+          if (runTime < weeklyCutoff) continue;
+
+          const tokens =
+            data.usage?.totalTokens ??
+            data.usage?.total_tokens ??
+            data.totalTokens ??
+            0;
+
+          if (typeof tokens === 'number' && tokens > 0) {
+            weeklyTokens += tokens;
+            if (runTime >= window5hCutoff) {
+              windowTokens += tokens;
+            }
+          }
+        } catch {
+          // Ignore malformed files
+        }
+      }
+    } catch {
+      // Ignore readdir errors
+    }
+  }
+
+  const windowPercentage = window5hLimit > 0 ? (windowTokens / window5hLimit) * 100 : 0;
+  const weeklyPercentage = weeklyLimit > 0 ? (weeklyTokens / weeklyLimit) * 100 : 0;
+
+  const resolveStatus = (pct: number): QuotaHealthStatus => {
+    if (pct > 100) return 'EXCEEDED';
+    if (pct >= 70) return 'WARNING';
+    return 'HEALTHY';
+  };
+
+  const windowStatus = resolveStatus(windowPercentage);
+  const weeklyStatus = resolveStatus(weeklyPercentage);
+
+  let status: QuotaHealthStatus = 'HEALTHY';
+  if (windowStatus === 'EXCEEDED' || weeklyStatus === 'EXCEEDED') {
+    status = 'EXCEEDED';
+  } else if (windowStatus === 'WARNING' || weeklyStatus === 'WARNING') {
+    status = 'WARNING';
+  }
+
+  return {
+    windowTokens,
+    windowLimit: window5hLimit,
+    windowPercentage,
+    windowStatus,
+    weeklyTokens,
+    weeklyLimit,
+    weeklyPercentage,
+    weeklyStatus,
+    status,
+  };
+}
 
 export interface RoutineTelemetrySummary {
   schemaVersion: '1.0.0';

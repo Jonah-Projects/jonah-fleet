@@ -6,6 +6,7 @@ import { checkDrift } from '../lib/diff.js';
 import { FLEET_VERSION } from '../lib/presets.js';
 import { computeTokenSpendFromLogs } from '../lib/fleet-query.js';
 import { formatTokens, formatCurrency } from '../lib/dashboard.js';
+import { getRollingWindowTokenUsage, formatQuotaStatusBadge } from '../lib/telemetry.js';
 import { runMonitor } from './monitor.js';
 import { renderFleetBanner } from '../lib/brand.js';
 
@@ -70,6 +71,8 @@ export async function runStatus(options: StatusOptions = {}): Promise<void> {
     tokenUsage = computeTokenSpendFromLogs(logContents);
   }
 
+  const rollingQuota = getRollingWindowTokenUsage(cwd);
+
   if (options.json) {
     console.log(
       JSON.stringify(
@@ -85,6 +88,7 @@ export async function runStatus(options: StatusOptions = {}): Promise<void> {
           budgets: manifest.budgets,
           repositories: manifest.repositories || [],
           tokenUsage,
+          quotaPacing: rollingQuota,
           drift: {
             hasDrift,
             ...drift,
@@ -187,6 +191,19 @@ export async function runStatus(options: StatusOptions = {}): Promise<void> {
         );
       }
     }
+  }
+
+  if (rollingQuota.windowTokens > 0 || rollingQuota.weeklyTokens > 0) {
+    const badge5h = formatQuotaStatusBadge(rollingQuota.windowStatus);
+    const badgeWeekly = formatQuotaStatusBadge(rollingQuota.weeklyStatus);
+
+    console.log(pc.bold('\n  ⏱️  Token Quota & Rolling Window Pacing:'));
+    console.log(
+      `    • 5-Hour Window:  ${pc.bold(formatTokens(rollingQuota.windowTokens))} / ${formatTokens(rollingQuota.windowLimit)} tokens (${pc.cyan(rollingQuota.windowPercentage.toFixed(1) + '%')}) ${badge5h}`
+    );
+    console.log(
+      `    • 7-Day Spend:    ${pc.bold(formatTokens(rollingQuota.weeklyTokens))} / ${formatTokens(rollingQuota.weeklyLimit)} tokens (${pc.cyan(rollingQuota.weeklyPercentage.toFixed(1) + '%')}) ${badgeWeekly}`
+    );
   }
 
   console.log(pc.bold('\n  Drift / Health:'));

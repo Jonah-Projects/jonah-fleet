@@ -388,6 +388,34 @@ The build is completing. Continuing shortly.
       expect(card).toContain('Error: build failed');
       expect(card).toContain('daemon.log');
     });
+
+    it('renders token usage breakdown and limit percentages when usage option is provided', () => {
+      const daemonLogDir = path.join(tmpRepo, '.jonah-fleet');
+      fs.mkdirSync(daemonLogDir, { recursive: true });
+      fs.writeFileSync(path.join(daemonLogDir, 'daemon.log'), 'fatal error: out of memory\n');
+
+      const card = renderErrorCard({
+        routine: 'autowork',
+        exitCode: 1,
+        repoRoot: tmpRepo,
+        issue: 42,
+        durationMs: 12000,
+        usage: {
+          totalTokens: 14250,
+          inputTokens: 11800,
+          outputTokens: 950,
+          thinkingTokens: 1500,
+        },
+      });
+
+      const clean = stripAnsi(card);
+      expect(clean).toContain('Tokens: 14,250');
+      expect(clean).toContain('in: 11,800');
+      expect(clean).toContain('out: 950');
+      expect(clean).toContain('think: 1,500');
+      expect(clean).toContain('0.71% of 5h limit');
+      expect(clean).toContain('0.16% of weekly limit');
+    });
   });
 
   describe('formatActionDescription', () => {
@@ -741,6 +769,73 @@ The build is completing. Continuing shortly.
       });
 
       expect(card).not.toMatch(/├[─]+┤\s*\n\s*├[─]+┤/);
+    });
+
+    it('renders token usage breakdown and limit percentages when usage option is provided', () => {
+      const card = renderSummaryCard({
+        routine: 'peer-review',
+        pr: 601,
+        title: 'fix(daemon): persist review state',
+        durationMs: 42000,
+        output: 'Squash-merged PR #601 into main.',
+        usage: {
+          totalTokens: 14250,
+          inputTokens: 11800,
+          outputTokens: 950,
+          thinkingTokens: 1500,
+        },
+      });
+
+      const clean = stripAnsi(card);
+      expect(clean).toContain('14.3k tokens');
+      expect(clean).toContain('Tokens: 14,250');
+      expect(clean).toContain('in: 11,800');
+      expect(clean).toContain('out: 950');
+      expect(clean).toContain('think: 1,500');
+      expect(clean).toContain('0.71% of 5h limit');
+      expect(clean).toContain('0.16% of weekly limit');
+    });
+
+    it('renders independent pacing status badges per window avoiding cross-contamination', () => {
+      const runsDir = path.join(tmpRepo, '.jonah-fleet', 'runs');
+      fs.mkdirSync(runsDir, { recursive: true });
+
+      const now = Date.now();
+      // 5h window: 50k tokens (2.5% of 2M -> HEALTHY)
+      fs.writeFileSync(
+        path.join(runsDir, 'recent.json'),
+        JSON.stringify({
+          routine: 'autowork',
+          timestamp: new Date(now - 1 * 3600 * 1000).toISOString(),
+          usage: { totalTokens: 50_000 },
+        })
+      );
+      // Older run (outside 5h, within 7d): 9.5M tokens (> 8.75M -> EXCEEDED)
+      fs.writeFileSync(
+        path.join(runsDir, 'older.json'),
+        JSON.stringify({
+          routine: 'autowork',
+          timestamp: new Date(now - 24 * 3600 * 1000).toISOString(),
+          usage: { totalTokens: 9_500_000 },
+        })
+      );
+
+      const card = renderSummaryCard({
+        routine: 'autowork',
+        issue: 99,
+        durationMs: 15000,
+        output: 'Closed issue #99.',
+        repoRoot: tmpRepo,
+        usage: { totalTokens: 50_000 },
+      });
+
+      const clean = stripAnsi(card);
+      // 5h line must NOT be marked [EXCEEDED]
+      expect(clean).toContain('Rolling 5h:');
+      expect(clean).toMatch(/Rolling 5h:.*\[HEALTHY\]/);
+      // 7d line must be marked [EXCEEDED]
+      expect(clean).toContain('Rolling 7d:');
+      expect(clean).toMatch(/Rolling 7d:.*\[EXCEEDED\]/);
     });
   });
 });
