@@ -11,6 +11,10 @@ import {
   DaemonState,
   filterReviewablePRs,
   isPRCiPending,
+  isPRApproved,
+  isPRCiGreen,
+  isPRAlreadyEvaluated,
+  initializeDaemonState,
   drainReviewQueue,
   reconcileOrphanedLocalRuns,
   performAutoworkScan,
@@ -95,6 +99,126 @@ describe('Local Agent Daemon Manager', () => {
     writeDaemonState(tmpRepo, state);
     clearDaemonState(tmpRepo);
     expect(readDaemonState(tmpRepo)).toBeNull();
+  });
+
+  it('hydrates evaluatedPRs and failureCooldowns from existing daemon.json on startup via initializeDaemonState', () => {
+    const existingState: DaemonState = {
+      pid: 1234,
+      startedAt: '2026-10-02T10:00:00.000Z',
+      reviewIntervalMinutes: 3,
+      autoworkIntervalMinutes: 30,
+      routines: ['peer-review'],
+      status: 'idle',
+      evaluatedPRs: {
+        501: {
+          headRefOid: 'sha-501',
+          evaluatedAt: '2026-10-02T10:05:00.000Z',
+          success: true,
+          outcome: 'approved',
+          ciState: 'pending',
+        },
+      },
+      failureCooldowns: {
+        502: {
+          failedAt: 1727860000000,
+          count: 2,
+        },
+      },
+    };
+    writeDaemonState(tmpRepo, existingState);
+
+    const { state, failureCooldowns } = initializeDaemonState(tmpRepo, {
+      reviewInterval: 5,
+      autoworkInterval: 45,
+    });
+
+    expect(state.evaluatedPRs).toEqual(existingState.evaluatedPRs);
+    expect(state.failureCooldowns).toEqual(existingState.failureCooldowns);
+    expect(failureCooldowns.get(502)).toEqual({ failedAt: 1727860000000, count: 2 });
+
+    // Disk read-back verification: persisted state on disk must retain hydrated fields
+    const persisted = readDaemonState(tmpRepo);
+    expect(persisted?.evaluatedPRs).toEqual(existingState.evaluatedPRs);
+    expect(persisted?.failureCooldowns).toEqual(existingState.failureCooldowns);
+  });
+
+  it('correctly evaluates isPRCiGreen and rejects completed checks with missing/empty conclusion', () => {
+    // Empty conclusion on COMPLETED status is a bogus green defect and must return false
+    const prWithEmptyConclusion = {
+      number: 1,
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: null }],
+    } as any;
+    expect(isPRCiGreen(prWithEmptyConclusion)).toBe(false);
+
+    const prWithUndefinedConclusion = {
+      number: 2,
+      statusCheckRollup: [{ status: 'COMPLETED' }],
+    } as any;
+    expect(isPRCiGreen(prWithUndefinedConclusion)).toBe(false);
+
+    // Explicit positive completions must return true
+    const prSuccess = {
+      number: 3,
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    } as any;
+    expect(isPRCiGreen(prSuccess)).toBe(true);
+
+    const prNeutral = {
+      number: 4,
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'NEUTRAL' }],
+    } as any;
+    expect(isPRCiGreen(prNeutral)).toBe(true);
+
+    const prSkipped = {
+      number: 5,
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'SKIPPED' }],
+    } as any;
+    expect(isPRCiGreen(prSkipped)).toBe(true);
+  });
+
+  it('allows CI green transition only for approved PRs and excludes bounced PRs on the same commit', () => {
+    const headOid = 'sha-eval-1';
+    const greenPR = {
+      number: 100,
+      headRefOid: headOid,
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'SUCCESS' }],
+    } as any;
+
+    // Case 1: Approved PR waiting for CI - when CI turns green, isPRAlreadyEvaluated is false (allow 1 sweep)
+    const approvedWaitingForCi = {
+      100: {
+        headRefOid: headOid,
+        evaluatedAt: new Date().toISOString(),
+        success: true,
+        outcome: 'approved' as const,
+        ciState: 'pending' as const,
+      },
+    };
+    expect(isPRAlreadyEvaluated(greenPR, { evaluatedPRs: approvedWaitingForCi })).toBe(false);
+
+    // Case 2: Approved PR that was already evaluated after CI was green - stays evaluated (prevent infinite sweeps)
+    const approvedAlreadyGreen = {
+      100: {
+        headRefOid: headOid,
+        evaluatedAt: new Date().toISOString(),
+        success: true,
+        outcome: 'approved' as const,
+        ciState: 'green' as const,
+      },
+    };
+    expect(isPRAlreadyEvaluated(greenPR, { evaluatedPRs: approvedAlreadyGreen })).toBe(true);
+
+    // Case 3: Bounced PR waiting for author fixes - turning CI green must NOT re-trigger review on same commit
+    const bouncedPRWaitingForFixes = {
+      100: {
+        headRefOid: headOid,
+        evaluatedAt: new Date().toISOString(),
+        success: true,
+        outcome: 'bounced' as const,
+        ciState: 'pending' as const,
+      },
+    };
+    expect(isPRAlreadyEvaluated(greenPR, { evaluatedPRs: bouncedPRWaitingForFixes })).toBe(true);
   });
 
   it('safely handles PR count query on non-git or error directories', async () => {
@@ -189,6 +313,84 @@ describe('Local Agent Daemon Manager', () => {
     // allowPendingCi preserves them if explicitly configured
     const all = filterReviewablePRs(prs, { allowPendingCi: true });
     expect(all.map((p) => p.number)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('filters out PRs that have already been evaluated on the same headRefOid, and re-enables them when a new commit is pushed', () => {
+    const prs = [
+      {
+        number: 4906,
+        headRefName: 'feat/auto-follow',
+        headRefOid: 'commit-sha-1',
+        title: 'feat: auto follow',
+      },
+      {
+        number: 4910,
+        headRefName: 'feat/standings',
+        headRefOid: 'commit-sha-2',
+        title: 'feat: multi standings',
+      },
+    ];
+
+    const evaluatedPRs = {
+      4906: {
+        headRefOid: 'commit-sha-1',
+        evaluatedAt: new Date().toISOString(),
+        success: true,
+      },
+    };
+
+    // PR 4906 was evaluated at commit-sha-1, so it should be filtered out
+    const filtered = filterReviewablePRs(prs, { evaluatedPRs });
+    expect(filtered.map((p) => p.number)).toEqual([4910]);
+
+    // When PR 4906 pushes a new commit (headRefOid changes), it becomes reviewable again
+    const prsWithNewCommit = [
+      {
+        number: 4906,
+        headRefName: 'feat/auto-follow',
+        headRefOid: 'commit-sha-1-updated',
+        title: 'feat: auto follow',
+      },
+      prs[1],
+    ];
+    const filteredAfterCommit = filterReviewablePRs(prsWithNewCommit, { evaluatedPRs });
+    expect(filteredAfterCommit.map((p) => p.number)).toEqual([4906, 4910]);
+  });
+
+  it('filters out PRs that have existing bot reviews on the current headRefOid with blocking findings or bounce to draft', () => {
+    const prWithBotReview = {
+      number: 599,
+      headRefName: 'fix/radar-gate',
+      headRefOid: 'head-sha-599',
+      title: 'fix: radar preflight gate',
+      reviews: [
+        {
+          author: { login: 'jonah-fleet-bot' },
+          state: 'COMMENTED',
+          commit: { oid: 'head-sha-599' },
+          body: '## Peer Review (Round 1) · Findings Summary\n\n- **Decision**: **BOUNCE TO DRAFT**',
+        },
+      ],
+    };
+
+    const prUnreviewed = {
+      number: 601,
+      headRefName: 'feat/new-feature',
+      headRefOid: 'head-sha-601',
+      title: 'feat: unreviewed feature',
+      reviews: [],
+    };
+
+    const filtered = filterReviewablePRs([prWithBotReview, prUnreviewed]);
+    expect(filtered.map((p) => p.number)).toEqual([601]);
+
+    // When PR 599 pushes a new commit, it becomes reviewable again even with the old review present
+    const prWithNewCommit = {
+      ...prWithBotReview,
+      headRefOid: 'head-sha-599-v2',
+    };
+    const filteredNew = filterReviewablePRs([prWithNewCommit, prUnreviewed]);
+    expect(filteredNew.map((p) => p.number)).toEqual([599, 601]);
   });
 
   describe('drainReviewQueue', () => {
@@ -394,6 +596,88 @@ describe('Local Agent Daemon Manager', () => {
 
       // Should execute exactly once and not loop infinitely because attemptedPRNumbers tracks #401
       expect(runCount).toBe(1);
+    });
+
+    it('records evaluated PR in state.evaluatedPRs upon routine completion', async () => {
+      const prs = [
+        {
+          number: 501,
+          headRefName: 'feat/pr-501',
+          headRefOid: 'sha-501',
+          title: 'feat: new pr 501',
+        },
+      ];
+
+      const daemonState: any = {
+        pid: 1234,
+        status: 'idle',
+        routines: ['peer-review'],
+      };
+
+      await drainReviewQueue({
+        repoRoot: tmpRepo,
+        state: daemonState,
+        getPRs: async () => prs,
+        runRoutine: async (opts) => {
+          opts.onTargetDetected?.('PR #501');
+          return { success: true, outcome: 'approved' };
+        },
+      });
+
+      expect(daemonState.evaluatedPRs).toBeDefined();
+      expect(daemonState.evaluatedPRs[501]).toBeDefined();
+      expect(daemonState.evaluatedPRs[501].headRefOid).toBe('sha-501');
+      expect(daemonState.evaluatedPRs[501].success).toBe(true);
+      expect(daemonState.evaluatedPRs[501].outcome).toBe('approved');
+    });
+
+    it('identifies approved PRs via reviewDecision or commit reviews', () => {
+      expect(isPRApproved({ number: 1, headRefName: 'f1', title: 't1', reviewDecision: 'APPROVED' })).toBe(true);
+      expect(isPRApproved({ number: 2, headRefName: 'f2', title: 't2', reviewDecision: 'REVIEW_REQUIRED' })).toBe(false);
+      expect(
+        isPRApproved({
+          number: 3,
+          headRefName: 'f3',
+          title: 't3',
+          headRefOid: 'sha-3',
+          reviews: [{ state: 'APPROVED' }],
+        })
+      ).toBe(true);
+      expect(
+        isPRApproved({
+          number: 4,
+          headRefName: 'f4',
+          title: 't4',
+          headRefOid: 'sha-4',
+          reviews: [{ commit: { oid: 'sha-4' }, body: 'LGTM! Approved for squash-merge.' }],
+        })
+      ).toBe(true);
+    });
+
+    it('passes fastPathMerge: true to runRoutine when PR is approved and CI is green', async () => {
+      let passedFastPath: boolean | undefined = undefined;
+
+      const prs = [
+        {
+          number: 601,
+          headRefName: 'feat/fast-path',
+          headRefOid: 'sha-601',
+          title: 'Fast Path PR',
+          reviewDecision: 'APPROVED',
+          statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'SUCCESS' }],
+        },
+      ];
+
+      await drainReviewQueue({
+        repoRoot: tmpRepo,
+        getPRs: async () => prs,
+        runRoutine: async (opts) => {
+          passedFastPath = opts.fastPathMerge;
+          return { success: true, outcome: 'merged' };
+        },
+      });
+
+      expect(passedFastPath).toBe(true);
     });
   });
 

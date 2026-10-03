@@ -98,6 +98,21 @@ describe('Local Routine Runner', () => {
     expect(skills).toContain('Read and follow .agents/skills/tdd/SKILL.md.');
   });
 
+  it('scopes discovered skills by routine to prevent prompt context bloat', () => {
+    fs.mkdirSync(path.join(tmpRepo, '.agents', 'skills', 'host-outreach'), { recursive: true });
+    fs.writeFileSync(path.join(tmpRepo, '.agents', 'skills', 'host-outreach', 'SKILL.md'), '# Host Outreach\n', 'utf8');
+
+    // peer-review routine should only get relevant skills (tdd, code-review, resolving-merge-conflicts), NOT host-outreach
+    const peerReviewSkills = discoverSkillsPrompt(tmpRepo, 'peer-review');
+    expect(peerReviewSkills).toContain('Read and follow .agents/skills/tdd/SKILL.md.');
+    expect(peerReviewSkills).not.toContain('host-outreach');
+
+    // Untyped / raw discovery should discover all skills
+    const allSkills = discoverSkillsPrompt(tmpRepo);
+    expect(allSkills).toContain('Read and follow .agents/skills/tdd/SKILL.md.');
+    expect(allSkills).toContain('Read and follow .agents/skills/host-outreach/SKILL.md.');
+  });
+
   it('builds autowork prompt in Targeted mode', () => {
     const prompt = buildRoutinePrompt(tmpRepo, 'autowork', { issue: 42 });
     expect(prompt).toContain('Targeted mode: work issue #42 directly');
@@ -113,6 +128,13 @@ describe('Local Routine Runner', () => {
   it('builds peer-review prompt in Targeted mode', () => {
     const prompt = buildRoutinePrompt(tmpRepo, 'peer-review', { pr: 105 });
     expect(prompt).toContain('Targeted mode: review PR #105 directly');
+  });
+
+  it('builds peer-review prompt in Fast-Path Merge Mode when CI is cleared', () => {
+    const prompt = buildRoutinePrompt(tmpRepo, 'peer-review', { pr: 105, fastPathMerge: true });
+    expect(prompt).toContain('Fast-Path Merge Mode: PR #105 has already received clean code review approval');
+    expect(prompt).toContain('gh pr merge 105 --squash --delete-branch');
+    expect(prompt).not.toContain('Read and follow .agents/skills');
   });
 
   it('builds peer-review prompt in Scan mode', () => {
