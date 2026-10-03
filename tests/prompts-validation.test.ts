@@ -173,6 +173,17 @@ describe("Prompt Validation & Invariants", () => {
     expect(optimizerContent).toContain("Milestone: Run Completed");
   });
 
+  it("validates peer-review.md milestone cards mention target PR with native GitHub links without backticks", () => {
+    const peerReviewPath = path.join(promptsDir, "peer-review.md");
+    const content = fs.readFileSync(peerReviewPath, "utf8");
+
+    // Must mention target PR with native autolink rather than backticked plain text
+    expect(content).toContain("- **Target / Context**: PR #<PR_NUMBER> (Round N)");
+    expect(content).not.toContain("- **Target / Context**: `PR #<PR_NUMBER> (Round N)`");
+    expect(content).toContain("- **Target / Context**: PR #<PR_NUMBER>");
+    expect(content).not.toContain("- **Target / Context**: `PR #<PR_NUMBER>`");
+  });
+
   it("validates trigger-review-routine.yml supports workflow_dispatch, issue_comment, and review_requested triggers", () => {
     const workflowPath = path.join(
       templatesDir,

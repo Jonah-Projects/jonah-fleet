@@ -418,6 +418,34 @@ describe('Local Routine Runner', () => {
       expect(result).toBeUndefined();
     });
 
+    it('creates local run issue with unbackticked target and preserves markdown in body file', () => {
+      let executedCmd = '';
+      let capturedBody = '';
+      execSyncMock.mockImplementation((cmd: string) => {
+        executedCmd = cmd;
+        const match = cmd.match(/--body-file "([^"]+)"/);
+        if (match && fs.existsSync(match[1])) {
+          capturedBody = fs.readFileSync(match[1], 'utf8');
+        }
+        return 'https://github.com/Jonah-Projects/jonah-fleet/issues/4872';
+      });
+
+      const issueNum = tryCreateLocalRunIssue(
+        '/tmp',
+        'peer-review',
+        '2026-10-02T14-25-21-699Z',
+        'PR #4867',
+        'test-host'
+      );
+
+      expect(issueNum).toBe(4872);
+      expect(executedCmd).toContain('gh issue create');
+      expect(executedCmd).toContain('--title "[peer-review] run 2026-10-02T14-25-21-699Z (PR #4867)"');
+      expect(capturedBody).toContain('- **Target**: PR #4867');
+      expect(capturedBody).not.toContain('- **Target**: `PR #4867`');
+      expect(capturedBody).toContain('- **Routine**: `peer-review`');
+    });
+
     it('gracefully handles errors in tryReconcileLocalRunIssue without throwing', () => {
       expect(() => {
         tryReconcileLocalRunIssue(
@@ -678,7 +706,8 @@ describe('Local Routine Runner', () => {
       expect(card).toContain('### 🧭 Milestone: Intake & Strategy');
       expect(card).toContain('- **Phase**: `Phase 1 · Target Selection & Planning`');
       expect(card).toContain('- **Status**: ⏳ In Progress');
-      expect(card).toContain('- **Target / Context**: `#124 (Fix token refresh in auth client)`');
+      expect(card).toContain('- **Target / Context**: #124 (Fix token refresh in auth client)');
+      expect(card).not.toContain('- **Target / Context**: `#124');
       expect(card).toContain('- **Key Decision / Finding**: Identified race condition in token-store.ts. Adding failing regression test first.');
       expect(card).toContain('- **Next**: Implementation & Test Verification');
     });
