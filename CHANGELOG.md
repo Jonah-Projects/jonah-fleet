@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.34.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.33.0...v1.34.0) (2026-10-03)
+
+
+### Features
+
+* **optimizer:** harden prompt optimizer and orchestration against token leaks ([#635](https://github.com/Jonah-Projects/jonah-fleet/issues/635)) ([9671650](https://github.com/Jonah-Projects/jonah-fleet/commit/9671650983499fd3517c242d8bb082e4b85a4475))
+
 ## [1.33.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.32.0...v1.33.0) (2026-10-03)
 
 
