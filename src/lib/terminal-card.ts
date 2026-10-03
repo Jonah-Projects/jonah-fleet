@@ -6,16 +6,14 @@ import pc from 'picocolors';
 import {
   calculateTokenQuotaPercentages,
   getRollingWindowTokenUsage,
+  formatQuotaStatusBadge,
+  formatTokenBreakdown,
+  type RunUsageMetrics,
 } from './telemetry.js';
 
-const execFileAsync = promisify(execFile);
+export type { RunUsageMetrics } from './telemetry.js';
 
-export interface RunUsageMetrics {
-  totalTokens?: number;
-  inputTokens?: number;
-  outputTokens?: number;
-  thinkingTokens?: number;
-}
+const execFileAsync = promisify(execFile);
 
 export interface SummaryCardOptions {
   routine: string;
@@ -1341,42 +1339,15 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
   }
 
   // Token consumption & Quota Limit Pacing
-  const total = options.usage?.totalTokens;
-  if (typeof total === 'number') {
-    const u = options.usage!;
-    const quota = calculateTokenQuotaPercentages(total);
-    const breakdown = [
-      u.inputTokens !== undefined ? `in: ${u.inputTokens.toLocaleString()}` : '',
-      u.outputTokens !== undefined ? `out: ${u.outputTokens.toLocaleString()}` : '',
-      u.thinkingTokens !== undefined ? `think: ${u.thinkingTokens.toLocaleString()}` : '',
-    ].filter(Boolean).join(' · ');
-
-    lines.push(border(`├${horizontal}┤`));
-    const tokenLine1 = ` Tokens: ${pc.bold(total.toLocaleString())}${breakdown ? pc.dim(` (${breakdown})`) : ''}`;
-    lines.push(border('│') + tokenLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine1).length)) + border('│'));
-
-    const tokenLine2 = `         ↳ ${pc.cyan(quota.pctOf5hLimit.toFixed(2) + '% of 5h limit')} · ${pc.cyan(quota.pctOfWeeklyLimit.toFixed(2) + '% of weekly limit')}`;
-    lines.push(border('│') + tokenLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine2).length)) + border('│'));
-
-    if (options.repoRoot) {
-      try {
-        const rolling = getRollingWindowTokenUsage(options.repoRoot);
-        if (rolling.windowTokens > 0 || rolling.weeklyTokens > 0) {
-          const statusBadge =
-            rolling.status === 'HEALTHY'
-              ? pc.green('[HEALTHY]')
-              : rolling.status === 'WARNING'
-                ? pc.yellow('[WARNING]')
-                : pc.red(`[${rolling.status}]`);
-
-          const rollingLine1 = ` Rolling 5h: ${rolling.windowTokens.toLocaleString()} / ${rolling.windowLimit.toLocaleString()} tokens (${rolling.windowPercentage.toFixed(1)}% · ${statusBadge})`;
-          lines.push(border('│') + rollingLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine1).length)) + border('│'));
-
-          const rollingLine2 = ` Rolling 7d: ${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()} tokens (${rolling.weeklyPercentage.toFixed(1)}% · ${statusBadge})`;
-          lines.push(border('│') + rollingLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine2).length)) + border('│'));
-        }
-      } catch {}
-    }
+  if (typeof options.usage?.totalTokens === 'number') {
+    lines.push(
+      ...renderTokenQuotaSection({
+        usage: options.usage,
+        repoRoot: options.repoRoot,
+        width,
+        borderColor: border,
+      })
+    );
   }
 
   // Footer section with log link
@@ -1389,6 +1360,52 @@ export function renderSummaryCard(options: SummaryCardOptions): string {
 
   lines.push(border(`└${horizontal}┘`));
   return lines.join('\n');
+}
+
+/**
+ * Helper to render the token consumption and quota pacing section for terminal cards.
+ */
+function renderTokenQuotaSection(options: {
+  usage?: RunUsageMetrics;
+  repoRoot?: string;
+  width: number;
+  borderColor?: (s: string) => string;
+}): string[] {
+  const total = options.usage?.totalTokens;
+  if (typeof total !== 'number') return [];
+
+  const border = options.borderColor ?? ((s: string) => pc.dim(pc.gray(s)));
+  const width = options.width;
+  const horizontal = '─'.repeat(width - 2);
+  const lines: string[] = [];
+
+  const quota = calculateTokenQuotaPercentages(total);
+  const breakdown = formatTokenBreakdown(options.usage, 'prefix');
+
+  lines.push(border(`├${horizontal}┤`));
+  const tokenLine1 = ` Tokens: ${pc.bold(total.toLocaleString())}${breakdown ? pc.dim(` (${breakdown})`) : ''}`;
+  lines.push(border('│') + tokenLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine1).length)) + border('│'));
+
+  const tokenLine2 = `         ↳ ${pc.cyan(quota.pctOf5hLimit.toFixed(2) + '% of 5h limit')} · ${pc.cyan(quota.pctOfWeeklyLimit.toFixed(2) + '% of weekly limit')}`;
+  lines.push(border('│') + tokenLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(tokenLine2).length)) + border('│'));
+
+  if (options.repoRoot) {
+    try {
+      const rolling = getRollingWindowTokenUsage(options.repoRoot);
+      if (rolling.windowTokens > 0 || rolling.weeklyTokens > 0) {
+        const badge5h = formatQuotaStatusBadge(rolling.windowStatus);
+        const badgeWeekly = formatQuotaStatusBadge(rolling.weeklyStatus);
+
+        const rollingLine1 = ` Rolling 5h: ${rolling.windowTokens.toLocaleString()} / ${rolling.windowLimit.toLocaleString()} tokens (${rolling.windowPercentage.toFixed(1)}% · ${badge5h})`;
+        lines.push(border('│') + rollingLine1 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine1).length)) + border('│'));
+
+        const rollingLine2 = ` Rolling 7d: ${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()} tokens (${rolling.weeklyPercentage.toFixed(1)}% · ${badgeWeekly})`;
+        lines.push(border('│') + rollingLine2 + ' '.repeat(Math.max(1, width - 2 - stripAnsi(rollingLine2).length)) + border('│'));
+      }
+    } catch {}
+  }
+
+  return lines;
 }
 
 /**
@@ -1437,6 +1454,18 @@ export function renderErrorCard(options: ErrorCardOptions): string {
     }
   } else {
     lines.push(pc.red('│') + pc.dim('  (No daemon.log found)') + ' '.repeat(Math.max(1, width - 26)) + pc.red('│'));
+  }
+
+  // Token consumption & Quota Limit Pacing
+  if (typeof options.usage?.totalTokens === 'number') {
+    lines.push(
+      ...renderTokenQuotaSection({
+        usage: options.usage,
+        repoRoot: options.repoRoot,
+        width,
+        borderColor: (s) => pc.red(s),
+      })
+    );
   }
 
   lines.push(pc.red(`├${horizontal}┤`));

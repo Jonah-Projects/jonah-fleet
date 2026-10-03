@@ -12,6 +12,8 @@ import {
   GLOBAL_5H_TOKEN_BUDGET,
   calculateTokenQuotaPercentages,
   getRollingWindowTokenUsage,
+  formatQuotaStatusBadge,
+  formatTokenBreakdown,
 } from '../src/lib/telemetry.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -253,6 +255,138 @@ describe('Fleet Telemetry Hub', () => {
       } finally {
         fs.rmSync(tmpRepo, { recursive: true, force: true });
       }
+    });
+
+    it('prefers JSON data.timestamp over file mtimeMs (preventing checkout/clone mtime reset false positives)', () => {
+      const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'jonah-fleet-mtime-test-'));
+      try {
+        const runsDir = path.join(tmpRepo, '.jonah-fleet', 'runs');
+        fs.mkdirSync(runsDir, { recursive: true });
+
+        const now = Date.now();
+        // File is freshly written (mtime is now), but data.timestamp is 24 hours ago
+        fs.writeFileSync(
+          path.join(runsDir, 'autowork-historical.json'),
+          JSON.stringify({
+            routine: 'autowork',
+            timestamp: new Date(now - 24 * 3600 * 1000).toISOString(),
+            usage: { totalTokens: 50_000 },
+          })
+        );
+
+        const rolling = getRollingWindowTokenUsage(tmpRepo, { now });
+        // Since timestamp is 24h ago, 5h window must be 0, even though file mtime is fresh
+        expect(rolling.windowTokens).toBe(0);
+        expect(rolling.weeklyTokens).toBe(50_000);
+      } finally {
+        fs.rmSync(tmpRepo, { recursive: true, force: true });
+      }
+    });
+
+    it('calculates independent window and weekly statuses without cross-contamination', () => {
+      const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'jonah-fleet-pacing-test-'));
+      try {
+        const runsDir = path.join(tmpRepo, '.jonah-fleet', 'runs');
+        fs.mkdirSync(runsDir, { recursive: true });
+
+        const now = Date.now();
+        // 5h window: 100,000 tokens (5% of 2.0M -> HEALTHY)
+        fs.writeFileSync(
+          path.join(runsDir, 'run-recent.json'),
+          JSON.stringify({
+            routine: 'peer-review',
+            timestamp: new Date(now - 1 * 3600 * 1000).toISOString(),
+            usage: { totalTokens: 100_000 },
+          })
+        );
+
+        // Outside 5h, within 7d: 9,000,000 tokens (total weekly = 9.1M > 8.75M limit -> EXCEEDED)
+        fs.writeFileSync(
+          path.join(runsDir, 'run-older.json'),
+          JSON.stringify({
+            routine: 'autowork',
+            timestamp: new Date(now - 24 * 3600 * 1000).toISOString(),
+            usage: { totalTokens: 9_000_000 },
+          })
+        );
+
+        const rolling = getRollingWindowTokenUsage(tmpRepo, { now });
+        expect(rolling.windowTokens).toBe(100_000);
+        expect(rolling.windowStatus).toBe('HEALTHY');
+        expect(rolling.weeklyTokens).toBe(9_100_000);
+        expect(rolling.weeklyStatus).toBe('EXCEEDED');
+        expect(rolling.status).toBe('EXCEEDED');
+      } finally {
+        fs.rmSync(tmpRepo, { recursive: true, force: true });
+      }
+    });
+
+    it('evaluates WARNING pacing status at >=70% and <=100% threshold', () => {
+      const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'jonah-fleet-warning-test-'));
+      try {
+        const runsDir = path.join(tmpRepo, '.jonah-fleet', 'runs');
+        fs.mkdirSync(runsDir, { recursive: true });
+
+        const now = Date.now();
+        // 5h window: 1.5M tokens (75% of 2.0M -> WARNING)
+        fs.writeFileSync(
+          path.join(runsDir, 'run-warning.json'),
+          JSON.stringify({
+            routine: 'autowork',
+            timestamp: new Date(now - 1 * 3600 * 1000).toISOString(),
+            usage: { totalTokens: 1_500_000 },
+          })
+        );
+
+        const rolling = getRollingWindowTokenUsage(tmpRepo, { now });
+        expect(rolling.windowStatus).toBe('WARNING');
+        expect(rolling.weeklyStatus).toBe('HEALTHY');
+        expect(rolling.status).toBe('WARNING');
+      } finally {
+        fs.rmSync(tmpRepo, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('formatQuotaStatusBadge', () => {
+    it('formats badges with correct colors and brackets', () => {
+      expect(stripAnsi(formatQuotaStatusBadge('HEALTHY'))).toBe('[HEALTHY]');
+      expect(stripAnsi(formatQuotaStatusBadge('WARNING'))).toBe('[WARNING]');
+      expect(stripAnsi(formatQuotaStatusBadge('EXCEEDED'))).toBe('[EXCEEDED]');
+      expect(stripAnsi(formatQuotaStatusBadge('UNKNOWN'))).toBe('[UNKNOWN]');
+    });
+  });
+
+  describe('formatTokenBreakdown', () => {
+    it('formats token breakdown with prefix style', () => {
+      const breakdown = formatTokenBreakdown(
+        {
+          inputTokens: 12500,
+          outputTokens: 850,
+          thinkingTokens: 1200,
+        },
+        'prefix'
+      );
+      expect(breakdown).toBe('in: 12,500 · out: 850 · think: 1,200');
+    });
+
+    it('formats token breakdown with suffix style', () => {
+      const breakdown = formatTokenBreakdown(
+        {
+          inputTokens: 12500,
+          outputTokens: 850,
+          thinkingTokens: 1200,
+        },
+        'suffix'
+      );
+      expect(breakdown).toBe('12,500 in · 850 out · 1,200 think');
+    });
+
+    it('handles partial usage metrics and undefined usage cleanly', () => {
+      expect(formatTokenBreakdown(undefined)).toBe('');
+      expect(formatTokenBreakdown({})).toBe('');
+      expect(formatTokenBreakdown({ inputTokens: 500 }, 'prefix')).toBe('in: 500');
+      expect(formatTokenBreakdown({ outputTokens: 200 }, 'suffix')).toBe('200 out');
     });
   });
 

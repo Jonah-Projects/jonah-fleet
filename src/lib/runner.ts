@@ -35,6 +35,8 @@ import { DEFAULT_ROUTINE_MODELS } from './presets.js';
 import {
   calculateTokenQuotaPercentages,
   getRollingWindowTokenUsage,
+  formatTokenBreakdown,
+  type RunUsageMetrics,
 } from './telemetry.js';
 
 export interface RunLocalRoutineOptions {
@@ -69,12 +71,7 @@ export interface RunLocalRoutineResult {
   transientServiceError?: boolean;
   durationMs?: number;
   outcome?: PeerReviewOutcome;
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    thinkingTokens?: number;
-    totalTokens?: number;
-  };
+  usage?: RunUsageMetrics;
 }
 
 export interface StreamJsonEvent {
@@ -781,12 +778,7 @@ export interface FallbackReportOptions {
   durationSec: number;
   output?: string;
   stderr?: string;
-  usage?: {
-    totalTokens?: number;
-    inputTokens?: number;
-    outputTokens?: number;
-    thinkingTokens?: number;
-  };
+  usage?: RunUsageMetrics;
   repoRoot?: string;
 }
 
@@ -886,13 +878,8 @@ export function formatFallbackRunReport(options: FallbackReportOptions): string 
 
   const total = options.usage?.totalTokens;
   if (typeof total === 'number') {
-    const u = options.usage!;
     const quota = calculateTokenQuotaPercentages(total);
-    const breakdown = [
-      u.inputTokens !== undefined ? `${u.inputTokens.toLocaleString()} in` : '',
-      u.outputTokens !== undefined ? `${u.outputTokens.toLocaleString()} out` : '',
-      u.thinkingTokens !== undefined ? `${u.thinkingTokens.toLocaleString()} think` : '',
-    ].filter(Boolean).join(' · ');
+    const breakdown = formatTokenBreakdown(options.usage, 'suffix');
 
     const k5h = (quota.window5hLimit / 1_000_000).toFixed(1) + 'M';
     const kWeekly = (quota.weeklyLimit / 1_000_000).toFixed(2) + 'M';
@@ -904,8 +891,8 @@ export function formatFallbackRunReport(options: FallbackReportOptions): string 
       try {
         const rolling = getRollingWindowTokenUsage(options.repoRoot);
         if (rolling.windowTokens > 0 || rolling.weeklyTokens > 0) {
-          reportContent += `| 5h Window Usage | \`${rolling.windowTokens.toLocaleString()} / ${rolling.windowLimit.toLocaleString()}\` tokens (\`${rolling.windowPercentage.toFixed(1)}%\` · \`[${rolling.status}]\`) |\n`;
-          reportContent += `| Weekly Spend | \`${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()}\` tokens (\`${rolling.weeklyPercentage.toFixed(1)}%\` · \`[${rolling.status}]\`) |\n`;
+          reportContent += `| 5h Window Usage | \`${rolling.windowTokens.toLocaleString()} / ${rolling.windowLimit.toLocaleString()}\` tokens (\`${rolling.windowPercentage.toFixed(1)}%\` · \`[${rolling.windowStatus}]\`) |\n`;
+          reportContent += `| Weekly Spend | \`${rolling.weeklyTokens.toLocaleString()} / ${rolling.weeklyLimit.toLocaleString()}\` tokens (\`${rolling.weeklyPercentage.toFixed(1)}%\` · \`[${rolling.weeklyStatus}]\`) |\n`;
         }
       } catch {}
     }

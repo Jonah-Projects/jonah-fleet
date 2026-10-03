@@ -70,6 +70,7 @@ import {
   preserveUncommittedWork,
   detectTransientServiceError,
 } from '../src/lib/runner.js';
+import { recordDaemonSessionUsage, readDaemonState } from '../src/lib/daemon.js';
 
 describe('Local Routine Runner', () => {
   let tmpRepo: string;
@@ -312,9 +313,50 @@ describe('Local Routine Runner', () => {
       expect(parsed?.result?.usage?.total_tokens).toBe(15400);
     });
 
+    it('parses step_update events with granular token usage breakdown', () => {
+      const raw = JSON.stringify({
+        event: 'step_update',
+        step_update: {
+          state: 'ACTIVE',
+          step_type: 'agent_response',
+          usage: {
+            input_tokens: 12000,
+            output_tokens: 800,
+            thinking_tokens: 1100,
+            total_tokens: 13900,
+          },
+        },
+      });
+
+      const parsed = parseStreamJsonEvent(raw);
+      expect(parsed).not.toBeNull();
+      expect(parsed?.step_update?.usage?.input_tokens).toBe(12000);
+      expect(parsed?.step_update?.usage?.output_tokens).toBe(800);
+      expect(parsed?.step_update?.usage?.thinking_tokens).toBe(1100);
+      expect(parsed?.step_update?.usage?.total_tokens).toBe(13900);
+    });
+
     it('returns null on invalid JSON', () => {
       expect(parseStreamJsonEvent('invalid json text')).toBeNull();
       expect(parseStreamJsonEvent('')).toBeNull();
+    });
+  });
+
+  describe('recordDaemonSessionUsage', () => {
+    it('accumulates sessionTokens on state and writes state to disk', () => {
+      const state: any = { pid: 1234, sessionTokens: 5000 };
+      recordDaemonSessionUsage(tmpRepo, state, { totalTokens: 12000 });
+      expect(state.sessionTokens).toBe(17000);
+
+      const persisted = readDaemonState(tmpRepo);
+      expect(persisted?.sessionTokens).toBe(17000);
+    });
+
+    it('handles missing or undefined usage safely without modifying state', () => {
+      const state: any = { pid: 1234, sessionTokens: 5000 };
+      recordDaemonSessionUsage(tmpRepo, state, undefined);
+      recordDaemonSessionUsage(tmpRepo, state, { totalTokens: undefined });
+      expect(state.sessionTokens).toBe(5000);
     });
   });
 
@@ -958,6 +1000,45 @@ describe('Local Routine Runner', () => {
 
       expect(report).toContain('| Run Tokens | `14,250` (`11,800 in · 950 out · 1,500 think`) |');
       expect(report).toContain('| Run % of Limits | `0.71%` of 5h (`2.0M`) · `0.16%` of weekly (`8.75M`) |');
+    });
+
+    it('includes rolling window usage lines with independent window statuses when repoRoot is provided', () => {
+      const runsDir = path.join(tmpRepo, '.jonah-fleet', 'runs');
+      fs.mkdirSync(runsDir, { recursive: true });
+
+      const now = Date.now();
+      // 5h run: 60k tokens
+      fs.writeFileSync(
+        path.join(runsDir, 'recent-run.json'),
+        JSON.stringify({
+          routine: 'autowork',
+          timestamp: new Date(now - 1 * 3600 * 1000).toISOString(),
+          usage: { totalTokens: 60_000 },
+        })
+      );
+      // Older run (outside 5h, within 7d): 9.5M tokens (> 8.75M -> EXCEEDED)
+      fs.writeFileSync(
+        path.join(runsDir, 'older-run.json'),
+        JSON.stringify({
+          routine: 'autowork',
+          timestamp: new Date(now - 24 * 3600 * 1000).toISOString(),
+          usage: { totalTokens: 9_500_000 },
+        })
+      );
+
+      const report = formatFallbackRunReport({
+        routine: 'autowork',
+        timestamp: '2026-10-03T08-30-00Z',
+        exitCode: 0,
+        hostname: 'penguin',
+        targetLabel: 'Issue #42',
+        durationSec: 30,
+        usage: { totalTokens: 60_000 },
+        repoRoot: tmpRepo,
+      });
+
+      expect(report).toContain('| 5h Window Usage | `60,000 / 2,000,000` tokens (`3.0%` · `[HEALTHY]`) |');
+      expect(report).toContain('| Weekly Spend | `9,560,000 / 8,750,000` tokens (`109.3%` · `[EXCEEDED]`) |');
     });
   });
 
