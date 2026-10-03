@@ -57,23 +57,31 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 
 ### 1. Collect signals & analyze logs
 
-1. **Query in-window routine issues**: List routine run issues within the window using `gh issue list --label routine-log --state all --limit 100 --json number,title,body,state,labels,createdAt`.
+1. **Query in-window routine issues & local run artifacts**:
+   - Query remote routine run issues within the window using `gh issue list --label routine-log --state all --limit 100 --json number,title,body,state,labels,createdAt`.
+   - Ingest local run artifacts from `.jonah-fleet/runs/*.json` (and `.jonah-fleet/runs/*.md`) or via `npx jonah-fleet telemetry --json`, capturing headless daemon runs, unfiled local executions, and exact per-step usage metrics.
+   - Fetch real-time provider plan quota via `npx jonah-fleet status` or `agy --output-format json --print /quota` to inspect cost-weighted 5-hour and weekly quota remaining percentages.
 2. **Extract failure categories**: Categorize runs labeled `status:failure` or logging `FAILURE` (`prompt_unclear`, `data_issue`, `token_limit`, `infeasible_task`).
-3. **Compute efficiency metrics**: Identify PRs experiencing $\ge 3$ review bounce rounds and runs with high iteration usage relative to limits.
+3. **Compute efficiency metrics**: Identify PRs experiencing $\ge 3$ review bounce rounds, PRs evaluated repeatedly on the same commit SHA, and runs with high iteration usage relative to limits.
 4. **Aggregate per-agent token & cost consumption**:
-   - Parse the metadata table from each in-window routine issue body: `Routine`, `Input tokens`, `Output tokens`, `Estimated cost`, `Iterations used` (e.g. `26 / 65`), and `Result` (`SUCCESS` or `FAILURE`).
+   - Parse the metadata table from each in-window routine issue body and local run artifact: `Routine`, `Input tokens`, `Output tokens`, `Estimated cost`, `Iterations used` (e.g. `26 / 65`), and `Result` (`SUCCESS` or `FAILURE`).
    - Group logs by `Routine` (`autowork`, `peer-review`, `issues-housekeeping`, `dependency-update-security-check`, `optimizer`, `product-planning`).
    - For each routine, compute:
      - **Run count**: total completed runs.
      - **Token volume**: total input tokens, total output tokens, combined total tokens.
+     - **Input/Output ratio**: `totalInputTokens / Math.max(1, totalOutputTokens)` to evaluate context efficiency and prompt density.
      - **Cost volume**: sum of estimated costs ($).
      - **Fleet spend share**: `(routine total cost / fleet total cost) * 100` (or token volume share if cost is unmetered).
      - **Token averages & peaks**: average tokens per run and max tokens in a single run.
      - **Iteration efficiency**: average iterations used per run and percentage of budget consumed.
-   - **Weekly token ceiling pacing**: Compare total fleet tokens and per-routine volume against the 70% weekly token budget ceiling specified in `ORCHESTRATION.md` (~8.75M tokens/week, and per-routine budget overrides in `agents-manifest.json` if present). Determine burn rate velocity (tokens/day) and projected 7-day total.
+   - **Weekly token ceiling & plan quota pacing**: Compare total fleet tokens and per-routine volume against the 70% weekly token budget ceiling specified in `ORCHESTRATION.md` (~8.75M tokens/week, and per-routine budget overrides in `agents-manifest.json` if present). Determine burn rate velocity (tokens/day) and projected 7-day total. Compare against actual provider plan quotas (5h and weekly remaining percentages).
 5. **Evaluate Token Anomaly Heuristics**: Detect actionable anomalies using concrete numerical thresholds:
    - **Token Surge**: Routine average token consumption increases >50% week-over-week (or against baseline).
    - **Budget Hog**: A single agent routine consumes >75% of total fleet token allowance.
+   - **Multi-Routine Budget Cannibalization**: Top-2 agent routines combined consume >80% of total fleet token allowance or plan quota, indicating systemic misallocation across routines.
+   - **Context Asymmetry & Prompt Bloat**: Routine average `inputTokens / outputTokens` ratio exceeds `35:1` (with input tokens > 50,000), or static context constitutes $>85\%$ of total tokens on non-trivial routines.
+   - **Unilateral Re-Review Thrash**: A pull request is evaluated >= 2 times on the same commit SHA without intervening commits, state changes, or explicit `/review` re-trigger commands.
+   - **Plan Quota Burn Velocity**: Actual Gemini/Claude plan quota remaining is <30% for weekly limit or <20% for 5-hour rolling limit, indicating cost-weighted compute exhaustion.
    - **Iteration Ceiling Exhaustion**: >20% of runs in a routine terminate at the `token_limit` / max iteration cap.
    - **Review Loop Burn**: Pull requests experiencing >= 3 bounce rounds between autowork and peer-review over unresolved or recurring findings.
    - **Feedback Loop Stagnation**: A downstream processing routine (e.g. impact measurement, verification, or triage) records 0 intake (`filed: 0` or 0 new items processed) across $\ge 2$ consecutive runs while upstream PRs merge or roadmap/feature issues close in the same window. Flags that discovery sweeps have stalled or become overly coarse.
@@ -86,7 +94,9 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 ### 2. Formulate preventative improvements
 
 Translate findings into concrete preventative improvements and remediation triggers:
-- **Instruction Pruning**: For Token Surge and prompt bloat, prune redundant instructions, anti-patterns, and no-ops in routine prompts following `/writing-for-agents` principles (replacing sprawling descriptions with crisp leading words and progressive disclosure pointers).
+- **Instruction Pruning & Skill Scoping**: For Token Surge, Context Asymmetry, and prompt bloat, prune redundant instructions, anti-patterns, and no-ops in routine prompts following `/writing-for-agents` principles, and enforce scoping skills strictly per routine rather than injecting all skills globally.
+- **Model Effort Calibration**: For Plan Quota Burn Velocity, calibrate reasoning effort levels strictly per routine tier (e.g. `gemini-3.8-flash-medium` for review, housekeeping, and optimizer) to prevent high-effort compute exhaustion.
+- **Review Deduplication & State Caching**: For Unilateral Re-Review Thrash, enforce review state caches (e.g. `daemon.json`) and backoff cooldowns to prevent repeat evaluations on unchanged commits.
 - **Early Exit & Candidate Skip**: For Budget Hog and runaway sweeps, add early termination guards, candidate pre-qualification filters, and infeasible evaluation caps.
 - **Iteration Ceiling & Self-Audit Tuning**: For Iteration Ceiling Exhaustion, adjust max iteration bounds or tighten pre-ready self-audits in `autowork.md` to catch defects before review cycles start.
 - **Ping-Pong Convergence**: For Review Loop Burn, tighten reviewer trust & noise filtering, enforce clean-merge gates, and apply ping-pong caps to prevent endless bounce cycles.
@@ -117,14 +127,14 @@ After completing (SUCCESS or FAILURE), record run execution details to `.jonah-f
 ```markdown
 ### Token & Cost Consumption by Agent
 
-| Routine | Runs | Input Tokens | Output Tokens | Total Tokens | Cost | Fleet % | Avg Iterations | Max Iterations | Status / Anomaly |
-|---|---|---|---|---|---|---|---|---|---|
-| `autowork` | 0 | 0 | 0 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
-| `peer-review` | 0 | 0 | 0 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
-| `issues-housekeeping` | 0 | 0 | 0 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
-| `dependency-update-security-check` | 0 | 0 | 0 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
-| `optimizer` | 0 | 0 | 0 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
-| `product-planning` | 0 | 0 | 0 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
+| Routine | Runs | Input Tokens | Output Tokens | I/O Ratio | Total Tokens | Cost | Fleet % | Avg Iterations | Max Iterations | Status / Anomaly |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `autowork` | 0 | 0 | 0 | 0:1 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
+| `peer-review` | 0 | 0 | 0 | 0:1 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
+| `issues-housekeeping` | 0 | 0 | 0 | 0:1 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
+| `dependency-update-security-check` | 0 | 0 | 0 | 0:1 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
+| `optimizer` | 0 | 0 | 0 | 0:1 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
+| `product-planning` | 0 | 0 | 0 | 0:1 | 0 | $0.00 | 0.0% | 0 | 0 | Nominal |
 ```
 
 - Weekly token budget pacing evaluation (pacing vs 70% ceiling in `ORCHESTRATION.md`)

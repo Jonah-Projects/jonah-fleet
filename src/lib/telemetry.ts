@@ -74,6 +74,21 @@ export interface ActualPlanQuota {
   error?: string;
 }
 
+export interface TokenAnomalyReport {
+  type:
+    | 'context_asymmetry'
+    | 'unilateral_rereview_thrash'
+    | 'budget_hog'
+    | 'multi_routine_cannibalization'
+    | 'plan_quota_velocity'
+    | 'token_surge'
+    | 'iteration_exhaustion';
+  severity: 'WARNING' | 'CRITICAL';
+  routine?: string;
+  message: string;
+  remediation: string;
+}
+
 /**
  * Formats a styled quota status badge.
  */
@@ -941,15 +956,70 @@ export function collectLocalTelemetryLogs(dir: string, repositoryName: string = 
   const traverse = (currentDir: string) => {
     if (!fs.existsSync(currentDir)) return;
     const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+
+    // Collect base names to avoid duplicates when both .md and .json exist
+    const filesByBase = new Map<string, { json?: string; md?: string }>();
     for (const entry of entries) {
-      const fullPath = path.join(currentDir, entry.name);
       if (entry.isDirectory()) {
-        traverse(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        traverse(path.join(currentDir, entry.name));
+      } else if (entry.isFile()) {
+        if (entry.name.endsWith('.md')) {
+          const base = entry.name.slice(0, -3);
+          const current = filesByBase.get(base) || {};
+          current.md = path.join(currentDir, entry.name);
+          filesByBase.set(base, current);
+        } else if (entry.name.endsWith('.json')) {
+          const base = entry.name.slice(0, -5);
+          const current = filesByBase.get(base) || {};
+          current.json = path.join(currentDir, entry.name);
+          filesByBase.set(base, current);
+        }
+      }
+    }
+
+    for (const [, paths] of filesByBase) {
+      let parsed = false;
+      if (paths.md) {
         try {
-          const content = fs.readFileSync(fullPath, 'utf8');
+          const content = fs.readFileSync(paths.md, 'utf8');
           const summary = parseLogToTelemetry(content, { repository: repositoryName });
-          if (summary) summaries.push(summary);
+          if (summary) {
+            summaries.push(summary);
+            parsed = true;
+          }
+        } catch {}
+      }
+      if (!parsed && paths.json) {
+        try {
+          const content = fs.readFileSync(paths.json, 'utf8');
+          const data = JSON.parse(content);
+          if (data.routine && data.timestamp) {
+            const inTokens = data.usage?.inputTokens ?? data.usage?.input_tokens ?? data.inputTokens ?? 0;
+            const outTokens = data.usage?.outputTokens ?? data.usage?.output_tokens ?? data.outputTokens ?? 0;
+            const totTokens = data.usage?.totalTokens ?? data.usage?.total_tokens ?? data.totalTokens ?? (inTokens + outTokens);
+            const durationSec = data.durationMs ? Math.round(data.durationMs / 1000) : (data.durationSeconds ?? undefined);
+            const result = data.result ?? (data.success === true ? 'SUCCESS' : data.success === false ? 'FAILURE' : 'UNKNOWN');
+
+            summaries.push({
+              schemaVersion: '1.0.0',
+              routine: data.routine,
+              repository: repositoryName,
+              timestamp: data.timestamp,
+              result,
+              errorReason: data.errorReason || data.error,
+              failureCategory: data.failureCategory,
+              inputTokens: inTokens,
+              outputTokens: outTokens,
+              totalTokens: totTokens,
+              estimatedCost: data.estimatedCost ?? (totTokens / 1_000_000) * 0.35,
+              durationSeconds: durationSec,
+              iterationsUsed: data.iterationsUsed,
+              maxIterations: data.maxIterations,
+              ambiguityGateTriggered: Boolean(data.ambiguityGateTriggered),
+              questionsAskedCount: data.questionsAskedCount || 0,
+              needsInfoApplied: Boolean(data.needsInfoApplied),
+            });
+          }
         } catch {}
       }
     }
@@ -1057,9 +1127,106 @@ function renderProgressBar(percentage: number, width: number = 25): string {
   return pc.green(filledBar) + pc.gray(emptyBar);
 }
 
+export function detectTokenAnomalies(
+  telemetry: AggregatedTelemetry,
+  options: { actualQuota?: ActualPlanQuota } = {}
+): TokenAnomalyReport[] {
+  const anomalies: TokenAnomalyReport[] = [];
+
+  // 1. Context Asymmetry & Prompt Bloat
+  // Routine inputTokens / outputTokens > 35:1 with significant input volume (>50k)
+  for (const [routineName, r] of Object.entries(telemetry.byRoutine)) {
+    const ratio = r.totalInputTokens / Math.max(1, r.totalOutputTokens);
+    if (ratio > 35 && r.totalInputTokens > 50_000) {
+      anomalies.push({
+        type: 'context_asymmetry',
+        severity: 'WARNING',
+        routine: routineName,
+        message: `Context Asymmetry on '${routineName}': Input/Output ratio is ${ratio.toFixed(1)}:1 (${r.totalInputTokens.toLocaleString()} input vs ${r.totalOutputTokens.toLocaleString()} output tokens).`,
+        remediation: `Apply progressive disclosure and skill pruning. Scope skills strictly per routine rather than injecting all skills globally.`,
+      });
+    }
+  }
+
+  // 2. Budget Hog (Single routine consumes > 75% of fleet tokens)
+  if (telemetry.totalTokens > 0) {
+    for (const [routineName, r] of Object.entries(telemetry.byRoutine)) {
+      const share = (r.totalTokens / telemetry.totalTokens) * 100;
+      if (share > 75 && Object.keys(telemetry.byRoutine).length > 1) {
+        anomalies.push({
+          type: 'budget_hog',
+          severity: 'CRITICAL',
+          routine: routineName,
+          message: `Budget Hog on '${routineName}': Consumes ${share.toFixed(1)}% of total fleet token allowance.`,
+          remediation: `Throttle dispatch cadence, introduce stricter pre-qualification filters, or add early exit guards.`,
+        });
+      }
+    }
+  }
+
+  // 3. Multi-Routine Budget Cannibalization (Top 2 routines consume > 80% of fleet tokens)
+  if (telemetry.totalTokens > 0 && Object.keys(telemetry.byRoutine).length >= 2) {
+    const sortedRoutines = Object.values(telemetry.byRoutine).sort(
+      (a, b) => b.totalTokens - a.totalTokens
+    );
+    const top2Spend = (sortedRoutines[0]?.totalTokens || 0) + (sortedRoutines[1]?.totalTokens || 0);
+    const top2Share = (top2Spend / telemetry.totalTokens) * 100;
+    if (top2Share > 80) {
+      anomalies.push({
+        type: 'multi_routine_cannibalization',
+        severity: 'WARNING',
+        message: `Multi-Routine Budget Cannibalization: Top 2 routines ('${sortedRoutines[0]?.routine}' and '${sortedRoutines[1]?.routine}') consume ${top2Share.toFixed(1)}% of fleet tokens.`,
+        remediation: `Rebalance dispatch pacing and coordinate candidate skips across authoring and review routines.`,
+      });
+    }
+  }
+
+  // 4. Iteration Ceiling Exhaustion (>20% runs terminate at token_limit)
+  for (const [routineName, r] of Object.entries(telemetry.byRoutine)) {
+    if (r.runCount >= 3) {
+      const tokenLimitFailures = (telemetry.events || []).filter(
+        (e) => e.routine === routineName && e.failureCategory === 'token_limit'
+      ).length;
+      const failPct = (tokenLimitFailures / r.runCount) * 100;
+      if (failPct > 20) {
+        anomalies.push({
+          type: 'iteration_exhaustion',
+          severity: 'WARNING',
+          routine: routineName,
+          message: `Iteration Ceiling Exhaustion on '${routineName}': ${failPct.toFixed(1)}% of runs terminate at max iteration/token limit.`,
+          remediation: `Decompose tasks vertically into smaller slices and tighten pre-ready self-audits.`,
+        });
+      }
+    }
+  }
+
+  // 5. Plan Quota Burn Velocity (Actual provider quota remaining is <30% weekly or <20% in 5h window)
+  if (options.actualQuota?.available) {
+    const geminiWeekly = options.actualQuota.geminiWeeklyRemainingPct;
+    const gemini5h = options.actualQuota.gemini5hRemainingPct;
+    if (geminiWeekly !== undefined && geminiWeekly < 30) {
+      anomalies.push({
+        type: 'plan_quota_velocity',
+        severity: geminiWeekly < 20 ? 'CRITICAL' : 'WARNING',
+        message: `Plan Quota Burn Velocity: Gemini weekly plan quota is at ${geminiWeekly.toFixed(1)}% remaining (<30% threshold).`,
+        remediation: `Downgrade auxiliary routines ('peer-review', 'optimizer') to medium reasoning effort and standard Flash models (gemini-3.8-flash-medium).`,
+      });
+    } else if (gemini5h !== undefined && gemini5h < 20) {
+      anomalies.push({
+        type: 'plan_quota_velocity',
+        severity: 'CRITICAL',
+        message: `Plan Quota Burn Velocity: Gemini 5h rolling plan quota is at ${gemini5h.toFixed(1)}% remaining (<20% threshold).`,
+        remediation: `Throttle active agent execution to prevent rate limit lockout during the current 5-hour window.`,
+      });
+    }
+  }
+
+  return anomalies;
+}
+
 export function renderTelemetryDashboard(
   telemetry: AggregatedTelemetry,
-  options: { json?: boolean } = {}
+  options: { json?: boolean; actualQuota?: ActualPlanQuota } = {}
 ): string {
   if (options.json) {
     return JSON.stringify(telemetry, null, 2);
@@ -1100,10 +1267,12 @@ export function renderTelemetryDashboard(
   lines.push('\n' + pc.bold('🤖 Spend by Agent Routine:'));
   for (const [routineName, r] of Object.entries(telemetry.byRoutine)) {
     const costStr = pc.green(`$${r.totalEstimatedCost.toFixed(2)}`);
+    const ratio = (r.totalInputTokens / Math.max(1, r.totalOutputTokens)).toFixed(0);
     lines.push(
       `   • ${pc.cyan(routineName.padEnd(30))} ` +
         `Runs: ${pc.bold(r.runCount.toString().padStart(2))} | ` +
         `Tokens: ${pc.bold(formatTokens(r.totalTokens).padStart(7))} | ` +
+        `I/O: ${ratio.padStart(2)}:1 | ` +
         `Cost: ${costStr.padStart(6)} | ` +
         `Avg Iter: ${r.avgIterationsUsed.toFixed(1)}`
     );
@@ -1134,6 +1303,17 @@ export function renderTelemetryDashboard(
   lines.push(
     `   • Est. Wasted Tokens Averted: ~${pc.bold(pc.green(formatTokens(amb.estimatedTokensSaved)))} tokens (avoided speculative builds)`
   );
+
+  // Detected Anomalies
+  const anomalies = detectTokenAnomalies(telemetry, { actualQuota: options.actualQuota });
+  if (anomalies.length > 0) {
+    lines.push('\n' + pc.bold(pc.yellow('🚨 Detected Token & Pacing Anomalies:')));
+    for (const anom of anomalies) {
+      const badge = anom.severity === 'CRITICAL' ? pc.red('[CRITICAL]') : pc.yellow('[WARNING]');
+      lines.push(`   ${badge} ${anom.message}`);
+      lines.push(pc.gray(`     ↳ Remediation: ${anom.remediation}`));
+    }
+  }
 
   // Failure breakdown
   const failKeys = Object.keys(telemetry.failureCategories);

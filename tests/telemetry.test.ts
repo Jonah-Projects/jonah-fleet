@@ -18,6 +18,7 @@ import {
   fetchActualPlanQuota,
   getActualPlanQuotaSync,
   formatPlanQuotaSummary,
+  detectTokenAnomalies,
 } from '../src/lib/telemetry.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -839,6 +840,153 @@ Claude and GPT models  Five Hour Limit Remaining  100%  2026-10-03 14:48 CEST
       expect(markdownSummary).toContain('Gemini 5h: `43.0% remaining` · Weekly: `16.2% remaining`');
       expect(markdownSummary).toContain('<br>');
       expect(markdownSummary).toContain('Claude/GPT 5h: `100.0% remaining` · Weekly: `100.0% remaining`');
+    });
+  });
+
+  describe('detectTokenAnomalies & Local Run Artifacts', () => {
+    it('detects Context Asymmetry when input/output ratio exceeds 35:1', () => {
+      const summaries: RoutineTelemetrySummary[] = [
+        {
+          schemaVersion: '1.0.0',
+          routine: 'autowork',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 120,
+          iterationsUsed: 10,
+          maxIterations: 65,
+          result: 'SUCCESS',
+          inputTokens: 90000,
+          outputTokens: 1500, // 60:1 ratio
+          totalTokens: 91500,
+          estimatedCost: 0.25,
+        },
+      ];
+      const aggregated = aggregateFleetTelemetry(summaries);
+      const anomalies = detectTokenAnomalies(aggregated);
+
+      const asymmetry = anomalies.find((a) => a.type === 'context_asymmetry');
+      expect(asymmetry).toBeDefined();
+      expect(asymmetry?.routine).toBe('autowork');
+      expect(asymmetry?.message).toContain('60.0:1');
+      expect(asymmetry?.remediation).toMatch(/skill pruning|progressive disclosure/i);
+    });
+
+    it('detects Multi-Routine Budget Cannibalization when top-2 routines consume >80% of fleet tokens', () => {
+      const summaries: RoutineTelemetrySummary[] = [
+        {
+          schemaVersion: '1.0.0',
+          routine: 'autowork',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 100,
+          iterationsUsed: 10,
+          maxIterations: 65,
+          result: 'SUCCESS',
+          inputTokens: 40000,
+          outputTokens: 2000,
+          totalTokens: 42000, // 42%
+          estimatedCost: 0.1,
+        },
+        {
+          schemaVersion: '1.0.0',
+          routine: 'peer-review',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 100,
+          iterationsUsed: 10,
+          maxIterations: 30,
+          result: 'SUCCESS',
+          inputTokens: 42000,
+          outputTokens: 2000,
+          totalTokens: 44000, // 44% => combined 86%
+          estimatedCost: 0.1,
+        },
+        {
+          schemaVersion: '1.0.0',
+          routine: 'issues-housekeeping',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 50,
+          iterationsUsed: 5,
+          maxIterations: 20,
+          result: 'SUCCESS',
+          inputTokens: 13000,
+          outputTokens: 1000,
+          totalTokens: 14000, // 14%
+          estimatedCost: 0.03,
+        },
+      ];
+      const aggregated = aggregateFleetTelemetry(summaries);
+      const anomalies = detectTokenAnomalies(aggregated);
+
+      const cannibalization = anomalies.find((a) => a.type === 'multi_routine_cannibalization');
+      expect(cannibalization).toBeDefined();
+      expect(cannibalization?.message).toContain('86.0%');
+    });
+
+    it('detects Plan Quota Velocity anomaly when actual plan quota remaining is <30%', () => {
+      const summaries: RoutineTelemetrySummary[] = [
+        {
+          schemaVersion: '1.0.0',
+          routine: 'autowork',
+          repository: 'test/repo',
+          timestamp: new Date().toISOString(),
+          durationSeconds: 100,
+          iterationsUsed: 10,
+          maxIterations: 65,
+          result: 'SUCCESS',
+          inputTokens: 10000,
+          outputTokens: 1000,
+          totalTokens: 11000,
+          estimatedCost: 0.05,
+        },
+      ];
+      const aggregated = aggregateFleetTelemetry(summaries);
+      const quota = {
+        available: true,
+        groups: {},
+        geminiWeeklyRemainingPct: 15.4,
+        gemini5hRemainingPct: 35.8,
+        fetchedAt: new Date().toISOString(),
+      };
+      const anomalies = detectTokenAnomalies(aggregated, { actualQuota: quota });
+
+      const planAnomaly = anomalies.find((a) => a.type === 'plan_quota_velocity');
+      expect(planAnomaly).toBeDefined();
+      expect(planAnomaly?.severity).toBe('CRITICAL');
+      expect(planAnomaly?.message).toContain('15.4%');
+    });
+
+    it('collects local telemetry from .jonah-fleet/runs/*.json files directly', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fleet-telemetry-test-'));
+      const runsDir = path.join(tempDir, '.jonah-fleet', 'runs');
+      fs.mkdirSync(runsDir, { recursive: true });
+
+      const jsonRun = {
+        routine: 'peer-review',
+        timestamp: '2026-10-03T08:32:11.038Z',
+        exitCode: 0,
+        success: true,
+        target: 'PR #625',
+        durationMs: 120000,
+        usage: {
+          inputTokens: 50000,
+          outputTokens: 2000,
+          thinkingTokens: 1000,
+          totalTokens: 52000,
+        },
+      };
+      fs.writeFileSync(path.join(runsDir, 'peer-review-test.json'), JSON.stringify(jsonRun, null, 2));
+
+      const collected = collectLocalTelemetryLogs(tempDir, 'test-repo');
+      expect(collected.length).toBe(1);
+      expect(collected[0].routine).toBe('peer-review');
+      expect(collected[0].inputTokens).toBe(50000);
+      expect(collected[0].outputTokens).toBe(2000);
+      expect(collected[0].totalTokens).toBe(52000);
+      expect(collected[0].result).toBe('SUCCESS');
+
+      fs.rmSync(tempDir, { recursive: true, force: true });
     });
   });
 });

@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+* **optimizer,telemetry,prompts:** harden prompt optimizer and orchestration routines against token leaks with Context Asymmetry, Unilateral Re-Review Thrash, Multi-Routine Cannibalization, and Plan Quota Burn Velocity anomaly heuristics, local run artifact ingestion, and I/O ratio scorecard tracking
 * **telemetry,status,runner,terminal-card:** discover and report real-time provider plan quota (5h rolling and weekly limits with reset countdowns for Gemini and 3P models) via `agy --output-format json --print /quota` with 1-minute TTL disk caching
 * **telemetry,runner,terminal-card,status:** report token consumption and 5-hour/weekly quota percentages on each run, terminal summary card, run report, status pacing section, and persist run usage to artifacts
 * **telemetry,terminal-card,runner:** address peer review findings on PR #617: prioritize artifact timestamp over file mtime, prevent pacing status cross-contamination across rolling windows, render token quota section in error cards, and consolidate canonical `RunUsageMetrics`

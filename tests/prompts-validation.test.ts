@@ -49,7 +49,7 @@ describe("Prompt Validation & Invariants", () => {
 
     // Scorecard table in logging section
     expect(content).toMatch(
-      /\| *Routine *\| *Runs *\| *Input Tokens *\| *Output Tokens *\| *Total Tokens *\| *Cost *\| *Fleet % *\| *Avg Iterations *\| *Max Iterations *\| *Status \/ Anomaly *\|/,
+      /\| *Routine *\| *Runs *\| *Input Tokens *\| *Output Tokens *\| *I\/O Ratio *\| *Total Tokens *\| *Cost *\| *Fleet % *\| *Avg Iterations *\| *Max Iterations *\| *Status \/ Anomaly *\|/,
     );
   });
 
@@ -62,6 +62,13 @@ describe("Prompt Validation & Invariants", () => {
     expect(content).toMatch(/Token Surge.*>50%/s);
     expect(content).toContain("Budget Hog");
     expect(content).toMatch(/Budget Hog.*>75%/s);
+    expect(content).toContain("Multi-Routine Budget Cannibalization");
+    expect(content).toMatch(/Multi-Routine Budget Cannibalization.*>80%/s);
+    expect(content).toContain("Context Asymmetry & Prompt Bloat");
+    expect(content).toMatch(/Context Asymmetry & Prompt Bloat.*35:1/s);
+    expect(content).toContain("Unilateral Re-Review Thrash");
+    expect(content).toMatch(/Unilateral Re-Review Thrash.*(?:≥|>=)\s*2/s);
+    expect(content).toContain("Plan Quota Burn Velocity");
     expect(content).toContain("Iteration Ceiling Exhaustion");
     expect(content).toMatch(/Iteration Ceiling Exhaustion.*>20%/s);
     expect(content).toContain("Review Loop Burn");
@@ -72,10 +79,14 @@ describe("Prompt Validation & Invariants", () => {
     );
     expect(content).toContain("Speculative Runaway Waste");
 
+    // Telemetry intake includes local run artifacts
+    expect(content).toMatch(/\.jonah-fleet\/runs\/\*\.json/);
+
     // Automated preventative actions
     expect(content).toMatch(
       /pruning redundant instructions|instruction pruning/i,
     );
+    expect(content).toMatch(/scoping skills strictly per routine|skill pruning/i);
     expect(content).toMatch(/early exit|candidate skip/i);
     expect(content).toMatch(/iteration ceiling|pre-ready self-audit/i);
     expect(content).toMatch(
@@ -84,7 +95,16 @@ describe("Prompt Validation & Invariants", () => {
     expect(content).toContain("Ambiguity Gate & Benchmark Eval Feeding");
   });
 
-  it("validates ORCHESTRATION.md documents the token anomaly triage and remediation workflow", () => {
+  it("validates optimizer.md scorecard table includes Input/Output Ratio column", () => {
+    const optimizerPath = path.join(promptsDir, "optimizer.md");
+    const content = fs.readFileSync(optimizerPath, "utf8");
+
+    expect(content).toMatch(
+      /\| *Routine *\| *Runs *\| *Input Tokens *\| *Output Tokens *\| *I\/O Ratio *\| *Total Tokens *\| *Cost *\| *Fleet % *\| *Avg Iterations *\| *Max Iterations *\| *Status \/ Anomaly *\|/,
+    );
+  });
+
+  it("validates ORCHESTRATION.md documents the token anomaly triage and remediation workflow with plan quota awareness", () => {
     const orchestrationPath = path.join(
       templatesDir,
       "prompts",
@@ -95,6 +115,10 @@ describe("Prompt Validation & Invariants", () => {
     expect(content).toContain("## Token Anomaly Triage & Remediation");
     expect(content).toContain("Token Surge");
     expect(content).toContain("Budget Hog");
+    expect(content).toContain("Multi-Routine Budget Cannibalization");
+    expect(content).toContain("Context Asymmetry & Prompt Bloat");
+    expect(content).toContain("Unilateral Re-Review Thrash");
+    expect(content).toContain("Plan Quota Burn Velocity");
     expect(content).toContain("Iteration Ceiling Exhaustion");
     expect(content).toContain("Review Loop Burn");
     expect(content).toContain("Feedback Loop Stagnation");
