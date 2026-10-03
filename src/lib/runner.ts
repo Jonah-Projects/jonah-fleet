@@ -36,7 +36,7 @@ import {
   calculateTokenQuotaPercentages,
   getRollingWindowTokenUsage,
   formatTokenBreakdown,
-  getActualPlanQuotaSync,
+  fetchActualPlanQuota,
   type RunUsageMetrics,
   type ActualPlanQuota,
 } from './telemetry.js';
@@ -902,8 +902,24 @@ export function formatFallbackRunReport(options: FallbackReportOptions): string 
 
       if (options.planQuota && options.planQuota.available) {
         const plan = options.planQuota;
-        if (plan.gemini5hRemainingPct !== undefined && plan.geminiWeeklyRemainingPct !== undefined) {
-          reportContent += `| Real Plan Quota | Gemini 5h: \`${plan.gemini5hRemainingPct.toFixed(1)}% remaining\` · Weekly: \`${plan.geminiWeeklyRemainingPct.toFixed(1)}% remaining\` |\n`;
+        const quotaParts: string[] = [];
+        if (plan.gemini5hRemainingPct !== undefined || plan.geminiWeeklyRemainingPct !== undefined) {
+          const sub: string[] = [];
+          if (plan.gemini5hRemainingPct !== undefined) sub.push(`Gemini 5h: \`${plan.gemini5hRemainingPct.toFixed(1)}% remaining\``);
+          if (plan.geminiWeeklyRemainingPct !== undefined) sub.push(`Weekly: \`${plan.geminiWeeklyRemainingPct.toFixed(1)}% remaining\``);
+          if (sub.length > 0) quotaParts.push(sub.join(' · '));
+        }
+        if (plan.claude5hRemainingPct !== undefined || plan.claudeWeeklyRemainingPct !== undefined) {
+          const sub: string[] = [];
+          if (plan.claude5hRemainingPct !== undefined) sub.push(`Claude/GPT 5h: \`${plan.claude5hRemainingPct.toFixed(1)}% remaining\``);
+          if (plan.claudeWeeklyRemainingPct !== undefined) {
+            const label = plan.claude5hRemainingPct !== undefined ? 'Weekly' : 'Claude/GPT Weekly';
+            sub.push(`${label}: \`${plan.claudeWeeklyRemainingPct.toFixed(1)}% remaining\``);
+          }
+          if (sub.length > 0) quotaParts.push(sub.join(' · '));
+        }
+        if (quotaParts.length > 0) {
+          reportContent += `| Real Plan Quota | ${quotaParts.join('<br>')} |\n`;
         }
       }
     }
@@ -1418,7 +1434,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
     }
   }
 
-  const planQuota = getActualPlanQuotaSync({ repoRoot: targetDir });
+  const planQuota = await fetchActualPlanQuota({ repoRoot: targetDir });
 
   if (loopGuardTrip) {
     exitCode = 1;

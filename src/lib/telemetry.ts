@@ -68,6 +68,8 @@ export interface ActualPlanQuota {
   gemini5hResetTime?: string;
   claudeWeeklyRemainingPct?: number;
   claude5hRemainingPct?: number;
+  claudeWeeklyResetTime?: string;
+  claude5hResetTime?: string;
   fetchedAt: string;
   error?: string;
 }
@@ -384,8 +386,34 @@ export function parseAgyQuotaOutput(raw: string): ActualPlanQuota {
     gemini5hResetTime: geminiGroup?.window5hResetTime,
     claudeWeeklyRemainingPct: claudeGroup?.weeklyRemainingPct,
     claude5hRemainingPct: claudeGroup?.window5hRemainingPct,
+    claudeWeeklyResetTime: claudeGroup?.weeklyResetTime,
+    claude5hResetTime: claudeGroup?.window5hResetTime,
     fetchedAt: new Date().toISOString(),
   };
+}
+
+function readCachedPlanQuota(cacheFile: string | undefined, cacheTtlMs: number): ActualPlanQuota | null {
+  if (!cacheFile || cacheTtlMs <= 0 || !fs.existsSync(cacheFile)) return null;
+  try {
+    const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    if (
+      cached &&
+      typeof cached.cachedAt === 'number' &&
+      Date.now() - cached.cachedAt < cacheTtlMs &&
+      cached.quota
+    ) {
+      return cached.quota;
+    }
+  } catch {}
+  return null;
+}
+
+function writeCachedPlanQuota(cacheFile: string | undefined, quota: ActualPlanQuota): void {
+  if (!cacheFile || !quota.available) return;
+  try {
+    fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+    fs.writeFileSync(cacheFile, JSON.stringify({ cachedAt: Date.now(), quota }, null, 2));
+  } catch {}
 }
 
 /**
@@ -397,24 +425,9 @@ export function getActualPlanQuotaSync(options: {
   executor?: () => string;
 } = {}): ActualPlanQuota {
   const cacheTtlMs = options.cacheTtlMs ?? 60_000;
-  let cacheFile: string | undefined;
-
-  if (options.repoRoot) {
-    cacheFile = path.join(options.repoRoot, '.jonah-fleet', 'plan-quota-cache.json');
-    if (cacheTtlMs > 0 && fs.existsSync(cacheFile)) {
-      try {
-        const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-        if (
-          cached &&
-          typeof cached.cachedAt === 'number' &&
-          Date.now() - cached.cachedAt < cacheTtlMs &&
-          cached.quota
-        ) {
-          return cached.quota;
-        }
-      } catch {}
-    }
-  }
+  const cacheFile = options.repoRoot ? path.join(options.repoRoot, '.jonah-fleet', 'plan-quota-cache.json') : undefined;
+  const cached = readCachedPlanQuota(cacheFile, cacheTtlMs);
+  if (cached) return cached;
 
   try {
     let rawOutput: string;
@@ -436,14 +449,7 @@ export function getActualPlanQuotaSync(options: {
     }
 
     const quota = parseAgyQuotaOutput(rawOutput);
-
-    if (quota.available && cacheFile) {
-      try {
-        fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
-        fs.writeFileSync(cacheFile, JSON.stringify({ cachedAt: Date.now(), quota }, null, 2));
-      } catch {}
-    }
-
+    writeCachedPlanQuota(cacheFile, quota);
     return quota;
   } catch (err: any) {
     return {
@@ -464,24 +470,9 @@ export async function fetchActualPlanQuota(options: {
   executor?: () => Promise<string> | string;
 } = {}): Promise<ActualPlanQuota> {
   const cacheTtlMs = options.cacheTtlMs ?? 60_000;
-  let cacheFile: string | undefined;
-
-  if (options.repoRoot) {
-    cacheFile = path.join(options.repoRoot, '.jonah-fleet', 'plan-quota-cache.json');
-    if (cacheTtlMs > 0 && fs.existsSync(cacheFile)) {
-      try {
-        const cached = JSON.parse(await fs.promises.readFile(cacheFile, 'utf8'));
-        if (
-          cached &&
-          typeof cached.cachedAt === 'number' &&
-          Date.now() - cached.cachedAt < cacheTtlMs &&
-          cached.quota
-        ) {
-          return cached.quota;
-        }
-      } catch {}
-    }
-  }
+  const cacheFile = options.repoRoot ? path.join(options.repoRoot, '.jonah-fleet', 'plan-quota-cache.json') : undefined;
+  const cached = readCachedPlanQuota(cacheFile, cacheTtlMs);
+  if (cached) return cached;
 
   try {
     let rawOutput: string;
@@ -502,14 +493,7 @@ export async function fetchActualPlanQuota(options: {
     }
 
     const quota = parseAgyQuotaOutput(rawOutput);
-
-    if (quota.available && cacheFile) {
-      try {
-        await fs.promises.mkdir(path.dirname(cacheFile), { recursive: true });
-        await fs.promises.writeFile(cacheFile, JSON.stringify({ cachedAt: Date.now(), quota }, null, 2));
-      } catch {}
-    }
-
+    writeCachedPlanQuota(cacheFile, quota);
     return quota;
   } catch (err: any) {
     return {
@@ -537,17 +521,26 @@ export function formatPlanQuotaSummary(quota: ActualPlanQuota): string {
       subParts.push(`Gemini 5h: ${quota.gemini5hRemainingPct.toFixed(1)}% remaining`);
     }
     if (quota.geminiWeeklyRemainingPct !== undefined) {
-      subParts.push(`Gemini Weekly: ${quota.geminiWeeklyRemainingPct.toFixed(1)}% remaining`);
+      const label = quota.gemini5hRemainingPct !== undefined ? 'Weekly' : 'Gemini Weekly';
+      subParts.push(`${label}: ${quota.geminiWeeklyRemainingPct.toFixed(1)}% remaining`);
     }
-    parts.push(subParts.join(' · '));
+    if (subParts.length > 0) {
+      parts.push(subParts.join(' · '));
+    }
   }
 
   if (quota.claude5hRemainingPct !== undefined || quota.claudeWeeklyRemainingPct !== undefined) {
     const subParts: string[] = [];
     if (quota.claude5hRemainingPct !== undefined) {
-      subParts.push(`Claude/GPT: ${quota.claude5hRemainingPct.toFixed(1)}% remaining`);
+      subParts.push(`Claude/GPT 5h: ${quota.claude5hRemainingPct.toFixed(1)}% remaining`);
     }
-    parts.push(subParts.join(' · '));
+    if (quota.claudeWeeklyRemainingPct !== undefined) {
+      const label = quota.claude5hRemainingPct !== undefined ? 'Weekly' : 'Claude/GPT Weekly';
+      subParts.push(`${label}: ${quota.claudeWeeklyRemainingPct.toFixed(1)}% remaining`);
+    }
+    if (subParts.length > 0) {
+      parts.push(subParts.join(' · '));
+    }
   }
 
   return parts.join('\n');

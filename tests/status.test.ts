@@ -142,6 +142,8 @@ describe('Status Command', () => {
           geminiWeeklyResetTime: '2026-10-07 06:44 CEST',
           claude5hRemainingPct: 100.0,
           claudeWeeklyRemainingPct: 100.0,
+          claude5hResetTime: '2026-10-03 14:48 CEST',
+          claudeWeeklyResetTime: '2026-10-10 09:48 CEST',
           fetchedAt: new Date().toISOString(),
         },
       })
@@ -153,6 +155,8 @@ describe('Status Command', () => {
     const jsonOutput = JSON.parse(jsonSpy.mock.calls[0][0]);
     expect(jsonOutput.planQuota).toBeDefined();
     expect(jsonOutput.planQuota.gemini5hRemainingPct).toBe(43.0);
+    expect(jsonOutput.planQuota.claude5hResetTime).toBe('2026-10-03 14:48 CEST');
+    expect(jsonOutput.planQuota.claudeWeeklyResetTime).toBe('2026-10-10 09:48 CEST');
     jsonSpy.mockRestore();
 
     // Test text output
@@ -163,7 +167,8 @@ describe('Status Command', () => {
     expect(textOutput).toContain('Gemini Models:');
     expect(textOutput).toContain('43.0% 5h remaining');
     expect(textOutput).toContain('Claude/GPT Models:');
-    expect(textOutput).toContain('100.0% 5h remaining');
+    expect(textOutput).toContain('100.0% 5h remaining (resets 2026-10-03 14:48 CEST)');
+    expect(textOutput).toContain('100.0% weekly remaining (resets 2026-10-10 09:48 CEST)');
     textSpy.mockRestore();
   });
 });

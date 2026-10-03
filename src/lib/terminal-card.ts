@@ -8,7 +8,7 @@ import {
   getRollingWindowTokenUsage,
   formatQuotaStatusBadge,
   formatTokenBreakdown,
-  getActualPlanQuotaSync,
+  formatPlanQuotaSummary,
   type RunUsageMetrics,
   type ActualPlanQuota,
 } from './telemetry.js';
@@ -1419,16 +1419,14 @@ function renderTokenQuotaSection(options: {
   }
 
   if (hasPlan && plan) {
-    if (plan.gemini5hRemainingPct !== undefined || plan.geminiWeeklyRemainingPct !== undefined) {
-      const subParts: string[] = [];
-      if (plan.gemini5hRemainingPct !== undefined) {
-        subParts.push(`Gemini 5h: ${plan.gemini5hRemainingPct.toFixed(1)}% remaining`);
+    const summary = formatPlanQuotaSummary(plan);
+    if (summary && summary !== 'Plan Quota: Unavailable') {
+      const summaryLines = summary.split('\n');
+      for (let i = 0; i < summaryLines.length; i++) {
+        const prefix = i === 0 ? ' Plan Quota: ' : '             ';
+        const planLine = `${prefix}${summaryLines[i]}`;
+        lines.push(border('│') + planLine + ' '.repeat(Math.max(1, width - 2 - stripAnsi(planLine).length)) + border('│'));
       }
-      if (plan.geminiWeeklyRemainingPct !== undefined) {
-        subParts.push(`Weekly: ${plan.geminiWeeklyRemainingPct.toFixed(1)}% remaining`);
-      }
-      const planLine = ` Plan Quota: ${subParts.join(' · ')}`;
-      lines.push(border('│') + planLine + ' '.repeat(Math.max(1, width - 2 - stripAnsi(planLine).length)) + border('│'));
     }
   }
 

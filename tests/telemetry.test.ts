@@ -729,6 +729,8 @@ Releasing claim and applying needs-info label.
       expect(quota.gemini5hResetTime).toBe('2026-10-03T10:20:55Z');
       expect(quota.claudeWeeklyRemainingPct).toBe(100.0);
       expect(quota.claude5hRemainingPct).toBe(100.0);
+      expect(quota.claudeWeeklyResetTime).toBe('2026-10-10T07:50:57Z');
+      expect(quota.claude5hResetTime).toBe('2026-10-03T12:50:57Z');
 
       expect(quota.groups['Gemini Models']).toBeDefined();
       expect(quota.groups['Gemini Models'].buckets.length).toBe(2);
@@ -750,6 +752,8 @@ Claude and GPT models  Five Hour Limit Remaining  100%  2026-10-03 14:48 CEST
       expect(quota.claudeWeeklyRemainingPct).toBe(100);
       expect(quota.claude5hRemainingPct).toBe(100);
       expect(quota.geminiWeeklyResetTime).toBe('2026-10-07 06:44 CEST');
+      expect(quota.claudeWeeklyResetTime).toBe('2026-10-10 09:48 CEST');
+      expect(quota.claude5hResetTime).toBe('2026-10-03 14:48 CEST');
     });
 
     it('returns unavailable when output is empty or errors', () => {
@@ -806,8 +810,27 @@ Claude and GPT models  Five Hour Limit Remaining  100%  2026-10-03 14:48 CEST
       const summary = stripAnsi(formatPlanQuotaSummary(quota));
 
       expect(summary).toContain('Gemini 5h: 43.0% remaining');
-      expect(summary).toContain('Gemini Weekly: 16.2% remaining');
-      expect(summary).toContain('Claude/GPT: 100.0% remaining');
+      expect(summary).toContain('Weekly: 16.2% remaining');
+      expect(summary).toContain('Claude/GPT 5h: 100.0% remaining');
+      expect(summary).toContain('Weekly: 100.0% remaining');
+    });
+
+    it('formats plan quota summary correctly when only weekly or 5h percentages exist', () => {
+      const claudeWeeklyOnly = {
+        available: true,
+        groups: {},
+        claudeWeeklyRemainingPct: 85.0,
+        fetchedAt: new Date().toISOString(),
+      };
+      expect(stripAnsi(formatPlanQuotaSummary(claudeWeeklyOnly))).toBe('Claude/GPT Weekly: 85.0% remaining');
+
+      const geminiWeeklyOnly = {
+        available: true,
+        groups: {},
+        geminiWeeklyRemainingPct: 50.0,
+        fetchedAt: new Date().toISOString(),
+      };
+      expect(stripAnsi(formatPlanQuotaSummary(geminiWeeklyOnly))).toBe('Gemini Weekly: 50.0% remaining');
     });
   });
 });

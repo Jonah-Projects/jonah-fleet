@@ -218,8 +218,10 @@ export async function runStatus(options: StatusOptions = {}): Promise<void> {
       );
     }
     if (planQuota.claude5hRemainingPct !== undefined || planQuota.claudeWeeklyRemainingPct !== undefined) {
+      const reset5h = planQuota.claude5hResetTime ? pc.dim(` (resets ${planQuota.claude5hResetTime})`) : '';
+      const resetWk = planQuota.claudeWeeklyResetTime ? pc.dim(` (resets ${planQuota.claudeWeeklyResetTime})`) : '';
       console.log(
-        `    • Claude/GPT Models: ${pc.bold(planQuota.claude5hRemainingPct?.toFixed(1) + '% 5h remaining')} · ${pc.bold(planQuota.claudeWeeklyRemainingPct?.toFixed(1) + '% weekly remaining')}`
+        `    • Claude/GPT Models: ${pc.bold(planQuota.claude5hRemainingPct?.toFixed(1) + '% 5h remaining')}${reset5h} · ${pc.bold(planQuota.claudeWeeklyRemainingPct?.toFixed(1) + '% weekly remaining')}${resetWk}`
       );
     }
   }

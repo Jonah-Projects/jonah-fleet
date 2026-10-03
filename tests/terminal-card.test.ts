@@ -850,6 +850,8 @@ The build is completing. Continuing shortly.
           groups: {},
           gemini5hRemainingPct: 43.0,
           geminiWeeklyRemainingPct: 16.2,
+          claude5hRemainingPct: 100.0,
+          claudeWeeklyRemainingPct: 80.0,
           fetchedAt: new Date().toISOString(),
         },
       });
@@ -858,6 +860,8 @@ The build is completing. Continuing shortly.
       expect(clean).toContain('Plan Quota:');
       expect(clean).toContain('Gemini 5h: 43.0% remaining');
       expect(clean).toContain('Weekly: 16.2% remaining');
+      expect(clean).toContain('Claude/GPT 5h: 100.0% remaining');
+      expect(clean).toContain('Weekly: 80.0% remaining');
     });
   });
 });
