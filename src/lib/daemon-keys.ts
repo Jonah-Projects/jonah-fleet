@@ -17,6 +17,7 @@ export interface KeyboardControllerOptions {
   onPauseToggle?: () => void;
   onStatus?: () => void;
   onToggleVerbose?: () => void;
+  onToggleFullBurn?: () => void;
   onTailLog?: () => Promise<void> | void;
   onCleanWorktrees?: () => Promise<void> | void;
   onGracefulStop?: () => void;
@@ -114,6 +115,12 @@ export class KeyboardController {
     // Verbose toggle: 'v' / 'V'
     if (str === 'v' || str === 'V' || keyName === 'v') {
       this.options.onToggleVerbose?.();
+      return;
+    }
+
+    // Full burn toggle: 'b' / 'B'
+    if (str === 'b' || str === 'B' || keyName === 'b') {
+      this.options.onToggleFullBurn?.();
       return;
     }
 
@@ -359,6 +366,7 @@ export function printKeybindingCheatSheet(): void {
   console.log(`  ${pc.bold(pc.green('p'))}        Pause / resume automated polling intervals`);
   console.log(`  ${pc.bold(pc.green('s'))}        Print current daemon status summary card`);
   console.log(`  ${pc.bold(pc.green('v'))}        Toggle verbose streaming logging live`);
+  console.log(`  ${pc.bold(pc.green('b'))}        Toggle full burn mode (override <20% plan quota floor)`);
   console.log(`  ${pc.bold(pc.green('l'))}        Tail recent lines from .jonah-fleet/daemon.log`);
   console.log(`  ${pc.bold(pc.green('w'))}        Inspect active worktrees and clean stale ones`);
   console.log(`  ${pc.bold(pc.green('q'))}        Graceful shutdown (waits for active routine to finish)`);
@@ -398,6 +406,11 @@ export function printDaemonStatusSummary(options: DaemonStatusSummaryOptions): v
     if (verbose !== undefined) {
       console.log(
         `  Verbose Mode:         ${verbose ? pc.green('ENABLED (streaming tokens)') : pc.gray('DISABLED (compact spinner)')}`
+      );
+    }
+    if (state.fullBurn !== undefined) {
+      console.log(
+        `  Full Burn:            ${state.fullBurn ? pc.red(pc.bold('ENABLED (quota floor bypassed)')) : pc.green('DISABLED (stops at <20% quota)')}`
       );
     }
     if (pendingRoutine) {
@@ -486,6 +499,7 @@ export interface FormatDaemonStatusLineOptions {
   columns?: number;
   tipIndex?: number;
   tips?: readonly string[];
+  fullBurn?: boolean;
 }
 
 /**
@@ -504,11 +518,12 @@ export function formatDaemonStatusLine(options: FormatDaemonStatusLineOptions = 
   const columns = options.columns !== undefined ? options.columns : (process.stderr.columns || 80);
   const maxCols = Math.max(20, (columns || 80) - 2);
   const includeTip = columns >= 55;
+  const burnBadge = options.fullBurn ? pc.red(' [FULL BURN]') : '';
 
   let core: string;
   if (options.isPaused) {
     const queueStr = options.pendingRoutine ? pc.cyan(` [Queued: ${options.pendingRoutine}]`) : '';
-    core = `${pc.dim('[' + timeString + ']')} ⏸  ${pc.yellow('PAUSED')}${queueStr}`;
+    core = `${pc.dim('[' + timeString + ']')} ⏸  ${pc.yellow('PAUSED')}${burnBadge}${queueStr}`;
   } else {
     const nextCheck = options.nextCheckTime !== undefined ? options.nextCheckTime : nowMs;
     const diffMs = Math.max(0, nextCheck - nowMs);
@@ -518,7 +533,7 @@ export function formatDaemonStatusLine(options: FormatDaemonStatusLineOptions = 
     const timeStr = `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
     const prStr = options.lastOpenPRCount !== undefined ? ` (${options.lastOpenPRCount} ready PRs)` : '';
     const queueStr = options.pendingRoutine ? pc.cyan(` [Queued: ${options.pendingRoutine}]`) : '';
-    core = `${pc.dim('[' + timeString + ']')} ⚡ ${pc.dim('Watchdog Idle · Next check in ' + timeStr + prStr)}${queueStr}`;
+    core = `${pc.dim('[' + timeString + ']')} ⚡ ${pc.dim('Watchdog Idle · Next check in ' + timeStr + prStr)}${burnBadge}${queueStr}`;
   }
 
   if (!includeTip) {

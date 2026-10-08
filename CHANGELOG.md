@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **peer-review,runner:** mention target PR with native GitHub links in run logs ([#599](https://github.com/Jonah-Projects/jonah-fleet/issues/599)) ([e22a1fb](https://github.com/Jonah-Projects/jonah-fleet/commit/e22a1fb42141b3748633289d9ac9582a70ffe631))
 
+## [Unreleased] - 2026-10-08
+
+### Features
+
+* **daemon,telemetry:** halt daemon execution when plan quota drops below 20% in either 5h or 7-day windows, with `--full-burn` CLI flag, environment variable, manifest configuration, and interactive hotkey override
+
 ## [Unreleased] - 2026-10-03
 
 ### Features
