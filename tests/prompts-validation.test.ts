@@ -208,7 +208,7 @@ describe("Prompt Validation & Invariants", () => {
     expect(content).not.toContain("- **Target / Context**: `PR #<PR_NUMBER>`");
   });
 
-  it("validates trigger-review-routine.yml supports workflow_dispatch, issue_comment, and review_requested triggers", () => {
+  it("validates trigger-review-routine.yml supports workflow_dispatch and review_requested triggers without wasteful issue_comment triggers", () => {
     const workflowPath = path.join(
       templatesDir,
       "workflows",
@@ -218,17 +218,13 @@ describe("Prompt Validation & Invariants", () => {
 
     expect(content).toContain("workflow_dispatch:");
     expect(content).toContain("pr_number:");
-    expect(content).toContain("issue_comment:");
+    expect(content).not.toContain("issue_comment:");
     expect(content).toContain("review_requested");
-    expect(content).toContain("/review");
-    expect(content).toContain("/peer-review");
-    expect(content).toContain("/retrigger");
-    expect(content).toContain("/re-review");
     expect(content).toMatch(/github\.event_name == 'workflow_dispatch'/);
-    expect(content).toMatch(/github\.event_name == 'issue_comment'/);
+    expect(content).not.toMatch(/github\.event_name == 'issue_comment'/);
   });
 
-  it("validates ORCHESTRATION.md documents manual and comment triggers for peer review", () => {
+  it("validates ORCHESTRATION.md documents manual triggers for peer review while guarding quota", () => {
     const orchestrationPath = path.join(
       templatesDir,
       "prompts",
@@ -238,8 +234,6 @@ describe("Prompt Validation & Invariants", () => {
 
     expect(content).toContain("trigger-review-routine.yml");
     expect(content).toContain("workflow_dispatch");
-    expect(content).toContain("/review");
-    expect(content).toContain("/peer-review");
   });
 
   it("validates ORCHESTRATION.md, autowork.md, and peer-review.md define the Peer Review Resilience & Orphaned PR Recovery protocol", () => {
