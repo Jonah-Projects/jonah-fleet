@@ -5,6 +5,19 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-10-09
+
+### Changed
+
+* **workflows:** omit unfiltered `issue_comment` triggers from `trigger-review-routine.yml` to conserve Actions runner quota and prevent comment-loop thrash
+
+## [1.35.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.34.0...v1.35.0) (2026-10-09)
+
+
+### Features
+
+* **daemon,telemetry:** halt daemon when plan quota drops below 20% unless full burn enabled ([#663](https://github.com/Jonah-Projects/jonah-fleet/issues/663)) ([33e0dc2](https://github.com/Jonah-Projects/jonah-fleet/commit/33e0dc202585944ce209bf54475b8465e19507d1))
+
 ## [1.34.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.33.0...v1.34.0) (2026-10-03)
 
 
@@ -33,11 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **peer-review,runner:** mention target PR with native GitHub links in run logs ([#599](https://github.com/Jonah-Projects/jonah-fleet/issues/599)) ([e22a1fb](https://github.com/Jonah-Projects/jonah-fleet/commit/e22a1fb42141b3748633289d9ac9582a70ffe631))
 
-## [Unreleased] - 2026-10-09
+## [Unreleased] - 2026-10-08
 
-### Changed
+### Features
 
-* **workflows:** omit unfiltered `issue_comment` triggers from `trigger-review-routine.yml` to conserve Actions runner quota and prevent comment-loop thrash
+* **daemon,telemetry:** halt daemon execution when plan quota drops below 20% in either 5h or 7-day windows, with `--full-burn` CLI flag, environment variable, manifest configuration, and interactive hotkey override
 ## [Unreleased] - 2026-10-03
 
 ### Features

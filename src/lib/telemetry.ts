@@ -546,6 +546,140 @@ export async function fetchActualPlanQuota(options: {
   }
 }
 
+export interface QuotaDepletionOptions {
+  thresholdPct?: number; // default: 20
+  model?: string;
+}
+
+export interface QuotaDepletionResult {
+  depleted: boolean;
+  thresholdPct: number;
+  window?: '5h' | '7days';
+  remainingPct?: number;
+  resetTime?: string;
+  groupName?: string;
+  message?: string;
+}
+
+/**
+ * Checks whether real-time plan quota is depleted below the safety threshold (<20% for 5h or 7days window).
+ */
+export function checkPlanQuotaDepletion(
+  quota: ActualPlanQuota | null | undefined,
+  options: QuotaDepletionOptions = {}
+): QuotaDepletionResult {
+  const threshold = options.thresholdPct ?? 20;
+
+  if (!quota || !quota.available) {
+    return { depleted: false, thresholdPct: threshold };
+  }
+
+  // Resolve target group based on model
+  const model = options.model?.toLowerCase() || '';
+  const isClaude =
+    model.includes('claude') ||
+    model.includes('gpt') ||
+    model.includes('openai') ||
+    model.includes('anthropic');
+
+  let groupName = isClaude ? 'Claude and GPT models' : 'Gemini Models';
+  let weeklyPct: number | undefined = isClaude
+    ? quota.claudeWeeklyRemainingPct
+    : quota.geminiWeeklyRemainingPct;
+  let weeklyReset: string | undefined = isClaude
+    ? quota.claudeWeeklyResetTime
+    : quota.geminiWeeklyResetTime;
+  let window5hPct: number | undefined = isClaude
+    ? quota.claude5hRemainingPct
+    : quota.gemini5hRemainingPct;
+  let window5hReset: string | undefined = isClaude
+    ? quota.claude5hResetTime
+    : quota.gemini5hResetTime;
+
+  // If the target group has no percentages set directly, inspect quota.groups
+  if (quota.groups) {
+    const targetGroup = quota.groups[groupName];
+    if (targetGroup) {
+      if (weeklyPct === undefined) {
+        weeklyPct = targetGroup.weeklyRemainingPct;
+        weeklyReset = targetGroup.weeklyResetTime;
+      }
+      if (window5hPct === undefined) {
+        window5hPct = targetGroup.window5hRemainingPct;
+        window5hReset = targetGroup.window5hResetTime;
+      }
+      if (weeklyPct === undefined || window5hPct === undefined) {
+        for (const b of targetGroup.buckets || []) {
+          if ((b.window === '5h' || b.id.includes('5h')) && window5hPct === undefined) {
+            window5hPct = b.remainingPercentage;
+            window5hReset = b.resetTime;
+          } else if ((b.window === 'weekly' || b.id.includes('weekly')) && weeklyPct === undefined) {
+            weeklyPct = b.remainingPercentage;
+            weeklyReset = b.resetTime;
+          }
+        }
+      }
+    } else if (weeklyPct === undefined && window5hPct === undefined) {
+      // Fallback: check the first group in quota.groups if preferred group doesn't exist
+      const groupKeys = Object.keys(quota.groups);
+      if (groupKeys.length > 0) {
+        const fallbackGroup = quota.groups[groupKeys[0]];
+        if (fallbackGroup) {
+          groupName = fallbackGroup.name;
+          weeklyPct = fallbackGroup.weeklyRemainingPct;
+          weeklyReset = fallbackGroup.weeklyResetTime;
+          window5hPct = fallbackGroup.window5hRemainingPct;
+          window5hReset = fallbackGroup.window5hResetTime;
+        }
+      }
+    }
+  }
+
+  const is5hDepleted = window5hPct !== undefined && window5hPct < threshold;
+  const isWeeklyDepleted = weeklyPct !== undefined && weeklyPct < threshold;
+
+  if (is5hDepleted || isWeeklyDepleted) {
+    if (is5hDepleted && isWeeklyDepleted) {
+      const lowerWindow = window5hPct! <= weeklyPct! ? '5h' : '7days';
+      const remainingPct = Math.min(window5hPct!, weeklyPct!);
+      const resetTime = lowerWindow === '5h' ? window5hReset : weeklyReset;
+      return {
+        depleted: true,
+        thresholdPct: threshold,
+        window: lowerWindow,
+        remainingPct,
+        resetTime,
+        groupName,
+        message: `${groupName} quota is below ${threshold}% in both 5h (${window5hPct!.toFixed(1)}%) and 7days (${weeklyPct!.toFixed(1)}%) windows`,
+      };
+    }
+
+    if (is5hDepleted) {
+      return {
+        depleted: true,
+        thresholdPct: threshold,
+        window: '5h',
+        remainingPct: window5hPct,
+        resetTime: window5hReset,
+        groupName,
+        message: `${groupName} 5h quota is at ${window5hPct!.toFixed(1)}% remaining (<${threshold}% floor)`,
+      };
+    }
+
+    return {
+      depleted: true,
+      thresholdPct: threshold,
+      window: '7days',
+      remainingPct: weeklyPct,
+      resetTime: weeklyReset,
+      groupName,
+      message: `${groupName} 7days weekly quota is at ${weeklyPct!.toFixed(1)}% remaining (<${threshold}% floor)`,
+    };
+  }
+
+  return { depleted: false, thresholdPct: threshold };
+}
+
 /**
  * Formats a clean human-readable summary of plan quota for display.
  */

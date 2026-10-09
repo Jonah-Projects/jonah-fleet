@@ -18,6 +18,7 @@ export interface DaemonCommandOptions {
   model?: string;
   foreground?: boolean;
   verbose?: boolean;
+  fullBurn?: boolean;
 }
 
 export async function runDaemonCommand(action?: string, options: DaemonCommandOptions = {}): Promise<void> {
@@ -36,6 +37,7 @@ export async function runDaemonCommand(action?: string, options: DaemonCommandOp
     model: options.model,
     foreground: options.foreground,
     verbose: options.verbose,
+    fullBurn: options.fullBurn,
   };
 
   if (act === 'start') {
@@ -60,6 +62,7 @@ export async function runDaemonCommand(action?: string, options: DaemonCommandOp
             { label: 'Review Watchdog', value: `Every ${state.reviewIntervalMinutes}m (zero-token preflight)` },
             { label: 'Autowork Scan', value: `Every ${state.autoworkIntervalMinutes}m` },
             { label: 'Routines', value: state.routines.join(', ') },
+            { label: 'Full Burn', value: state.fullBurn ? 'ENABLED' : 'DISABLED (stops at <20% quota)' },
             { label: 'Log', value: '.jonah-fleet/daemon.log' },
           ],
         })
@@ -121,6 +124,7 @@ export async function runDaemonCommand(action?: string, options: DaemonCommandOp
       details: [
         { label: 'Status', value: running && state ? state.status.toUpperCase() : 'STOPPED' },
         ...(running && state ? [{ label: 'PID', value: String(state.pid) }] : []),
+        ...(running && state && state.fullBurn !== undefined ? [{ label: 'Full Burn', value: state.fullBurn ? 'ENABLED' : 'DISABLED' }] : []),
         { label: 'Target', value: cwd },
       ],
     })
@@ -134,6 +138,11 @@ export async function runDaemonCommand(action?: string, options: DaemonCommandOp
     console.log(`  Peer Review Cadence:  Every ${state.reviewIntervalMinutes} minutes (0-token fast preflight)`);
     console.log(`  Autowork Cadence:     Every ${state.autoworkIntervalMinutes} minutes`);
     console.log(`  Routines:             ${state.routines.join(', ')}`);
+    if (state.fullBurn !== undefined) {
+      console.log(
+        `  Full Burn:            ${state.fullBurn ? pc.red(pc.bold('ENABLED (quota floor bypassed)')) : pc.green('DISABLED (stops at <20% quota)')}`
+      );
+    }
     let currentStateText = pc.green('IDLE');
     if (state.status === 'working') {
       const workingDesc = state.activeRoutine + (state.activeTarget ? ` (${pc.bold(state.activeTarget)})` : '');

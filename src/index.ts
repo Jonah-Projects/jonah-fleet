@@ -42,6 +42,7 @@ program
   .option('-m, --model <model>', 'LLM model override')
   .option('--foreground', 'Run daemon in foreground with live console logs')
   .option('-v, --verbose', 'Stream raw agent tokens and logs directly to stdout')
+  .option('--full-burn', 'Run in full burn mode without stopping on <20% plan quota limit')
   .action(async (action, options) => {
     await runDaemonCommand(action, options);
   });
