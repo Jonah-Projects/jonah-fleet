@@ -34,7 +34,14 @@ import {
   type BacklogTriageReport,
   type BacklogIssueInfo,
 } from './terminal-card.js';
-import type { RunUsageMetrics } from './telemetry.js';
+import {
+  type RunUsageMetrics,
+  type ActualPlanQuota,
+  type QuotaDepletionResult,
+  checkPlanQuotaDepletion,
+  fetchActualPlanQuota,
+} from './telemetry.js';
+import { loadManifest } from './manifest.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -81,6 +88,7 @@ export interface DaemonState {
   evaluatedPRs?: Record<number, EvaluatedPRRecord>;
   failureCooldowns?: Record<number, PRFailureRecord>;
   sessionTokens?: number;
+  fullBurn?: boolean;
 }
 
 export interface DaemonOptions {
@@ -93,6 +101,9 @@ export interface DaemonOptions {
   model?: string;
   foreground?: boolean;
   verbose?: boolean;
+  fullBurn?: boolean;
+  quotaThresholdPct?: number; // default: 20
+  getPlanQuota?: (repoRoot: string) => Promise<ActualPlanQuota> | ActualPlanQuota;
   stdin?: any;
   getPRs?: (repoRoot: string) => Promise<ReviewablePR[]>;
   getBacklog?: (repoRoot: string) => Promise<BacklogTriageReport>;
@@ -105,6 +116,7 @@ export interface DaemonOptions {
     output?: string;
     stderr?: string;
     usage?: RunUsageMetrics;
+    planQuota?: ActualPlanQuota;
   }>;
 }
 
@@ -165,6 +177,75 @@ export function isDaemonRunning(repoRoot: string): boolean {
     clearDaemonState(repoRoot);
     return false;
   }
+}
+
+/**
+ * Checks whether full burn mode is enabled across options, daemon state, environment variables, or manifest.
+ */
+export function isFullBurnEnabled(
+  options: DaemonOptions = {},
+  state?: DaemonState | null,
+  repoRoot?: string
+): boolean {
+  if (options.fullBurn === true || state?.fullBurn === true) return true;
+  if (
+    process.env.JONAH_FLEET_FULL_BURN === 'true' ||
+    process.env.JONAH_FLEET_FULL_BURN === '1' ||
+    process.env.FULL_BURN === 'true' ||
+    process.env.FULL_BURN === '1'
+  ) {
+    return true;
+  }
+  if (repoRoot) {
+    try {
+      const manifest = loadManifest(repoRoot);
+      if (
+        (manifest as any)?.budgets?.fullBurn === true ||
+        (manifest as any)?.daemon?.fullBurn === true
+      ) {
+        return true;
+      }
+    } catch {}
+  }
+  return false;
+}
+
+/**
+ * Checks real-time plan quota against the safety floor (<20% in 5h or 7days window) unless full-burn is enabled.
+ */
+export async function checkDaemonQuotaGuard(
+  repoRoot: string,
+  options: DaemonOptions = {},
+  state?: DaemonState | null,
+  cachedQuota?: ActualPlanQuota
+): Promise<{ shouldStop: boolean; depletion?: QuotaDepletionResult }> {
+  if (isFullBurnEnabled(options, state, repoRoot)) {
+    return { shouldStop: false };
+  }
+
+  let quota = cachedQuota;
+  if (!quota) {
+    if (options.getPlanQuota) {
+      quota = await options.getPlanQuota(repoRoot);
+    } else {
+      quota = await fetchActualPlanQuota({ repoRoot });
+    }
+  }
+
+  if (!quota || !quota.available) {
+    return { shouldStop: false };
+  }
+
+  const depletion = checkPlanQuotaDepletion(quota, {
+    thresholdPct: options.quotaThresholdPct ?? 20,
+    model: options.model,
+  });
+
+  if (depletion.depleted) {
+    return { shouldStop: true, depletion };
+  }
+
+  return { shouldStop: false };
 }
 
 export interface ReviewablePR {
@@ -706,9 +787,17 @@ export async function startBackgroundDaemon(repoRoot: string, options: DaemonOpt
     throw new Error(`Daemon is already running with PID ${existing?.pid}`);
   }
 
+  const guard = await checkDaemonQuotaGuard(repoRoot, options);
+  if (guard.shouldStop) {
+    throw new Error(
+      `Plan quota is below 20% (${guard.depletion?.message}). Daemon stopped to protect compute budget. Run with --full-burn to bypass this guard.`
+    );
+  }
+
   const reviewInterval = options.reviewInterval || 3;
   const autoworkInterval = options.autoworkInterval || options.interval || 30;
   const routines = options.routines || ['peer-review', 'autowork'];
+  const fullBurn = isFullBurnEnabled(options, undefined, repoRoot);
 
   // Path to cli entrypoint or executable
   const logFilePath = path.join(repoRoot, '.jonah-fleet', 'daemon.log');
@@ -733,12 +822,15 @@ export async function startBackgroundDaemon(repoRoot: string, options: DaemonOpt
   if (options.verbose) {
     args.push('--verbose');
   }
+  if (fullBurn) {
+    args.push('--full-burn');
+  }
 
   const child = spawn(process.execPath, [cliPath, ...args], {
     cwd: repoRoot,
     detached: true,
     stdio: ['ignore', logFd, logFd],
-    env: { ...process.env, JONAH_FLEET_DAEMON: 'true' },
+    env: { ...process.env, JONAH_FLEET_DAEMON: 'true', ...(fullBurn ? { JONAH_FLEET_FULL_BURN: 'true' } : {}) },
   });
 
   child.unref();
@@ -750,6 +842,7 @@ export async function startBackgroundDaemon(repoRoot: string, options: DaemonOpt
     autoworkIntervalMinutes: autoworkInterval,
     routines,
     status: 'idle',
+    fullBurn,
   };
 
   writeDaemonState(repoRoot, state);
@@ -916,10 +1009,12 @@ export interface DrainReviewQueueOptions {
     output?: string;
     stderr?: string;
     usage?: RunUsageMetrics;
+    planQuota?: ActualPlanQuota;
   }>;
   onAttempted?: (prNumber: number) => void;
   failureCooldowns?: Map<number, PRFailureRecord>;
   onQuotaExhausted?: (resetInfo?: string) => void;
+  onQuotaDepleted?: (depletion: QuotaDepletionResult) => void;
 }
 
 /**
@@ -963,9 +1058,23 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
     onAttempted,
     failureCooldowns,
     onQuotaExhausted,
+    onQuotaDepleted,
   } = drainOptions;
 
   if (isStopping()) return;
+
+  const guard = await checkDaemonQuotaGuard(repoRoot, options, state);
+  if (guard.shouldStop) {
+    if (clearTicker) clearTicker();
+    console.warn(
+      pc.red(
+        `\n🛑 Peer Review Watchdog stopped: Plan quota is below 20% (${guard.depletion?.message}).`
+      )
+    );
+    onQuotaDepleted?.(guard.depletion!);
+    return;
+  }
+
   if (state) {
     state.lastReviewCheckAt = new Date().toISOString();
     writeDaemonState(repoRoot, state);
@@ -1016,6 +1125,18 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
     const targetLabel = formatTargetLabel(`PR #${currentPR.number}`, currentPR.title);
     let targetPRStr: string | undefined = targetLabel;
 
+    const loopGuard = await checkDaemonQuotaGuard(repoRoot, options, state);
+    if (loopGuard.shouldStop) {
+      if (clearTicker) clearTicker();
+      console.warn(
+        pc.red(
+          `\n🛑 Peer Review Watchdog stopped: Plan quota is below 20% (${loopGuard.depletion?.message}).`
+        )
+      );
+      onQuotaDepleted?.(loopGuard.depletion!);
+      break;
+    }
+
     try {
       if (clearTicker) clearTicker();
       if (state) {
@@ -1050,6 +1171,20 @@ export async function drainReviewQueue(drainOptions: DrainReviewQueueOptions): P
           }
         },
       });
+
+      if (result.planQuota) {
+        const postGuard = await checkDaemonQuotaGuard(repoRoot, options, state, result.planQuota);
+        if (postGuard.shouldStop) {
+          if (clearTicker) clearTicker();
+          console.warn(
+            pc.red(
+              `\n🛑 Peer Review Watchdog stopped: Plan quota dropped below 20% after routine (${postGuard.depletion?.message}).`
+            )
+          );
+          onQuotaDepleted?.(postGuard.depletion!);
+          break;
+        }
+      }
 
       // Record attempted PR number from detected target or candidate list
       const activeTargetStr = targetPRStr as string | undefined;
@@ -1182,11 +1317,13 @@ export interface PerformAutoworkScanOptions {
     output?: string;
     stderr?: string;
     usage?: RunUsageMetrics;
+    planQuota?: ActualPlanQuota;
   }>;
   onDiagnosticCard?: (card: string) => void;
   onAttempted?: (prNumber: number) => void;
   failureCooldowns?: Map<number, PRFailureRecord>;
   onQuotaExhausted?: (resetInfo?: string) => void;
+  onQuotaDepleted?: (depletion: QuotaDepletionResult) => void;
 }
 
 /**
@@ -1211,6 +1348,18 @@ export async function performAutoworkScan(
 
   if (isStopping()) return { executed: false, reason: 'stopping' };
 
+  const initialGuard = await checkDaemonQuotaGuard(repoRoot, options, state);
+  if (initialGuard.shouldStop) {
+    if (clearTicker) clearTicker();
+    console.warn(
+      pc.red(
+        `\n🛑 Autowork Backlog Scan stopped: Plan quota depleted (<20% remaining). ${initialGuard.depletion?.message}`
+      )
+    );
+    scanOptions.onQuotaDepleted?.(initialGuard.depletion!);
+    return { executed: false, reason: 'quota_depleted' };
+  }
+
   const routines = options.routines || ['peer-review', 'autowork'];
 
   // Strict priority invariant: drain reviewable PRs before running autowork
@@ -1233,6 +1382,7 @@ export async function performAutoworkScan(
         onAttempted: scanOptions.onAttempted,
         failureCooldowns: scanOptions.failureCooldowns,
         onQuotaExhausted: scanOptions.onQuotaExhausted,
+        onQuotaDepleted: scanOptions.onQuotaDepleted,
       });
 
       const remainingPRs = (await getPRs(repoRoot)).length;
@@ -1289,6 +1439,20 @@ export async function performAutoworkScan(
   });
 
   recordDaemonSessionUsage(repoRoot, state, result.usage);
+
+  if (result.planQuota) {
+    const postRoutineGuard = await checkDaemonQuotaGuard(repoRoot, options, state, result.planQuota);
+    if (postRoutineGuard.shouldStop) {
+      if (clearTicker) clearTicker();
+      console.warn(
+        pc.red(
+          `\n🛑 Autowork Scan stopped: Plan quota dropped below 20% after routine (${postRoutineGuard.depletion?.message}).`
+        )
+      );
+      scanOptions.onQuotaDepleted?.(postRoutineGuard.depletion!);
+      return { executed: true, reason: 'quota_depleted' };
+    }
+  }
 
   const isQuota =
     result.quotaPaused ||
@@ -1350,6 +1514,7 @@ export function initializeDaemonState(
     status: 'idle',
     evaluatedPRs: existingState?.evaluatedPRs,
     failureCooldowns: existingState?.failureCooldowns,
+    fullBurn: isFullBurnEnabled(options, existingState, repoRoot),
   };
   writeDaemonState(repoRoot, state);
 
@@ -1373,6 +1538,21 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
 
   const { state, failureCooldowns } = initializeDaemonState(repoRoot, options);
 
+  const initialGuard = await checkDaemonQuotaGuard(repoRoot, options, state);
+  if (initialGuard.shouldStop) {
+    console.warn(
+      pc.red(
+        `\n🛑 Daemon stopped: Plan quota is below 20% (${initialGuard.depletion?.message}).\n` +
+          `   Remaining quota must stay >= 20% for 5h and 7days windows.\n` +
+          `   To bypass this safety limit, start with --full-burn or set FULL_BURN=true.\n`
+      )
+    );
+    clearDaemonState(repoRoot);
+    return;
+  }
+
+  const isFullBurn = isFullBurnEnabled(options, state, repoRoot);
+
   console.log(
     renderFleetBanner({
       command: 'DAEMON',
@@ -1382,8 +1562,9 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         { label: 'Review Watchdog', value: `Every ${reviewInterval}m (zero-token preflight)` },
         { label: 'Autowork Scan', value: `Every ${autoworkInterval}m` },
         { label: 'Routines', value: routines.join(', ') },
+        { label: 'Full Burn', value: isFullBurn ? 'ENABLED' : 'DISABLED (stops at <20% quota)' },
         { label: 'Target', value: repoRoot },
-        { label: 'Hotkeys', value: "'r' review · 'a' autowork · 'p' pause · 's' status · '?' help" },
+        { label: 'Hotkeys', value: "'r' review · 'a' autowork · 'p' pause · 's' status · 'b' burn · '?' help" },
       ],
     })
   );
@@ -1483,6 +1664,9 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         runRoutine: runRoutineFn,
         failureCooldowns,
         onQuotaExhausted: handleQuotaPause,
+        onQuotaDepleted: async () => {
+          await handleStop();
+        },
       });
       try {
         const prs = await getPRsFn(repoRoot);
@@ -1546,6 +1730,9 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
         runRoutine: runRoutineFn,
         failureCooldowns,
         onQuotaExhausted: handleQuotaPause,
+        onQuotaDepleted: async () => {
+          await handleStop();
+        },
       });
 
       try {
@@ -1611,6 +1798,20 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
 
   const runTargetedReview = async (prNumber: number): Promise<void> => {
     if (isStopping || isWorking) return;
+
+    const guard = await checkDaemonQuotaGuard(repoRoot, options, state);
+    if (guard.shouldStop) {
+      clearTicker();
+      console.warn(
+        pc.red(
+          `\n🛑 Cannot start targeted review: Plan quota is below 20% (${guard.depletion?.message}).\n` +
+            `   Press 'b' to toggle full-burn mode if you wish to proceed.`
+        )
+      );
+      updateTicker();
+      return;
+    }
+
     try {
       isWorking = true;
       clearTicker();
@@ -1636,6 +1837,20 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
           writeDaemonState(repoRoot, state);
         },
       });
+
+      if (result.planQuota) {
+        const postGuard = await checkDaemonQuotaGuard(repoRoot, options, state, result.planQuota);
+        if (postGuard.shouldStop) {
+          clearTicker();
+          console.warn(
+            pc.red(
+              `\n🛑 Daemon stopped after targeted review: Plan quota dropped below 20% (${postGuard.depletion?.message}).`
+            )
+          );
+          await handleStop();
+          return;
+        }
+      }
 
       if (result.success) {
         const outcome =
@@ -1684,6 +1899,20 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
 
   const runTargetedAutowork = async (issueNumber: number): Promise<void> => {
     if (isStopping || isWorking) return;
+
+    const guard = await checkDaemonQuotaGuard(repoRoot, options, state);
+    if (guard.shouldStop) {
+      clearTicker();
+      console.warn(
+        pc.red(
+          `\n🛑 Cannot start targeted autowork: Plan quota is below 20% (${guard.depletion?.message}).\n` +
+            `   Press 'b' to toggle full-burn mode if you wish to proceed.`
+        )
+      );
+      updateTicker();
+      return;
+    }
+
     try {
       isWorking = true;
       clearTicker();
@@ -1709,6 +1938,20 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
           writeDaemonState(repoRoot, state);
         },
       });
+
+      if (result.planQuota) {
+        const postGuard = await checkDaemonQuotaGuard(repoRoot, options, state, result.planQuota);
+        if (postGuard.shouldStop) {
+          clearTicker();
+          console.warn(
+            pc.red(
+              `\n🛑 Daemon stopped after targeted autowork: Plan quota dropped below 20% (${postGuard.depletion?.message}).`
+            )
+          );
+          await handleStop();
+          return;
+        }
+      }
 
       if (result.success) {
         console.log(pc.green(`✓ Targeted autowork on Issue #${issueNumber} completed successfully.\n`));
@@ -1901,6 +2144,25 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
       }
       updateTicker();
     },
+    onToggleFullBurn: () => {
+      if (isStopping || isGracefulStopping) return;
+      options.fullBurn = !isFullBurnEnabled(options, state, repoRoot);
+      if (state) {
+        state.fullBurn = options.fullBurn;
+        writeDaemonState(repoRoot, state);
+      }
+      clearTicker();
+      if (options.fullBurn) {
+        console.log(
+          pc.red(`\n[${new Date().toLocaleTimeString()}] 🔥 Full burn mode ENABLED (ignoring <20% quota floor).`)
+        );
+      } else {
+        console.log(
+          pc.green(`\n[${new Date().toLocaleTimeString()}] 🛡️ Full burn mode DISABLED (daemon will stop if quota < 20%).`)
+        );
+      }
+      updateTicker();
+    },
     onTailLog: () => {
       if (isStopping || isGracefulStopping) return;
       clearTicker();
@@ -1999,6 +2261,18 @@ export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {
 
     try {
       if (!isPaused) {
+        const tickGuard = await checkDaemonQuotaGuard(repoRoot, options, state);
+        if (tickGuard.shouldStop) {
+          clearTicker();
+          console.warn(
+            pc.red(
+              `\n🛑 Daemon stopped by quota guard: Plan quota is below 20% (${tickGuard.depletion?.message}). Stopping daemon...`
+            )
+          );
+          await handleStop();
+          return;
+        }
+
         const now = Date.now();
         if (routines.includes('peer-review') && now >= nextReviewCheckTime) {
           await performReviewDrain();
