@@ -220,6 +220,7 @@ describe("Prompt Validation & Invariants", () => {
     expect(content).toContain("pr_number:");
     expect(content).not.toContain("issue_comment:");
     expect(content).toContain("review_requested");
+    expect(content).not.toContain("github.event.issue.html_url");
     expect(content).toMatch(/github\.event_name == 'workflow_dispatch'/);
     expect(content).not.toMatch(/github\.event_name == 'issue_comment'/);
   });
@@ -234,6 +235,9 @@ describe("Prompt Validation & Invariants", () => {
 
     expect(content).toContain("trigger-review-routine.yml");
     expect(content).toContain("workflow_dispatch");
+    expect(content).toContain("runner quota");
+    expect(content).toContain("Unfiltered comment triggers are omitted");
+    expect(content).not.toContain("`/review` comment");
   });
 
   it("validates ORCHESTRATION.md, autowork.md, and peer-review.md define the Peer Review Resilience & Orphaned PR Recovery protocol", () => {
@@ -257,6 +261,8 @@ describe("Prompt Validation & Invariants", () => {
     expect(orchestrationContent).toContain("Autowork Phase 1 Watchdog");
 
     expect(autoworkContent).toContain("Orphaned Ready PR Recovery");
+    expect(autoworkContent).not.toContain("posting `/review` comment");
+    expect(autoworkContent).not.toContain("NEVER post `/review`");
     expect(peerReviewContent).toContain(
       "Category B (first review / unreviewed)",
     );
