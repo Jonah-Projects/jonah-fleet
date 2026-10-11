@@ -48,6 +48,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 - **Defect Taxonomy of Bogus Green Checks**: The most expensive errors in agentic engineering come from checks reporting success for work they did not do. Audit verification against the 6 defect shapes (Vacuous assertion, Silent no-match, Errored check, Wrong reference, Stale premise, Scope mismatch). Exit codes and concrete diffs are authoritative; agent summaries are merely intent.
 - **Anti-Hallucination Disk Read-Back Verification**: Verify artifacts, generated configs, or outputs by reading values directly back out of the written artifact on disk, never from an in-memory variable, shell echo, or assumption.
 - **Reader / Writer Separation**: Peer Review is strictly an evaluator and merge authority. Never write or commit code modifications to the PR branch directly; bounce to draft so the author or autowork session applies the fix in their warm context.
+- **Streaming Truncation & Log Inspection Guardrail**: When inspecting command outputs, CI logs, or large diffs, never dump unbounded streams that could exhaust the LLM context window or stall IPC buffers. Always inspect voluminous outputs with paging, line/byte limits, or head/tail/grep filters (e.g. `gh pr diff | head -n 100`, `gh run view --log | tail -n 50`). Tool outputs exceeding 500 lines or 64 KB are automatically truncated by the runner circuit breaker using head-tail preservation to protect context.
 
 ## Final action: merge, bounce to draft, or approve & defer merge
 
@@ -78,6 +79,7 @@ Every review ends in exactly one of three states:
 - On re-review, do not raise new findings in code that was unchanged since the prior review — only inspect the delta commits.
 - Do not bounce a PR for non-blocking style/preference findings when all correctness checks pass.
 - Do not bounce an external contributor PR purely for missing `Closes #N` when the PR description provides a clear specification.
+- Do not dump full unbounded command outputs or large file contents into context — use paging, head/tail, or grep.
 - Do not call `schedule` or yield the turn with plain text while waiting for background verification tasks — stay in the tool loop until the final action is taken.
 - Do not busy-poll `gh run view` or `gh pr checks` in a loop when remote CI is in progress—verify locally once and defer merge, or bounce to draft immediately if blocking findings exist.
 - Do not rerun full local test suites when remote CI checks on the head commit are already green and passing.

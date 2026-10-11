@@ -135,6 +135,297 @@ export interface StreamJsonEvent {
   [key: string]: any;
 }
 
+export const DEFAULT_MAX_LINES = 500;
+export const DEFAULT_MAX_BYTES = 64 * 1024; // 64 KB = 65,536 bytes
+export const DEFAULT_HEAD_LINES = 50;
+export const DEFAULT_TAIL_LINES = 100;
+
+export interface HeadTailTruncationOptions {
+  maxLines?: number;
+  maxBytes?: number;
+  headLines?: number;
+  tailLines?: number;
+}
+
+export interface HeadTailTruncationResult {
+  text: string;
+  truncated: boolean;
+  totalLines: number;
+  totalBytes: number;
+  truncatedLines: number;
+  truncatedBytes: number;
+}
+
+export interface CommandExecutionOptions {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  timeout?: number;
+  maxLines?: number;
+  maxBytes?: number;
+  headLines?: number;
+  tailLines?: number;
+}
+
+export interface CommandExecutionResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  truncated: boolean;
+}
+
+/**
+ * Streaming truncator that preserves head and tail of output when line or byte thresholds are exceeded.
+ */
+export class HeadTailStreamTruncator {
+  private maxLines: number;
+  private maxBytes: number;
+  private headLines: number;
+  private tailLines: number;
+
+  private buffer: string = '';
+  private head: string[] = [];
+  private tail: string[] = [];
+  private allLines: string[] = [];
+  private totalLines: number = 0;
+  private totalBytes: number = 0;
+  private hasExceeded: boolean = false;
+  private flushed: boolean = false;
+
+  constructor(options: HeadTailTruncationOptions = {}) {
+    this.maxLines = options.maxLines ?? DEFAULT_MAX_LINES;
+    this.maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
+    this.headLines = options.headLines ?? DEFAULT_HEAD_LINES;
+    this.tailLines = options.tailLines ?? DEFAULT_TAIL_LINES;
+  }
+
+  public feed(chunk: string): void {
+    if (!chunk) return;
+    this.totalBytes += Buffer.byteLength(chunk, 'utf8');
+    this.buffer += chunk;
+
+    const parts = this.buffer.split('\n');
+    this.buffer = parts.pop() ?? '';
+
+    for (const line of parts) {
+      this.processLine(line);
+    }
+
+    if (!this.hasExceeded && this.totalBytes > this.maxBytes) {
+      this.triggerExceeded();
+    }
+  }
+
+  private processLine(line: string): void {
+    this.totalLines++;
+
+    if (!this.hasExceeded) {
+      this.allLines.push(line);
+      if (this.totalLines > this.maxLines || this.totalBytes > this.maxBytes) {
+        this.triggerExceeded();
+      }
+    } else {
+      if (this.head.length < this.headLines) {
+        this.head.push(line);
+      } else {
+        this.tail.push(line);
+        if (this.tail.length > this.tailLines) {
+          this.tail.shift();
+        }
+      }
+    }
+  }
+
+  private triggerExceeded(): void {
+    this.hasExceeded = true;
+    this.head = this.allLines.slice(0, this.headLines);
+    const remaining = this.allLines.slice(this.headLines);
+    this.tail = remaining.slice(-this.tailLines);
+    this.allLines = [];
+  }
+
+  public flush(): void {
+    if (this.flushed) return;
+    this.flushed = true;
+
+    if (this.buffer.length > 0) {
+      const line = this.buffer;
+      this.buffer = '';
+      this.processLine(line);
+    }
+
+    if (!this.hasExceeded && (this.totalLines > this.maxLines || this.totalBytes > this.maxBytes)) {
+      this.triggerExceeded();
+    }
+  }
+
+  public isTruncated(): boolean {
+    if (!this.flushed) {
+      this.flush();
+    }
+    return this.hasExceeded;
+  }
+
+  public getResult(): HeadTailTruncationResult {
+    if (!this.flushed) {
+      this.flush();
+    }
+
+    if (!this.hasExceeded) {
+      const text = this.allLines.join('\n');
+      return {
+        text,
+        truncated: false,
+        totalLines: this.totalLines,
+        totalBytes: this.totalBytes,
+        truncatedLines: 0,
+        truncatedBytes: 0,
+      };
+    }
+
+    let finalHead = this.head.join('\n');
+    let finalTail = this.tail.join('\n');
+
+    // If single line or single chunk exceeded maxBytes with empty tail
+    if (this.head.length <= 1 && this.tail.length === 0 && finalHead.length > 0) {
+      const line = finalHead;
+      const targetHead = Math.floor(this.maxBytes * 0.35);
+      const targetTail = Math.floor(this.maxBytes * 0.55);
+      finalHead = Buffer.from(line, 'utf8').subarray(0, targetHead).toString('utf8');
+      const lineBuf = Buffer.from(line, 'utf8');
+      finalTail = lineBuf.subarray(Math.max(0, lineBuf.length - targetTail)).toString('utf8');
+    } else {
+      const maxAllowedBytes = this.maxBytes;
+      const currentHeadBytes = Buffer.byteLength(finalHead, 'utf8');
+      const currentTailBytes = Buffer.byteLength(finalTail, 'utf8');
+
+      if (currentHeadBytes + currentTailBytes > maxAllowedBytes) {
+        const targetHeadBytes = Math.floor(maxAllowedBytes * 0.35);
+        const targetTailBytes = Math.floor(maxAllowedBytes * 0.55);
+
+        if (currentHeadBytes > targetHeadBytes) {
+          finalHead = Buffer.from(finalHead, 'utf8').subarray(0, targetHeadBytes).toString('utf8');
+        }
+        if (currentTailBytes > targetTailBytes) {
+          const tailBuf = Buffer.from(finalTail, 'utf8');
+          finalTail = tailBuf.subarray(Math.max(0, tailBuf.length - targetTailBytes)).toString('utf8');
+        }
+      }
+    }
+
+    const omittedLines = Math.max(0, this.totalLines - (this.head.length + this.tail.length));
+    const retainedBytes = Buffer.byteLength(finalHead, 'utf8') + Buffer.byteLength(finalTail, 'utf8');
+    const truncatedBytes = Math.max(0, this.totalBytes - retainedBytes);
+    const truncatedKb = (truncatedBytes / 1024).toFixed(1);
+
+    const separator = `\n... [${omittedLines} lines / ${truncatedKb} KB truncated to preserve context window] ...\n`;
+    const text = `${finalHead}${separator}${finalTail}`;
+
+    return {
+      text,
+      truncated: true,
+      totalLines: this.totalLines,
+      totalBytes: this.totalBytes,
+      truncatedLines: omittedLines,
+      truncatedBytes,
+    };
+  }
+
+  public getOutput(): string {
+    return this.getResult().text;
+  }
+}
+
+/**
+ * Truncates text output using head-tail preservation when line or byte ceilings are exceeded.
+ */
+export function truncateHeadTail(
+  output: string,
+  options: HeadTailTruncationOptions = {}
+): string {
+  if (!output) return '';
+  const truncator = new HeadTailStreamTruncator(options);
+  truncator.feed(output);
+  truncator.flush();
+  return truncator.getOutput();
+}
+
+/**
+ * Truncates text output returning detailed metadata about lines and bytes truncated.
+ */
+export function truncateHeadTailDetails(
+  output: string,
+  options: HeadTailTruncationOptions = {}
+): HeadTailTruncationResult {
+  if (!output) {
+    return {
+      text: '',
+      truncated: false,
+      totalLines: 0,
+      totalBytes: 0,
+      truncatedLines: 0,
+      truncatedBytes: 0,
+    };
+  }
+  const truncator = new HeadTailStreamTruncator(options);
+  truncator.feed(output);
+  truncator.flush();
+  return truncator.getResult();
+}
+
+/**
+ * Safely executes an external command with head-tail streaming truncation on stdout and stderr.
+ */
+export async function executeCommand(
+  file: string,
+  args: string[],
+  options: CommandExecutionOptions = {}
+): Promise<CommandExecutionResult> {
+  return new Promise((resolve, reject) => {
+    const stdoutTruncator = new HeadTailStreamTruncator({
+      maxLines: options.maxLines,
+      maxBytes: options.maxBytes,
+      headLines: options.headLines,
+      tailLines: options.tailLines,
+    });
+    const stderrTruncator = new HeadTailStreamTruncator({
+      maxLines: options.maxLines,
+      maxBytes: options.maxBytes,
+      headLines: options.headLines,
+      tailLines: options.tailLines,
+    });
+
+    const child = spawn(file, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: options.timeout,
+    });
+
+    child.stdout?.on('data', (chunk) => {
+      stdoutTruncator.feed(chunk.toString('utf8'));
+    });
+
+    child.stderr?.on('data', (chunk) => {
+      stderrTruncator.feed(chunk.toString('utf8'));
+    });
+
+    child.on('error', (err) => {
+      reject(err);
+    });
+
+    child.on('close', (code, signal) => {
+      stdoutTruncator.flush();
+      stderrTruncator.flush();
+      resolve({
+        stdout: stdoutTruncator.getOutput(),
+        stderr: stderrTruncator.getOutput(),
+        exitCode: resolveExitCode(code, signal),
+        truncated: stdoutTruncator.isTruncated() || stderrTruncator.isTruncated(),
+      });
+    });
+  });
+}
+
 /**
  * Line buffer for incremental stream-json chunk processing.
  */
@@ -174,6 +465,9 @@ export function parseStreamJsonEvent(line: string): StreamJsonEvent | null {
   try {
     const parsed = JSON.parse(line);
     if (parsed && typeof parsed === 'object') {
+      if (parsed.step_update?.tool_info?.output && typeof parsed.step_update.tool_info.output === 'string') {
+        parsed.step_update.tool_info.output = truncateHeadTail(parsed.step_update.tool_info.output);
+      }
       return parsed as StreamJsonEvent;
     }
     return null;
@@ -1216,6 +1510,7 @@ export async function runLocalRoutine(options: RunLocalRoutineOptions): Promise<
             executedAnyTool = true;
             lastActionDesc = null;
             if (su.tool_info?.output) {
+              su.tool_info.output = truncateHeadTail(su.tool_info.output);
               checkTargetDetection(su.tool_info.output);
             }
             if (spinner) {
