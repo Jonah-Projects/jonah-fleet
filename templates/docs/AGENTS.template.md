@@ -98,3 +98,10 @@ To trigger the Autowork routine manually on any specific issue, use the GitHub A
 - Auth boundaries required for all sensitive mutations.
 - Never commit credentials, tokens, or secret keys to version control.
 - Validate request inputs and sanitize outputs.
+
+## Operational Memory (LESSONS.md)
+
+- **Role-Partitioned Memory**: Standardize lesson entries in `LESSONS.md` using routine role tags: `[autowork]`, `[peer-review]`, `[optimizer]`, or `[general]` (e.g. `### [autowork] Title`, `### [peer-review] Title`, `### [general] Title`). Subsystem composite tags are also supported (e.g. `### [autowork:subsystem] Title`).
+- **Targeted Routine Ingestion**: Autonomous routines ingest general lessons plus routine-specific lessons, omitting unrelated entries to prevent unbounded token expansion while maintaining high-signal operational memory.
+- **Post-Run Recording**: When capturing new non-obvious gotchas or quirks on PR branches, always tag the entry with the active routine's role (or `[general]`) and adhere strictly to the 25-entry hard cap.
+
