@@ -65,6 +65,40 @@ describe("Operational Lessons (LESSONS.md) & Prompt Integration", () => {
     expect(content).toMatch(/LESSONS_ARCHIVE\.md/);
     expect(content).toMatch(/graduat(?:ing|e|ion)/i);
   });
+
+  it("validates autowork.md and peer-review.md support role-partitioned LESSONS.md filtering and tag recording", () => {
+    const autoworkPath = path.join(promptsDir, "autowork.md");
+    const autoworkContent = fs.readFileSync(autoworkPath, "utf8");
+
+    expect(autoworkContent).toMatch(/autowork.*general/i);
+    expect(autoworkContent).toMatch(/\[autowork\]/);
+
+    const peerReviewPath = path.join(promptsDir, "peer-review.md");
+    const peerReviewContent = fs.readFileSync(peerReviewPath, "utf8");
+
+    expect(peerReviewContent).toMatch(/peer-review.*general/i);
+    expect(peerReviewContent).toMatch(/\[peer-review\]/);
+  });
+
+  it("validates templates/docs/ and AGENTS.md document lesson tagging syntax ([autowork], [peer-review], [general])", () => {
+    const lessonTemplatePath = path.join(templatesDir, "docs", "LESSONS.template.md");
+    const lessonTemplate = fs.readFileSync(lessonTemplatePath, "utf8");
+    expect(lessonTemplate).toContain("[autowork]");
+    expect(lessonTemplate).toContain("[peer-review]");
+    expect(lessonTemplate).toContain("[general]");
+
+    const agentsPath = path.resolve(process.cwd(), "AGENTS.md");
+    const agentsContent = fs.readFileSync(agentsPath, "utf8");
+    expect(agentsContent).toContain("[autowork]");
+    expect(agentsContent).toContain("[peer-review]");
+    expect(agentsContent).toContain("[general]");
+
+    const agentsTemplatePath = path.join(templatesDir, "docs", "AGENTS.template.md");
+    const agentsTemplate = fs.readFileSync(agentsTemplatePath, "utf8");
+    expect(agentsTemplate).toContain("[autowork]");
+    expect(agentsTemplate).toContain("[peer-review]");
+    expect(agentsTemplate).toContain("[general]");
+  });
 });
 
 describe("Structured Human Escalation Card Protocol ('Why I believe this')", () => {

@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-11
 
+### Added
+
+- **memory:** partition `LESSONS.md` operational memory ingestion by routine role (`[autowork]`, `[peer-review]`, `[general]`) to prevent unbounded prompt token bloat while maintaining high-signal operational memory
+
 ### Fixed
 
 - **terminal-card:** refine backlog triage hints to provide targeted unblock advice for radar digests and `needs-attention` issues instead of generic `needs-human` prompts

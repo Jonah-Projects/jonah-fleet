@@ -140,7 +140,7 @@ Check if `$PR_NUMBER` is set:
 1. Run `/code-review` over the diff (or delta commits if re-review) evaluating:
    - **Standards**: Conformance to `AGENTS.md` (or `CLAUDE.md`/`GEMINI.md`), conventions, and architecture.
    - **Spec Compliance**: Verification against the linked issue's deliverables (`## Tasks`), or against the PR description's summary/changes if no tracking issue is linked.
-   - **Operational Memory & Lessons Invariant**: Inspect `LESSONS.md` diffs in PRs to verify the lesson is accurate, non-trivial, follows the 3-line structured schema, and the file adheres to the 25-entry hard cap.
+   - **Operational Memory & Lessons Invariant**: Inspect `LESSONS.md` diffs in PRs to verify the lesson is accurate, non-trivial, follows the 3-line structured schema, tags the originating routine role (e.g. `### [autowork] ...`, `### [peer-review] ...`, or `### [general] ...`), and the file adheres to the 25-entry hard cap. If reviewing code that solves a non-obvious gotcha or recurring architectural trap, ensure a structured 3-line entry tagged with the originating routine role (`### [peer-review] ...` or `### [general] ...`) is appended to `LESSONS.md`.
 2. Run Security Pass: auth gates, permission checks, injection risks, sensitive credentials.
 3. **Design System & Viewport Density Pass** (if PR modifies frontend/rendered UI):
    - **Token Purity**: Check for arbitrary CSS/Tailwind sizing overrides (e.g. `text-[...px]`, `w-[...px]`) or bespoke button styling bypassing standard design system tokens.
@@ -296,7 +296,7 @@ Cacheable across consecutive runs within the same repository.
 In this tier, Peer Review ingests semi-stable repository conventions, operational memory, and configuration rules that change infrequently across consecutive runs in the same repository:
 
 1. **Repository Conventions (`AGENTS.md`)**: Read `AGENTS.md` (or `CLAUDE.md` / `GEMINI.md`) for coding standards, architectural patterns, design system token purity, and required CI / test commands.
-2. **Operational Memory (`LESSONS.md`)**: Verify that any non-obvious quirks or gotchas captured on the active PR branch adhere to the 25-entry hard cap.
+2. **Operational Memory (`LESSONS.md`)**: If `LESSONS.md` exists, ingest role-relevant operational gotchas filtered for the active routine role (`grep -E "^### \[(peer-review|general)\]" LESSONS.md -A 4`), omitting unrelated routine roles, and verify that any non-obvious quirks or gotchas captured on the active PR branch adhere to the 25-entry hard cap.
 3. **Fleet Manifest (`agents-manifest.json`)**: Ingest configured review models, round caps, and iteration ceilings.
 4. **Engineering Skills (`.agents/skills/`)**: Leverage `code-review`, `design-critique`, and `writing-for-agents` for structured evaluation.
 
