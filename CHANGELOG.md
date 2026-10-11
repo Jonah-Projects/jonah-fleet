@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-10-11
 
+### Added
+
+- **runner:** add head-tail streaming truncation circuit breaker (`DEFAULT_MAX_LINES = 500`, `DEFAULT_MAX_BYTES = 64KB`) for command execution and large tool outputs to prevent context overflow and worker stalls
+
 ### Fixed
 
 - **terminal-card:** refine backlog triage hints to provide targeted unblock advice for radar digests and `needs-attention` issues instead of generic `needs-human` prompts

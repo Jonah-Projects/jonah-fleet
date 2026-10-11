@@ -43,6 +43,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 - **Anti-Hallucination Disk Read-Back Verification**: Always verify generated code, configs, and artifacts by reading values directly back out of the written artifact on disk, never from in-memory variables or shell command echoes.
 - **Precision Git Scoping**: Never execute bare `git commit` or blind `git add .` without scoping. Always commit designated paths explicitly (`git commit -m "..." -- <paths>`) or verify `git status --porcelain` to avoid sweeping in uncommitted scratch artifacts or concurrent session files.
 - **Incremental Commits**: Commit early and incrementally. Do NOT accumulate dozens of edits across many files without committing. Once your implementation passes the Red Gate test and local tests, commit your changes immediately (`git commit -m "<type>(<scope>): <subject>" -- <paths>`). Then run formatting and linting as a separate commit. This guarantees your work is persisted in git and immune to mid-session crashes.
+- **Streaming Truncation & Log Inspection Guardrail**: When executing commands or inspecting large files, test outputs, or git diffs, never dump unbounded streams that could exhaust the LLM context window or stall IPC buffers. Always inspect voluminous outputs with paging, line/byte limits, or head/tail/grep filters (e.g. `git log -n <N>`, `head -n 50`, `tail -n 100`, `grep`). Tool outputs exceeding 500 lines or 64 KB are automatically truncated by the runner circuit breaker using head-tail preservation to protect context.
 
 ## Negative examples (DO NOT do these)
 
@@ -65,6 +66,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 - Do not use bare `git commit` or blind `git add .` without scoping specific paths (`git commit -m "..." -- <paths>`).
 - Do not verify generated files by checking in-memory strings or shell variables; read values back out of the file on disk.
 - Do not accumulate changes across many files without committing — commit incrementally as soon as tests pass, then format/lint.
+- Do not dump full unbounded command outputs or large file contents into context — use paging, head/tail, or grep.
 
 ## Instructions
 
