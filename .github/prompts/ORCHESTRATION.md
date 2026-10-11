@@ -28,7 +28,7 @@ Autowork triggers pass the target issue via environment variables (`TARGET_ISSUE
 
 Invariants deliberately upheld from this spec:
 
-- **Single-flight per issue and PR convergence** — at most one run works an issue or pull request at a time, enforced by the autowork claim protocol (assign → read-back → earliest-timestamp tiebreak). For **umbrella** issues, single-flight is maintained at the _child-issue_ level so slices progress cleanly.
+- **Single-flight per issue and PR convergence** — at most one run works an issue or pull request at a time, enforced by the autowork claim protocol (assign → read-back → earliest-timestamp tiebreak). For **umbrella** issues, single-flight is maintained at the _child-issue_ level so slices progress cleanly. Pull requests actively claimed by peer review (`Starting review (round N)`) or awaiting review are strictly protected from concurrent autowork convergence and repetitive polling loops.
 - **Recover dead-run claims** — a crashed run's orphaned claim is released back to the pool rather than starving the issue or PR, both opportunistically during candidate selection and periodically via issues housekeeping.
 - **Reader/writer separation** — the routine that authors a PR never merges it; the Peer Review routine is the sole merge authority for pull requests.
 - **Warm-Context Review Synchronization** — Autowork maintains an active warm session during implementation, polling for Peer Review's verdict. When Peer Review bounces a PR to draft with findings, Autowork immediately detects the draft state in-session, applies fixes directly to its warm working tree, and re-marks the PR ready—re-firing Peer Review for Round N+1 without cold-start overhead.
@@ -54,7 +54,7 @@ Single source of truth for both autowork candidate reclamation and housekeeping 
 
 Single source of truth for Autowork Phase 1 pull request convergence. An assigned pull request or draft PR with unaddressed review comments is a _stale claim_ (safe to reclaim and reassign by another runner) only when **all** of these hold:
 
-1. **It carries an autowork claim comment**: The PR thread contains `🔒 Addressing review findings by autowork run …` or `🔒 Addressing review findings by local autowork session …`.
+1. **It carries an autowork claim comment or peer-review marker**: The PR thread contains `🔒 Addressing review findings by autowork run …`, `🔒 Addressing review findings by local autowork session …`, or `Starting review (round N) …`.
 2. **The claim is old**: The most recent claim comment's `created_at` is **more than 2 hours** ago. (2 hours instead of 6 hours because PR review convergence is a rapid turnaround loop).
 3. **No active commits or review activity**: No new commit has been pushed to the PR branch within the last 2 hours.
 

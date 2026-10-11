@@ -874,5 +874,23 @@ describe("Prompt Validation & Invariants", () => {
     expect(tddSkillContent).toContain("Silent No-Match");
     expect(tddSkillContent).toContain("Disk Read-Back Verification");
   });
+
+  it("validates autowork.md and ORCHESTRATION.md guard against in-flight peer-review polling loops and define the Active Peer Review invariant", () => {
+    const autoworkPath = path.join(promptsDir, "autowork.md");
+    const orchestrationPath = path.join(templatesDir, "prompts", "ORCHESTRATION.md");
+
+    const autoworkContent = fs.readFileSync(autoworkPath, "utf8");
+    const orchestrationContent = fs.readFileSync(orchestrationPath, "utf8");
+
+    // autowork.md Phase 1 active peer review invariant & anti-polling rules
+    expect(autoworkContent).toContain("Active Peer Review & Non-Draft Awaiting Review Invariant");
+    expect(autoworkContent).toMatch(/Starting review \(round N\)/);
+    expect(autoworkContent).toContain("MUST NOT attempt to address it, MUST NOT block, and MUST NEVER poll its review run issue");
+    expect(autoworkContent).toContain("Do not busy-poll external routine issues, PRs under review, or background tasks in a repetitive tool loop");
+
+    // ORCHESTRATION.md PR stale-claim definition & concurrency protection
+    expect(orchestrationContent).toContain("Starting review (round N)");
+    expect(orchestrationContent).toMatch(/Pull requests actively claimed by peer review \(`Starting review \(round N\)`\)/);
+  });
 });
 
