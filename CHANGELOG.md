@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.36.0...v1.37.0) (2026-10-11)
+
+
+### Features
+
+* **prompts,memory:** partition LESSONS.md ingestion by routine role ([#700](https://github.com/Jonah-Projects/jonah-fleet/issues/700)) ([21fe1b2](https://github.com/Jonah-Projects/jonah-fleet/commit/21fe1b21669ee0d7dc470c601732fb395efa0126))
+
 ## [1.36.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.35.2...v1.36.0) (2026-10-11)
 
 
