@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.35.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.35.1...v1.35.2) (2026-10-11)
+
+
+### Bug Fixes
+
+* **terminal-card:** refine backlog triage hints for radar digests and needs-attention issues ([#692](https://github.com/Jonah-Projects/jonah-fleet/issues/692)) ([935ef75](https://github.com/Jonah-Projects/jonah-fleet/commit/935ef75a5e4cbd607bc75f0767901f6f6d7927a8))
+
 ## [Unreleased] - 2026-10-11
 
 ### Fixed
