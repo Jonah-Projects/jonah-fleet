@@ -61,7 +61,7 @@ If any criterion cannot be met, stop immediately and log FAILURE with the reason
 - Do not fall into the **Telemetry Rabbit Hole**: do not spend cycles instrumenting elaborate fallback telemetry or defensive error handling for features that suffer from lack of user intent rather than software bugs.
 - Do not guess or invent arbitrary specifications for ambiguous issues — post the 4-part escalation card ('Why I believe this'), label `needs-info`, and release the claim instead of blindly writing code.
 - Do not call `schedule` or yield the turn with plain text while waiting for background verification tasks — stay in the tool loop until the Definition of Done is met.
-- Do not busy-poll external routine issues, PRs under review, or background tasks in a repetitive tool loop. When waiting on long-running tasks, stop calling tools and let the system wake you up; never poll in a loop with identical commands (e.g. repeated `gh issue view` or `gh run view`).
+- Do not busy-poll external routine issues, PRs under review, or background tasks in a repetitive tool loop; never poll in a loop with identical commands (e.g. repeated `gh issue view <peer_review_run>` or `gh run view`) without making progress.
 - Do not write implementation code before proving that the reproduction test or verifier fails (the Red Gate).
 - Do not pause or prompt rhetorical questions ("Shall I continue?", "Should I start implementing?")—proceed autonomously.
 - Do not use bare `git commit` or blind `git add .` without scoping specific paths (`git commit -m "..." -- <paths>`).
@@ -96,7 +96,7 @@ b. **Eligible → claim, then implement.** Call `get_me` once to learn your own 
    - **Active Peer Review & Non-Draft Awaiting Review Invariant**: In Phase 1, only PRs that have been **bounced to draft** with actionable review findings, or PRs with **unaddressed review comments** (threads from peer review requiring code changes), require convergence. If a PR is ready for review (`isDraft: false`), or carries an active peer-review claim comment (`Starting review (round N)` posted within the last 2 hours), or has no unaddressed review comments / changes requested, you DO NOT OWN THIS PR. You MUST NOT attempt to address it, MUST NOT block, and MUST NEVER poll its review run issue (e.g. `gh issue view <peer_review_run>`). Skip this PR immediately and evaluate the next PR or proceed directly to Phase 2.
    1a. **PR Claim Protocol (Single-Flight PR Convergence)**:
    - For each open PR needing attention (bounced to draft with actionable findings, or open with unaddressed review comments):
-   - **Check eligibility**: re-read candidate PR (`gh pr view <PR> --json assignees,comments`). Skip PRs currently assigned to another live runner or carrying an active autowork claim comment (`🔒 Addressing review findings by ...`) or active peer-review claim (`Starting review (round N)`) posted within the last 2 hours (unless stale claim per `ORCHESTRATION.md`).
+   - **Check eligibility**: re-read candidate PR (`gh pr view <PR> --json assignees,comments`). Skip PRs currently assigned to another live runner or carrying an active claim comment posted within the last 2 hours per the invariant above (unless stale claim per `ORCHESTRATION.md`).
    - Call `get_me` once to learn your own login if not already known.
    - **Claim atomically**: assign yourself to the PR (`gh pr edit <PR> --add-assignee <login>`) AND post a claim comment on the PR:
      - In **Cloud Actions**: `🔒 Addressing review findings by autowork run {run_url} {timestamp}`

@@ -5,6 +5,12 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **prompts:** prevent autowork repetition polling loops on in-flight peer-review PRs, define the Active Peer Review & Non-Draft Awaiting Review Invariant in `autowork.md`, and protect `Starting review (round N)` claim windows in `ORCHESTRATION.md`
+
 ## [1.37.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.36.0...v1.37.0) (2026-10-11)
 
 
@@ -25,19 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
 * **terminal-card:** refine backlog triage hints for radar digests and needs-attention issues ([#692](https://github.com/Jonah-Projects/jonah-fleet/issues/692)) ([935ef75](https://github.com/Jonah-Projects/jonah-fleet/commit/935ef75a5e4cbd607bc75f0767901f6f6d7927a8))
-
-## [Unreleased] - 2026-10-11
-
-### Added
-
-- **memory:** partition `LESSONS.md` operational memory ingestion by routine role (`[autowork]`, `[peer-review]`, `[general]`) to prevent unbounded prompt token bloat while maintaining high-signal operational memory
-- **runner:** add head-tail streaming truncation circuit breaker (`DEFAULT_MAX_LINES = 500`, `DEFAULT_MAX_BYTES = 64KB`) for command execution and large tool outputs to prevent context overflow and worker stalls
-
-
-### Fixed
-
-- **prompts:** prevent autowork repetition polling loops on in-flight peer-review PRs, define the Active Peer Review & Non-Draft Awaiting Review Invariant in `autowork.md`, and protect `Starting review (round N)` claim windows in `ORCHESTRATION.md`
-- **terminal-card:** refine backlog triage hints to provide targeted unblock advice for radar digests and `needs-attention` issues instead of generic `needs-human` prompts
 
 ## [1.35.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.35.0...v1.35.1) (2026-10-10)
 

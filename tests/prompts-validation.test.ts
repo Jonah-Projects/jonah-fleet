@@ -887,10 +887,15 @@ describe("Prompt Validation & Invariants", () => {
     expect(autoworkContent).toMatch(/Starting review \(round N\)/);
     expect(autoworkContent).toContain("MUST NOT attempt to address it, MUST NOT block, and MUST NEVER poll its review run issue");
     expect(autoworkContent).toContain("Do not busy-poll external routine issues, PRs under review, or background tasks in a repetitive tool loop");
+    expect(autoworkContent).not.toContain("stop calling tools and let the system wake you up");
 
     // ORCHESTRATION.md PR stale-claim definition & concurrency protection
-    expect(orchestrationContent).toContain("Starting review (round N)");
-    expect(orchestrationContent).toMatch(/Pull requests actively claimed by peer review \(`Starting review \(round N\)`\)/);
+    expect(orchestrationContent).toMatch(
+      /It carries an autowork claim comment or peer-review marker[\s\S]*Starting review \(round N\)/,
+    );
+    expect(orchestrationContent).toMatch(
+      /Pull requests actively claimed by peer review \(`Starting review \(round N\)` within 2 hours\)/,
+    );
   });
 });
 
