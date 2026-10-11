@@ -1799,7 +1799,45 @@ export function renderBacklogDiagnosticCard(
     hints.push("Remove 'needs-info' or 'needs-design' once specifications are clarified.");
   }
   if (report.gatedHuman && report.gatedHuman.length > 0) {
-    hints.push("Remove 'needs-human' if autonomous implementation is appropriate.");
+    const hasRadar = report.gatedHuman.some((item) => {
+      const labels = (item.labels || []).map((l) =>
+        (typeof l === 'string' ? l : l.name).toLowerCase()
+      );
+      return isRadarDigestTitle(item.title) || labels.includes('radar');
+    });
+
+    const hasNeedsAttention = report.gatedHuman.some((item) => {
+      const labels = (item.labels || []).map((l) =>
+        (typeof l === 'string' ? l : l.name).toLowerCase()
+      );
+      return (
+        labels.includes('needs-attention') &&
+        !isRadarDigestTitle(item.title) &&
+        !labels.includes('radar')
+      );
+    });
+
+    const hasNeedsHuman = report.gatedHuman.some((item) => {
+      const labels = (item.labels || []).map((l) =>
+        (typeof l === 'string' ? l : l.name).toLowerCase()
+      );
+      return (
+        labels.includes('needs-human') ||
+        (!isRadarDigestTitle(item.title) &&
+          !labels.includes('radar') &&
+          !labels.includes('needs-attention'))
+      );
+    });
+
+    if (hasRadar) {
+      hints.push('Triage or close radar digests if no upstream adoption is needed.');
+    }
+    if (hasNeedsAttention) {
+      hints.push("Review issues labeled 'needs-attention' and remove the label once triaged.");
+    }
+    if (hasNeedsHuman) {
+      hints.push("Remove 'needs-human' if autonomous implementation is appropriate.");
+    }
   }
   if (report.inProgress && report.inProgress.length > 0) {
     hints.push("Merge or close open PRs, or unassign human assignees to allow agent pickup.");

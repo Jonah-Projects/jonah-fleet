@@ -379,6 +379,93 @@ describe('Daemon Autowork Backlog Preflight & Classification', () => {
       expect(card).toContain('needs-human');
       expect(card).toContain('needs-info');
     });
+
+    it('renders targeted unblock hint for radar digests without suggesting needs-human', () => {
+      const report: BacklogTriageReport = {
+        actionable: [],
+        inProgress: [],
+        gatedHuman: [
+          {
+            number: 501,
+            title: '📡 Upstream Ecosystem Radar: Intel Digest (2026-09-28)',
+            labels: [{ name: 'enhancement' }],
+          },
+        ],
+        awaitingInfo: [],
+        guardrails: [],
+        routineLogs: [],
+        total: 1,
+      };
+
+      const card = renderBacklogDiagnosticCard(report);
+      expect(card).toContain('Triage or close radar digests if no upstream adoption is needed.');
+      expect(card).not.toContain("Remove 'needs-human'");
+    });
+
+    it('renders targeted unblock hint for needs-attention issues without suggesting needs-human', () => {
+      const report: BacklogTriageReport = {
+        actionable: [],
+        inProgress: [],
+        gatedHuman: [
+          {
+            number: 503,
+            title: 'chore: unexpected triage required',
+            labels: [{ name: 'needs-attention' }],
+          },
+        ],
+        awaitingInfo: [],
+        guardrails: [],
+        routineLogs: [],
+        total: 1,
+      };
+
+      const card = renderBacklogDiagnosticCard(report);
+      expect(card).toContain("Review issues labeled 'needs-attention'");
+      expect(card).toContain('triaged.');
+      expect(card).not.toContain("Remove 'needs-human'");
+
+      const wideCard = renderBacklogDiagnosticCard(report, { width: 100 });
+      expect(wideCard).toContain("Review issues labeled 'needs-attention' and remove the label once triaged.");
+    });
+
+    it('renders multiple targeted hints when gatedHuman has a mix of radar digests, needs-attention, and needs-human', () => {
+      const report: BacklogTriageReport = {
+        actionable: [],
+        inProgress: [],
+        gatedHuman: [
+          {
+            number: 501,
+            title: '📡 Upstream Ecosystem Radar: Intel Digest (2026-09-28)',
+            labels: [{ name: 'radar' }],
+          },
+          {
+            number: 503,
+            title: 'chore: unexpected triage required',
+            labels: [{ name: 'needs-attention' }],
+          },
+          {
+            number: 14,
+            title: 'feat: needs architectural decision',
+            labels: [{ name: 'needs-human' }],
+          },
+        ],
+        awaitingInfo: [],
+        guardrails: [],
+        routineLogs: [],
+        total: 3,
+      };
+
+      const card = renderBacklogDiagnosticCard(report);
+      expect(card).toContain('Triage or close radar digests if no upstream adoption is needed.');
+      expect(card).toContain("Review issues labeled 'needs-attention'");
+      expect(card).toContain('triaged.');
+      expect(card).toContain("Remove 'needs-human' if autonomous implementation is appropriate.");
+
+      const wideCard = renderBacklogDiagnosticCard(report, { width: 100 });
+      expect(wideCard).toContain('Triage or close radar digests if no upstream adoption is needed.');
+      expect(wideCard).toContain("Review issues labeled 'needs-attention' and remove the label once triaged.");
+      expect(wideCard).toContain("Remove 'needs-human' if autonomous implementation is appropriate.");
+    });
   });
 
   describe('performAutoworkScan Zero-Token Preflight Bypass', () => {
