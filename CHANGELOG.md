@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.37.0...v1.37.1) (2026-10-12)
+
+
+### Bug Fixes
+
+* **prompts:** prevent autowork repetition polling loops on in-flight peer-review PRs ([#713](https://github.com/Jonah-Projects/jonah-fleet/issues/713)) ([ceb76f8](https://github.com/Jonah-Projects/jonah-fleet/commit/ceb76f84c78b16d9075b1b4e453c6ae8696c1d88))
+
 ## [Unreleased]
 
 ### Fixed
