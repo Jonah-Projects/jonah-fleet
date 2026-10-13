@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.37.1...v1.37.2) (2026-10-13)
+
+
+### Bug Fixes
+
+* **security:** resolve high-severity vulnerability GHSA-68fv-2mgg-jv7q in source-map-js ([#726](https://github.com/Jonah-Projects/jonah-fleet/issues/726)) ([15bad9a](https://github.com/Jonah-Projects/jonah-fleet/commit/15bad9a7a8a05be2f9081a2c6f4169fc68f37051))
+
 ## [1.37.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.37.0...v1.37.1) (2026-10-12)
 
 
