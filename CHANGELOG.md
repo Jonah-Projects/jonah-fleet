@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **prompts:** prevent autowork repetition polling loops on in-flight peer-review PRs, define the Active Peer Review & Non-Draft Awaiting Review Invariant in `autowork.md`, and protect `Starting review (round N)` claim windows in `ORCHESTRATION.md`
 
+### Security
+
+- **dependencies:** resolve high-severity vulnerability GHSA-68fv-2mgg-jv7q in transitive dependency `source-map-js` via package override
+
+
 ## [1.37.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.36.0...v1.37.0) (2026-10-11)
 
 
