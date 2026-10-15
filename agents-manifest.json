@@ -22,7 +22,8 @@
   "models": {
     "default": "gemini-3.8-flash-high",
     "issues-housekeeping": "gemini-3.8-flash-medium",
-    "dependency-update-security-check": "gemini-3.8-flash-medium"
+    "dependency-update-security-check": "gemini-3.8-flash-medium",
+    "product-planning": "gemini-4-argon-medium"
   },
   "budgets": {
     "weeklyTokens": 8750000,

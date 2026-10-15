@@ -2,7 +2,7 @@ import pc from 'picocolors';
 import { loadManifest, saveManifest } from '../lib/manifest.js';
 import { installFleet } from '../lib/installer.js';
 import { checkDrift } from '../lib/diff.js';
-import { FLEET_VERSION } from '../lib/presets.js';
+import { DEFAULT_MODELS_CONFIG, FLEET_VERSION } from '../lib/presets.js';
 import { provisionLabels } from '../lib/labels.js';
 import { renderFleetBanner } from '../lib/brand.js';
 
@@ -61,8 +61,12 @@ export async function runSync(options: SyncOptions = {}): Promise<void> {
     return;
   }
 
-  // Update manifest version
+  // Update manifest version and backfill missing default routine models
   manifest.version = FLEET_VERSION;
+  manifest.models = {
+    ...DEFAULT_MODELS_CONFIG,
+    ...manifest.models,
+  };
   saveManifest(cwd, manifest);
 
   const result = installFleet(cwd, manifest, { force: true });

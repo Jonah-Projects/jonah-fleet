@@ -146,4 +146,21 @@ describe('Sync Fleet Workflow Logic & Drift Scenarios', () => {
     const postDrift = checkDrift(tempDir, manifest);
     expect(postDrift.modifiedWorkflows.length).toBe(0);
   });
+
+  it('backfills missing default routine models into existing manifest during sync', async () => {
+    const manifest = createDefaultManifest('standard');
+    manifest.models = {
+      default: 'gemini-3.8-flash-high',
+      'issues-housekeeping': 'gemini-3.8-flash-medium',
+      'dependency-update-security-check': 'gemini-3.8-flash-medium',
+    };
+    saveManifest(tempDir, manifest);
+    installFleet(tempDir, manifest);
+
+    await runSync({ force: true, cwd: tempDir });
+
+    const syncedManifest = loadManifest(tempDir);
+    expect(syncedManifest?.models?.['product-planning']).toBe('gemini-4-argon-medium');
+  });
 });
+

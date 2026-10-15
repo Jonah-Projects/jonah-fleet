@@ -100,6 +100,7 @@ describe('Manifest generation', () => {
     expect(manifest.models).toBeDefined();
     expect(manifest.models?.default).toBe('gemini-3.8-flash-high');
     expect(manifest.models?.['issues-housekeeping']).toBe('gemini-3.8-flash-medium');
+    expect(manifest.models?.['product-planning']).toBe('gemini-4-argon-medium');
     expect(manifest.budgets).toBeDefined();
     expect(manifest.budgets?.weeklyTokens).toBe(8_750_000);
     expect(manifest.budgets?.timeoutMinutes?.autowork).toBe(60);
@@ -116,6 +117,11 @@ describe('Manifest generation', () => {
     const housekeeping = resolveRoutineConfig(null, 'issues-housekeeping');
     expect(housekeeping.model).toBe('gemini-3.8-flash-medium');
     expect(housekeeping.timeoutMinutes).toBe(40);
+
+    const productPlanning = resolveRoutineConfig(null, 'product-planning');
+    expect(productPlanning.model).toBe('gemini-4-argon-medium');
+    expect(productPlanning.timeoutMinutes).toBe(45);
+    expect(productPlanning.maxIterations).toBe(40);
   });
 
   it('resolves routine configuration with manifest overrides', async () => {

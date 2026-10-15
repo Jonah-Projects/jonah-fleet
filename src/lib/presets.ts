@@ -101,7 +101,7 @@ export const DEFAULT_ROUTINE_MODELS: Record<string, string> = {
   optimizer: 'gemini-3.8-flash-medium',
   'issues-housekeeping': 'gemini-3.8-flash-medium',
   'dependency-update-security-check': 'gemini-3.8-flash-medium',
-  'product-planning': 'gemini-3.8-flash-high',
+  'product-planning': 'gemini-4-argon-medium',
   'analytics-review': 'gemini-3.8-flash-medium',
   'design-review': 'gemini-3.8-flash-high',
 };
@@ -134,6 +134,7 @@ export const DEFAULT_MODELS_CONFIG: RoutineModels = {
   optimizer: 'gemini-3.8-flash-medium',
   'issues-housekeeping': 'gemini-3.8-flash-medium',
   'dependency-update-security-check': 'gemini-3.8-flash-medium',
+  'product-planning': 'gemini-4-argon-medium',
   'analytics-review': 'gemini-3.8-flash-medium',
 };
 
