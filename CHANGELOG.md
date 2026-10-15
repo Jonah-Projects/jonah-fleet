@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.37.2...v1.38.0) (2026-10-15)
+
+
+### Features
+
+* **presets,sync:** switch product-planning default model to gemini-4-argon-medium ([25856f3](https://github.com/Jonah-Projects/jonah-fleet/commit/25856f3e3348c4c38af889dafb19d0ba56b52c2d))
+
 ## [2026-10-15]
 
 ### Changed
