@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.39.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.38.0...v1.39.0) (2026-10-17)
+
+
+### Features
+
+* **daemon:** tighten default autowork backlog cadence to 5 minutes ([#749](https://github.com/Jonah-Projects/jonah-fleet/issues/749)) ([043506a](https://github.com/Jonah-Projects/jonah-fleet/commit/043506abab2061506c75326a3e70edf24cbb0913))
+
 ## [Unreleased] - 2026-10-17
 
 ### Changed
