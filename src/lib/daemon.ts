@@ -554,6 +554,7 @@ export interface BacklogPR {
   isDraft?: boolean;
   labels?: Array<{ name: string } | string>;
   assignees?: Array<{ login: string }>;
+  comments?: Array<{ body?: string }>;
   url?: string;
 }
 
@@ -606,7 +607,13 @@ export function classifyBacklogIssues(
     const prLabelNames = (pr.labels || []).map((l) =>
       (typeof l === 'string' ? l : l.name).toLowerCase()
     );
-    const hasNeedsHuman = prLabelNames.includes('needs-human');
+    const hasEscalationComment = (pr.comments || []).some((c) =>
+      /🛑\s*Escalation:\s*Human Decision Required|Ping-Pong Cap/i.test(c.body || '')
+    );
+    const hasNeedsHuman =
+      prLabelNames.includes('needs-human') ||
+      prLabelNames.includes('needs-attention') ||
+      hasEscalationComment;
     const hasHumanAssignee = (pr.assignees || []).some((a) => !isBotLogin(a.login));
 
     let hasKnownIssue = false;
@@ -647,10 +654,12 @@ export function classifyBacklogIssues(
       continue;
     }
 
-    // 2. Gated by human (needs-human, needs-attention, radar/intel digest on issue OR on associated draft PR)
+    // 2. Gated by human (needs-human, needs-attention, status:staging, routine:product-planning, radar/intel digest on issue OR on associated draft PR)
     if (
       labelNames.includes('needs-human') ||
       labelNames.includes('needs-attention') ||
+      labelNames.includes('status:staging') ||
+      labelNames.includes('routine:product-planning') ||
       labelNames.includes('radar') ||
       isRadarDigestTitle(issue.title) ||
       gatedDraftPRReferencedIssues.has(issue.number)
@@ -758,7 +767,7 @@ export async function getOpenPRsForBacklog(
   try {
     const { stdout } = await execFileAsync(
       'gh',
-      ['pr', 'list', '--state', 'open', '--json', 'number,title,body,headRefName,isDraft,labels,assignees,url', '--limit', '50'],
+      ['pr', 'list', '--state', 'open', '--json', 'number,title,body,headRefName,isDraft,labels,assignees,comments,url', '--limit', '50'],
       { cwd: repoRoot, timeout: 5000 }
     );
     return JSON.parse(stdout || '[]') as BacklogPR[];

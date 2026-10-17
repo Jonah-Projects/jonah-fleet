@@ -166,6 +166,53 @@ describe('Daemon Autowork Backlog Preflight & Classification', () => {
       expect(report.actionable).toHaveLength(0);
     });
 
+    it('classifies issues with draft PRs containing Ping-Pong Cap escalation comments as gatedHuman', () => {
+      const issues: BacklogIssue[] = [
+        {
+          number: 5347,
+          title: 'feat(auth): In-situ modal authentication expansion',
+          labels: [{ name: 'priority/P2' }, { name: 'autowork-candidate' }],
+          assignees: [{ login: 'jonah-fleet-bot' }],
+        },
+      ];
+      const openPRs = [
+        {
+          number: 5357,
+          title: 'feat(auth): expand in-situ modal authentication (#5347)',
+          body: 'Closes #5347',
+          headRefName: 'feat/modal-auth-group-join-5347',
+          isDraft: true,
+          labels: [{ name: 'priority/P2' }],
+          comments: [
+            {
+              body: '## 🛑 Escalation: Human Decision Required (Ping-Pong Cap · Step 3b)\n\nLeaving PR in draft for human review.',
+            },
+          ],
+        },
+      ];
+
+      const report = classifyBacklogIssues(issues, openPRs);
+      expect(report.gatedHuman).toHaveLength(1);
+      expect(report.gatedHuman[0].number).toBe(5347);
+      expect(report.actionable).toHaveLength(0);
+    });
+
+    it('classifies status:staging and routine:product-planning issues as gatedHuman', () => {
+      const issues: BacklogIssue[] = [
+        {
+          number: 5352,
+          title: '🗺️ Product Plan — 2026-11-01 (Staging)',
+          labels: [{ name: 'routine:product-planning' }, { name: 'status:staging' }],
+          assignees: [],
+        },
+      ];
+
+      const report = classifyBacklogIssues(issues);
+      expect(report.gatedHuman).toHaveLength(1);
+      expect(report.gatedHuman[0].number).toBe(5352);
+      expect(report.actionable).toHaveLength(0);
+    });
+
     it('classifies issues with human-assigned draft PRs as inProgress', () => {
       const issues: BacklogIssue[] = [
         {
