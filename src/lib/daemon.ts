@@ -94,7 +94,7 @@ export interface DaemonState {
 export interface DaemonOptions {
   interval?: number; // legacy fallback interval (minutes)
   reviewInterval?: number; // minutes (default: 3)
-  autoworkInterval?: number; // minutes (default: 30)
+  autoworkInterval?: number; // minutes (default: 5)
   quotaCooldownMinutes?: number; // minutes to pause checks on quota exhaustion (default: 15)
   prFailureCooldownMinutes?: number; // minutes to cooldown a failing PR before retrying (default: 15)
   routines?: string[];
@@ -795,7 +795,7 @@ export async function startBackgroundDaemon(repoRoot: string, options: DaemonOpt
   }
 
   const reviewInterval = options.reviewInterval || 3;
-  const autoworkInterval = options.autoworkInterval || options.interval || 30;
+  const autoworkInterval = options.autoworkInterval || options.interval || 5;
   const routines = options.routines || ['peer-review', 'autowork'];
   const fullBurn = isFullBurnEnabled(options, undefined, repoRoot);
 
@@ -1501,7 +1501,7 @@ export function initializeDaemonState(
   options: DaemonOptions = {}
 ): { state: DaemonState; failureCooldowns: Map<number, PRFailureRecord> } {
   const reviewInterval = options.reviewInterval || 3;
-  const autoworkInterval = options.autoworkInterval || options.interval || 30;
+  const autoworkInterval = options.autoworkInterval || options.interval || 5;
   const routines = options.routines || ['peer-review', 'autowork'];
 
   const existingState = readDaemonState(repoRoot);
@@ -1533,7 +1533,7 @@ export function initializeDaemonState(
  */
 export async function runDaemonLoop(repoRoot: string, options: DaemonOptions = {}): Promise<void> {
   const reviewInterval = options.reviewInterval || 3;
-  const autoworkInterval = options.autoworkInterval || options.interval || 30;
+  const autoworkInterval = options.autoworkInterval || options.interval || 5;
   const routines = options.routines || ['peer-review', 'autowork'];
 
   const { state, failureCooldowns } = initializeDaemonState(repoRoot, options);

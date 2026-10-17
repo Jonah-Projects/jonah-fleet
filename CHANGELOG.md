@@ -5,6 +5,12 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-10-17
+
+### Changed
+
+* **daemon:** tighten default autowork backlog polling cadence from 30 minutes to 5 minutes (`--autowork-interval` default: 5m) enabled by provider plan usage cap protection
+
 ## [1.38.0](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.37.2...v1.38.0) (2026-10-15)
 
 
