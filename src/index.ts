@@ -37,7 +37,7 @@ program
   .description('Manage background local worker daemon polling for unclaimed issues and pull requests')
   .option('-i, --interval <minutes>', 'Legacy global polling interval in minutes (default: 30)')
   .option('--review-interval <minutes>', 'Peer Review watchdog cadence in minutes (default: 3)')
-  .option('--autowork-interval <minutes>', 'Autowork backlog cadence in minutes (default: 30)')
+  .option('--autowork-interval <minutes>', 'Autowork backlog cadence in minutes (default: 5)')
   .option('-r, --routines <list>', 'Comma-separated routines to run (default: peer-review,autowork)')
   .option('-m, --model <model>', 'LLM model override')
   .option('--foreground', 'Run daemon in foreground with live console logs')

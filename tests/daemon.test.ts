@@ -142,6 +142,22 @@ describe('Local Agent Daemon Manager', () => {
     expect(persisted?.failureCooldowns).toEqual(existingState.failureCooldowns);
   });
 
+  it('defaults autowork cadence to 5 minutes and review watchdog to 3 minutes when options are omitted', () => {
+    const { state } = initializeDaemonState(tmpRepo);
+    expect(state.autoworkIntervalMinutes).toBe(5);
+    expect(state.reviewIntervalMinutes).toBe(3);
+
+    const persisted = readDaemonState(tmpRepo);
+    expect(persisted?.autoworkIntervalMinutes).toBe(5);
+    expect(persisted?.reviewIntervalMinutes).toBe(3);
+  });
+
+  it('honors legacy interval option as fallback for autowork cadence when autoworkInterval is omitted', () => {
+    const { state } = initializeDaemonState(tmpRepo, { interval: 15 });
+    expect(state.autoworkIntervalMinutes).toBe(15);
+    expect(state.reviewIntervalMinutes).toBe(3);
+  });
+
   it('correctly evaluates isPRCiGreen and rejects completed checks with missing/empty conclusion', () => {
     // Empty conclusion on COMPLETED status is a bogus green defect and must return false
     const prWithEmptyConclusion = {
