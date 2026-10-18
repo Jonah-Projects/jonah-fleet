@@ -5,6 +5,13 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.39.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.39.1...v1.39.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* **prompts:** exclude escalated draft PRs and staging product plans from autowork convergence and candidate selection ([#768](https://github.com/Jonah-Projects/jonah-fleet/issues/768)) ([47f6e3f](https://github.com/Jonah-Projects/jonah-fleet/commit/47f6e3f64f61dcbc9b66eb3e0579954e6f4871f2)), closes [#767](https://github.com/Jonah-Projects/jonah-fleet/issues/767)
+
 ## [1.39.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.39.0...v1.39.1) (2026-10-17)
 
 
