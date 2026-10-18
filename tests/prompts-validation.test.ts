@@ -897,5 +897,29 @@ describe("Prompt Validation & Invariants", () => {
       /Pull requests actively claimed by peer review \(`Starting review \(round N\)` within 2 hours\)/,
     );
   });
+
+  it("validates autowork.md and ORCHESTRATION.md exclude escalated draft PRs and staging product plans from autowork backlog and apply needs-human on ping-pong cap", () => {
+    const autoworkPath = path.join(promptsDir, "autowork.md");
+    const orchestrationPath = path.join(templatesDir, "prompts", "ORCHESTRATION.md");
+
+    const autoworkContent = fs.readFileSync(autoworkPath, "utf8");
+    const orchestrationContent = fs.readFileSync(orchestrationPath, "utf8");
+
+    // autowork.md Phase 1 excludes escalated draft PRs carrying needs-human, needs-attention, or escalation cards
+    expect(autoworkContent).toContain("Escalated Draft PR & Human-Gated Invariant");
+    expect(autoworkContent).toMatch(/needs-human/);
+    expect(autoworkContent).toMatch(/🛑\s*Escalation:\s*Human Decision Required/);
+
+    // autowork.md Step 3b explicitly applies needs-human label on ping-pong cap
+    expect(autoworkContent).toMatch(/gh pr edit <PR> --add-label "needs-human"/);
+
+    // autowork.md Phase 2 Step 8 includes staging and product planning exclusions in server-side query
+    expect(autoworkContent).toContain("-label:status:staging");
+    expect(autoworkContent).toContain("-label:routine:product-planning");
+    expect(autoworkContent).toContain("-label:routine-log");
+
+    // ORCHESTRATION.md documents the escalated draft PR invariant
+    expect(orchestrationContent).toContain("Escalated Draft PR & Human-Gated Invariant");
+  });
 });
 
