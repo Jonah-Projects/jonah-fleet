@@ -4,8 +4,8 @@ on:
   pull_request:
     types: [ready_for_review, opened, reopened, synchronize, review_requested]
   schedule:
-    # Periodic scan sweep every 2 hours to catch and recover any orphaned or unreviewed ready PRs
-    - cron: '45 */2 * * *'
+    # Periodic scan sweep every 6 hours to catch and recover any orphaned or unreviewed ready PRs
+    - cron: '45 */6 * * *'
   workflow_dispatch:
     inputs:
       pr_number:
@@ -19,7 +19,9 @@ jobs:
       (github.event_name == 'pull_request' &&
        github.event.pull_request.draft == false &&
        github.event.pull_request.head.repo.full_name == github.repository &&
-       !startsWith(github.event.pull_request.head.ref, 'release-please--')) ||
+       !startsWith(github.event.pull_request.head.ref, 'release-please--') &&
+       (contains(github.event.pull_request.labels.*.name, 'priority/P0') ||
+        contains(github.event.pull_request.labels.*.name, 'priority/P1'))) ||
       (github.event_name == 'schedule') ||
       (github.event_name == 'workflow_dispatch')
     concurrency:
@@ -44,9 +46,20 @@ jobs:
         run: |
           if [ -z "$PR_NUM" ]; then
             if [ "$EVENT_NAME" = "schedule" ]; then
-              open_prs=$(gh api "repos/${REPOSITORY}/pulls?state=open&per_page=1" --jq 'length' 2>/dev/null || echo "0")
+              CUTOFF_TS=$(( $(date -u +%s) - 172800 ))
+              open_prs=$(gh api "repos/${REPOSITORY}/pulls?state=open&per_page=50" --jq '
+                [ .[]
+                  | select(.draft != true)
+                  | select((.head.ref | startswith("release-please--")) | not)
+                  | select(
+                      ([.labels[]?.name] | any(. == "priority/P0" or . == "priority/P1")) or
+                      (([.labels[]?.name] | any(. == "priority/P2" or . == "priority/P3")) | not) or
+                      ((.created_at | fromdateiso8601) <= '"$CUTOFF_TS"')
+                    )
+                ] | length
+              ' 2>/dev/null || echo "0")
               if [ "$open_prs" -eq "0" ]; then
-                echo "No open PRs found in ${REPOSITORY} — skipping scheduled review routine scan."
+                echo "No eligible ready PRs found in ${REPOSITORY} — skipping scheduled review routine scan."
                 echo "skip=true" >> "$GITHUB_OUTPUT"
                 exit 0
               fi

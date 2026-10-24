@@ -32,7 +32,32 @@ jobs:
       statuses: write
       actions: read
     steps:
+      - name: Preflight work check
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+          TARGET_ARG: ${{ inputs.target_issue || inputs.issue_number }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "$EVENT_NAME" = "schedule" ] && [ -z "$TARGET_ARG" ]; then
+            open_prs=$(gh api "repos/${REPOSITORY}/pulls?state=open&per_page=30" --jq '
+              [ .[]
+                | select((.head.ref | startswith("release-please--")) | not)
+                | select((.draft == true and ([.labels[]?.name] | any(. == "needs-human" or . == "needs-attention"))) | not)
+              ] | length
+            ' 2>/dev/null || echo "1")
+            open_issues=$(gh issue list --repo "$REPOSITORY" --state open --search "-label:routine-log -label:status:staging -label:routine:product-planning -label:measurement -label:needs-human -label:needs-design -label:wontfix -label:needs-info" --limit 20 --json number --jq 'length' 2>/dev/null || echo "1")
+            if [ "${open_prs:-0}" -eq 0 ] && [ "${open_issues:-0}" -eq 0 ]; then
+              echo "No open actionable issues or non-release PRs found in ${REPOSITORY} — skipping scheduled autowork scan."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
       - name: Checkout repository
+        if: steps.guard.outputs.skip != 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -40,11 +65,13 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
+        if: steps.guard.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Configure Git author identity
+        if: steps.guard.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
@@ -67,6 +94,7 @@ jobs:
           gh auth setup-git
 
       - name: Cache Antigravity CLI
+        if: steps.guard.outputs.skip != 'true'
         id: cache-agy
         uses: actions/cache@v4
         with:
@@ -74,14 +102,16 @@ jobs:
           key: agy-cli-linux-amd64-v1
 
       - name: Install Antigravity CLI
-        if: steps.cache-agy.outputs.cache-hit != 'true'
+        if: steps.guard.outputs.skip != 'true' && steps.cache-agy.outputs.cache-hit != 'true'
         run: |
           curl -fsSL https://antigravity.google/cli/install.sh | bash
 
       - name: Add Antigravity CLI to PATH
+        if: steps.guard.outputs.skip != 'true'
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Write Antigravity OAuth Token
+        if: steps.guard.outputs.skip != 'true'
         env:
           ANTIGRAVITY_OAUTH_TOKEN: ${{ secrets.ANTIGRAVITY_OAUTH_TOKEN || secrets.GEMINI_API_KEY }}
         run: |
@@ -95,6 +125,7 @@ jobs:
           chmod 600 "$HOME/.gemini/antigravity-cli/antigravity-oauth-token"
 
       - name: Preflight validation
+        if: steps.guard.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -109,6 +140,7 @@ jobs:
           echo "✓ Preflight credential and GitHub CLI validation passed."
 
       - name: Discover domain skills
+        if: steps.guard.outputs.skip != 'true'
         id: skills
         run: |
           SKILLS_PROMPT=""
@@ -122,6 +154,7 @@ jobs:
           echo "skills_prompt=$SKILLS_PROMPT" >> "$GITHUB_OUTPUT"
 
       - name: Resolve routine configuration
+        if: steps.guard.outputs.skip != 'true'
         id: routine-config
         run: |
           ROUTINE="autowork"
@@ -172,7 +205,7 @@ jobs:
           fi
 
       - name: Initialize Routine Run Issue
-        if: steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule'
+        if: steps.guard.outputs.skip != 'true' && (steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule')
         id: run-issue
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
@@ -202,7 +235,7 @@ jobs:
           echo "ROUTINE_ISSUE_NUMBER=$ISSUE_NUMBER" >> "$GITHUB_ENV"
 
       - name: Run Autowork
-        if: steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule'
+        if: steps.guard.outputs.skip != 'true' && (steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule')
         timeout-minutes: 60
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -247,7 +280,7 @@ jobs:
           fi
 
       - name: Emit run summary
-        if: always() && (steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule')
+        if: always() && steps.guard.outputs.skip != 'true' && (steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule')
         run: |
           if [ "$QUOTA_PAUSED" = "true" ]; then
             echo "### ⏸️ Milestone: Routine Execution Quota-Paused" >> "$GITHUB_STEP_SUMMARY"
@@ -261,7 +294,7 @@ jobs:
           fi
 
       - name: Emit Fleet Telemetry (Opt-in)
-        if: always() && (steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule')
+        if: always() && steps.guard.outputs.skip != 'true' && (steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule')
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
           TELEMETRY_ENDPOINT: ${{ secrets.JONAH_FLEET_TELEMETRY_ENDPOINT }}
@@ -275,7 +308,7 @@ jobs:
           fi
 
       - name: Verify Atomic Handoff Invariant (PR Existence Guard)
-        if: always() && (steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule')
+        if: always() && steps.guard.outputs.skip != 'true' && (steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -296,7 +329,7 @@ jobs:
           fi
 
       - name: Reconcile Routine Run Issue
-        if: always() && (steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule')
+        if: always() && steps.guard.outputs.skip != 'true' && (steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule')
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
           ISSUE_NUMBER: ${{ steps.run-issue.outputs.issue_number }}

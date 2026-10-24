@@ -463,6 +463,62 @@ describe('Workflow Validation & Invariants', () => {
       expect(content, `${file} must guard Initialize Routine Run Issue with enabled check`).toContain("steps.routine-config.outputs.enabled != 'false' || github.event_name != 'schedule'");
     }
   });
+
+  it('optimizes trigger-review-routine.yml with job-level P0/P1 filter, 6-hour cron sweep, and non-draft scheduled preflight', () => {
+    const templatePath = path.join(workflowsDir, 'trigger-review-routine.yml');
+    const githubPath = path.join(process.cwd(), '.github/workflows/trigger-review-routine.yml');
+
+    for (const filePath of [templatePath, githubPath]) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      expect(content).toContain("cron: '45 */6 * * *'");
+      expect(content).toContain("contains(github.event.pull_request.labels.*.name, 'priority/P0')");
+      expect(content).toContain("contains(github.event.pull_request.labels.*.name, 'priority/P1')");
+      expect(content).toContain('.draft != true');
+      expect(content).toContain('startswith("release-please--")) | not');
+    }
+  });
+
+  it('optimizes autowork-cron.yml with a zero-token preflight guard before checkout and issue creation', () => {
+    const templatePath = path.join(workflowsDir, 'autowork-cron.yml');
+    const githubPath = path.join(process.cwd(), '.github/workflows/autowork-cron.yml');
+
+    for (const filePath of [templatePath, githubPath]) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const guardIdx = content.indexOf('name: Preflight work check');
+      const checkoutIdx = content.indexOf('name: Checkout repository');
+      const issueIdx = content.indexOf('name: Initialize Routine Run Issue');
+
+      expect(guardIdx).toBeGreaterThan(-1);
+      expect(guardIdx).toBeLessThan(checkoutIdx);
+      expect(checkoutIdx).toBeLessThan(issueIdx);
+      expect(content).toContain("steps.guard.outputs.skip != 'true'");
+      expect(content).toContain('-label:routine-log');
+    }
+  });
+
+  it('optimizes trigger-autowork-on-bug.yml to filter out unrelated label events and routine-log issues at the job level', () => {
+    const templatePath = path.join(workflowsDir, 'trigger-autowork-on-bug.yml');
+    const githubPath = path.join(process.cwd(), '.github/workflows/trigger-autowork-on-bug.yml');
+
+    for (const filePath of [templatePath, githubPath]) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      expect(content).toContain("!contains(github.event.issue.labels.*.name, 'routine-log')");
+      expect(content).toContain("github.event.label.name == 'bug'");
+      expect(content).toContain("github.event.label.name == 'priority/P1'");
+      expect(content).toContain("github.event.label.name == 'priority/P0'");
+    }
+  });
+
+  it('optimizes trigger-autowork-on-merge.yml preflight to skip when no actionable open issues or draft PRs exist', () => {
+    const templatePath = path.join(workflowsDir, 'trigger-autowork-on-merge.yml');
+    const githubPath = path.join(process.cwd(), '.github/workflows/trigger-autowork-on-merge.yml');
+
+    for (const filePath of [templatePath, githubPath]) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      expect(content).toContain('-label:routine-log');
+      expect(content).toContain('No open actionable issues or draft PRs found after merge');
+    }
+  });
 });
 
 
