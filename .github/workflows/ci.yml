@@ -3,8 +3,16 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '.github/prompts/logs/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '.github/prompts/logs/**'
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || format('{0}-{1}', github.event_name, github.ref) }}
+  cancel-in-progress: true
 
 jobs:
   test:

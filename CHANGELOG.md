@@ -5,6 +5,12 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-10-24]
+
+### Changed
+
+* **workflows:** optimize GitHub Actions runner consumption across `trigger-review-routine.yml`, `autowork-cron.yml`, `trigger-autowork-on-bug.yml`, and `trigger-autowork-on-merge.yml` by moving `priority/P0` and `priority/P1` PR filters to the job-level `if:` condition, adding zero-token preflight work checks before repository checkout and routine issue creation, filtering out `routine-log` and unrelated label events on bug triggers, and shifting the default review watchdog cron from 2h to 6h (`45 */6 * * *`).
+
 ## [1.39.2](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.39.1...v1.39.2) (2026-10-18)
 
 
