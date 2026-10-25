@@ -47,7 +47,7 @@ jobs:
                 | select((.draft == true and ([.labels[]?.name] | any(. == "needs-human" or . == "needs-attention"))) | not)
               ] | length
             ' 2>/dev/null || echo "1")
-            open_issues=$(gh issue list --repo "$REPOSITORY" --state open --search "-label:routine-log -label:status:staging -label:routine:product-planning -label:measurement -label:needs-human -label:needs-design -label:wontfix -label:needs-info" --limit 20 --json number --jq 'length' 2>/dev/null || echo "1")
+            open_issues=$(gh issue list --repo "$REPOSITORY" --state open --search "-label:routine-log -label:status:staging -label:routine:product-planning -label:measurement -label:needs-human -label:needs-design -label:wontfix -label:needs-info -label:needs-attention" --limit 20 --json number --jq 'length' 2>/dev/null || echo "1")
             if [ "${open_prs:-0}" -eq 0 ] && [ "${open_issues:-0}" -eq 0 ]; then
               echo "No open actionable issues or non-release PRs found in ${REPOSITORY} — skipping scheduled autowork scan."
               echo "skip=true" >> "$GITHUB_OUTPUT"
