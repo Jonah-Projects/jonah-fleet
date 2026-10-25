@@ -42,7 +42,7 @@ jobs:
             fi
           fi
           # Skip if no open actionable issues or bounced draft PRs exist to work on
-          open_issues=$(gh issue list --repo "$OWNER/$REPO" --state open --search "-label:routine-log -label:status:staging -label:routine:product-planning -label:measurement -label:needs-human -label:needs-design -label:wontfix -label:needs-info" --limit 20 --json number --jq 'length' 2>/dev/null || echo "1")
+          open_issues=$(gh issue list --repo "$OWNER/$REPO" --state open --search "-label:routine-log -label:status:staging -label:routine:product-planning -label:measurement -label:needs-human -label:needs-design -label:wontfix -label:needs-info -label:needs-attention" --limit 20 --json number --jq 'length' 2>/dev/null || echo "1")
           open_draft_prs=$(gh api "repos/$OWNER/$REPO/pulls?state=open&per_page=30" --jq '[ .[] | select(.draft == true and ((.head.ref | startswith("release-please--")) | not) and (([.labels[]?.name] | any(. == "needs-human" or . == "needs-attention")) | not)) ] | length' 2>/dev/null || echo "1")
           if [ "${open_issues:-0}" -eq 0 ] && [ "${open_draft_prs:-0}" -eq 0 ]; then
             echo "No open actionable issues or draft PRs found after merge — skipping autowork fire."

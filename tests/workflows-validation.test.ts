@@ -493,6 +493,7 @@ describe('Workflow Validation & Invariants', () => {
       expect(checkoutIdx).toBeLessThan(issueIdx);
       expect(content).toContain("steps.guard.outputs.skip != 'true'");
       expect(content).toContain('-label:routine-log');
+      expect(content).toContain('-label:needs-attention');
     }
   });
 
@@ -516,6 +517,7 @@ describe('Workflow Validation & Invariants', () => {
     for (const filePath of [templatePath, githubPath]) {
       const content = fs.readFileSync(filePath, 'utf8');
       expect(content).toContain('-label:routine-log');
+      expect(content).toContain('-label:needs-attention');
       expect(content).toContain('No open actionable issues or draft PRs found after merge');
     }
   });
