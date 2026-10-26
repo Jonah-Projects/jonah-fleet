@@ -5,6 +5,14 @@ All notable changes to `jonah-fleet` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.40.1](https://github.com/Jonah-Projects/jonah-fleet/compare/v1.40.0...v1.40.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* **security:** resolve High and Moderate vulnerabilities in vitest, vite, and @vitest/mocker ([#832](https://github.com/Jonah-Projects/jonah-fleet/issues/832)) ([08a1928](https://github.com/Jonah-Projects/jonah-fleet/commit/08a1928a21f1dd95447761768f05d78631de1a6e))
+* **workflows:** exclude needs-attention issues from autowork preflight candidate checks ([#824](https://github.com/Jonah-Projects/jonah-fleet/issues/824)) ([94d7b48](https://github.com/Jonah-Projects/jonah-fleet/commit/94d7b4873579d356e3be63941eb09b4eb84701cc)), closes [#823](https://github.com/Jonah-Projects/jonah-fleet/issues/823)
+
 ## [2026-10-26]
 
 ### Security
