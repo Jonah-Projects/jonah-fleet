@@ -98,7 +98,7 @@ describe('Manifest generation', () => {
   it('includes default models and budgets in standard manifest', () => {
     const manifest = createDefaultManifest('standard');
     expect(manifest.models).toBeDefined();
-    expect(manifest.models?.default).toBe('gemini-3.8-flash-high');
+    expect(manifest.models?.default).toBe('gemini-4-hydrogen-medium');
     expect(manifest.models?.['issues-housekeeping']).toBe('gemini-3.8-flash-medium');
     expect(manifest.models?.['product-planning']).toBe('gemini-4-argon-medium');
     expect(manifest.budgets).toBeDefined();
@@ -110,7 +110,7 @@ describe('Manifest generation', () => {
   it('resolves routine configuration with defaults when manifest is empty', async () => {
     const { resolveRoutineConfig } = await import('../src/lib/manifest.js');
     const config = resolveRoutineConfig(null, 'autowork');
-    expect(config.model).toBe('gemini-3.8-flash-high');
+    expect(config.model).toBe('gemini-4-hydrogen-medium');
     expect(config.timeoutMinutes).toBe(60);
     expect(config.maxIterations).toBe(65);
 

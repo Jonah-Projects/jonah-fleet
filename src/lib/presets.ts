@@ -96,14 +96,14 @@ export interface LessonsConfig {
 }
 
 export const DEFAULT_ROUTINE_MODELS: Record<string, string> = {
-  autowork: 'gemini-3.8-flash-high',
+  autowork: 'gemini-4-hydrogen-medium',
   'peer-review': 'gemini-3.8-flash-medium',
   optimizer: 'gemini-3.8-flash-medium',
   'issues-housekeeping': 'gemini-3.8-flash-medium',
   'dependency-update-security-check': 'gemini-3.8-flash-medium',
   'product-planning': 'gemini-4-argon-medium',
   'analytics-review': 'gemini-3.8-flash-medium',
-  'design-review': 'gemini-3.8-flash-high',
+  'design-review': 'gemini-4-hydrogen-medium',
 };
 
 export const DEFAULT_ROUTINE_TIMEOUTS: Record<string, number> = {
@@ -129,7 +129,7 @@ export const DEFAULT_ROUTINE_MAX_ITERATIONS: Record<string, number> = {
 };
 
 export const DEFAULT_MODELS_CONFIG: RoutineModels = {
-  default: 'gemini-3.8-flash-high',
+  default: 'gemini-4-hydrogen-medium',
   'peer-review': 'gemini-3.8-flash-medium',
   optimizer: 'gemini-3.8-flash-medium',
   'issues-housekeeping': 'gemini-3.8-flash-medium',

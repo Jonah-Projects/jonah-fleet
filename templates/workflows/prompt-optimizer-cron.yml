@@ -86,7 +86,7 @@ jobs:
         id: routine-config
         run: |
           ROUTINE="optimizer"
-          DEFAULT_MODEL="gemini-3.8-flash-high"
+          DEFAULT_MODEL="gemini-3.8-flash-medium"
           DEFAULT_TIMEOUT="35"
 
           MODEL="$DEFAULT_MODEL"
@@ -167,7 +167,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
           ROUTINE: optimizer
           ROUTINE_ISSUE_NUMBER: ${{ steps.run-issue.outputs.issue_number }}
-          MODEL: ${{ steps.routine-config.outputs.model || 'gemini-3.8-flash-high' }}
+          MODEL: ${{ steps.routine-config.outputs.model || 'gemini-3.8-flash-medium' }}
           PRINT_TIMEOUT: ${{ steps.routine-config.outputs.print_timeout || '35m' }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}

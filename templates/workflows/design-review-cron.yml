@@ -163,7 +163,7 @@ jobs:
           set +e
           node .github/scripts/run-with-loop-guard.js \
             -p "$PROMPT" \
-            --model gemini-3.8-flash-high \
+            --model gemini-4-hydrogen-medium \
             --output-format text \
             --print-timeout 50m \
             --dangerously-skip-permissions 2>&1 | tee /tmp/agy.log
